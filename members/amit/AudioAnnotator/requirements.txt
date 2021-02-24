@@ -1,0 +1,4 @@
+dearpygui==0.6.213
+numpy==1.20.1
+scipy==1.6.1
+simpleaudio==1.0.4
