@@ -1,0 +1,1 @@
+This directory contains code for nsynth guitar subset analysis 
