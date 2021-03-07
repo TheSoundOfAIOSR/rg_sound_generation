@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+     <link rel="stylesheet" href="https://www.w3schools.com/w3css/4/w3.css">
+
+    <title>Audio Annotator</title>
+</head>
+<body>
+     <div class="w3-container w3-margin w3-teal">
+         <h1>Audio Annotator</h1>
+     </div>
+     <hr />
+     <div class="w3-container w3-margin">
+         <h3>Audio</h3>
+         <p>File name: {{ key }}</p>
+         <audio controls>
+             <source src="{{ audio_path }}" type="audio/wav">
+             Your browser does not support the audio tag.
+         </audio>
+         <h3>Spectrogram</h3>
+            <img src="{{ image_path }}" />
+
+         <h3>Enter Qualities</h3>
+         <p>Please enter up to 6 qualities</p>
+         <form class="w3-container" action="{{ url_for('main.index') }}" method="post">
+              <div class="w3-row-padding">
+                  <div class="w3-third">
+                      <input class="w3-input w3-border" type="text" placeholder="One" name="q1">
+                  </div>
+                  <div class="w3-third">
+                      <input class="w3-input w3-border" type="text" placeholder="Two" name="q2">
+                  </div>
+                  <div class="w3-third">
+                      <input class="w3-input w3-border" type="text" placeholder="Three" name="q3">
+                  </div>
+              </div>
+             <div class="w3-row-padding">
+                  <div class="w3-third">
+                      <input class="w3-input w3-border" type="text" placeholder="Four" name="q4">
+                  </div>
+                  <div class="w3-third">
+                      <input class="w3-input w3-border" type="text" placeholder="Five" name="q5">
+                  </div>
+                  <div class="w3-third">
+                      <input class="w3-input w3-border" type="text" placeholder="Six" name="q6">
+                  </div>
+              </div>
+             <div class="w3-padding">
+                 <button class="w3-button w3-teal" type="submit">Save</button>
+             </div>
+         </form>
+     </div>
+</body>
+</html>
