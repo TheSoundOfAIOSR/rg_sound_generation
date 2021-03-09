@@ -48,10 +48,12 @@ def _int64_feature(value):
 
 # ------------------------------------------------------------------------------
 
-def prepare_partial_tfrecord(dataset_dir='nsynth_guitar',
-                             split='train',
-                             sample_rate=16000,
-                             frame_rate=250):
+def prepare_partial_tfrecord(
+        dataset_dir='nsynth_guitar',
+        split='train',
+        sample_rate=16000,
+        frame_rate=250
+):
     split_dir = os.path.join(dataset_dir, split)
     audio_dir = os.path.join(split_dir, 'audio')
     nsynth_dataset_file = os.path.join(split_dir, 'examples.json')
