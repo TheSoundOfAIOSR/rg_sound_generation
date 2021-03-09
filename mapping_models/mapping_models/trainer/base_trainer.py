@@ -1,17 +1,17 @@
 import tensorflow as tf
 import os
 
-from data_providers import CompleteTFRecordProvider
+from mapping_models.data_providers import CompleteTFRecordProvider
 
 
 def create_dataset(
-    dataset_dir='nsynth_guitar',
-    split='train',
-    batch_size=16,
-    example_secs=4,
-    sample_rate=16000,
-    frame_rate=250,
-    map_func=None
+        dataset_dir='nsynth_guitar',
+        split='train',
+        batch_size=16,
+        example_secs=4,
+        sample_rate=16000,
+        frame_rate=250,
+        map_func=None
 ):
     assert os.path.exists(dataset_dir)
 
@@ -33,51 +33,6 @@ def create_dataset(
     )
 
     return dataset
-
-
-def features_map(features):
-    note_number = features['note_number']
-    velocity = features['velocity']
-    instrument_source = features['instrument_source']
-    qualities = features['qualities']
-    f0_scaled = features['f0_scaled']
-    ld_scaled = features['ld_scaled']
-    z = features['z']
-
-    sequence_length = f0_scaled.shape[0]
-
-    def convert_to_sequence(feature):
-        channels = feature.shape[0]
-        feature = tf.expand_dims(feature, axis=0)
-
-        feature = tf.broadcast_to(feature, shape=(sequence_length, channels))
-        feature = tf.cast(feature, dtype=tf.float32)
-
-        return feature
-
-    # Normalize data
-    # 0-127
-    note_number = note_number / 127
-    velocity = velocity / 127
-
-    # 0-2
-    # 0	acoustic, 1	electronic, 2	synthetic
-    instrument_source = instrument_source / 2
-
-    # Prepare dataset for a sequence to sequence mapping
-    note_number = convert_to_sequence(note_number)
-    velocity = convert_to_sequence(velocity)
-    instrument_source = convert_to_sequence(instrument_source)
-    qualities = convert_to_sequence(qualities)
-
-    f0_scaled = tf.expand_dims(f0_scaled, axis=-1)
-    ld_scaled = tf.expand_dims(ld_scaled, axis=-1)
-    z = tf.reshape(z, shape=(sequence_length, 16))
-
-    inputs = tf.concat([note_number, velocity, instrument_source, qualities, z], axis=-1)
-    targets = tf.concat([f0_scaled, ld_scaled], axis=-1)
-
-    return inputs, targets
 
 
 def get_callbacks(checkpoint_file):
@@ -102,9 +57,11 @@ def train(
         model,
         dataset_dir,
         model_dir,
+        features_map=None,
         epochs=20,
         steps_per_epoch=100,
-        validation_steps=10
+        validation_steps=10,
+        load_checkpoint=False
 ):
     # create datasets
     train_dataset = create_dataset(dataset_dir=dataset_dir, split='train', map_func=features_map)
@@ -117,11 +74,14 @@ def train(
 
     print(model.summary())
 
-    checkpoint_dir = 'checkpoints'
+    checkpoint_dir = os.path.join(os.getcwd(), 'checkpoints')
     checkpoint_file = os.path.join(checkpoint_dir, model_dir, 'cp.ckpt')
 
-    if os.path.isdir(checkpoint_dir) and os.listdir(checkpoint_dir):
-        model.load_weights(checkpoint_file)
+    if os.path.isdir(checkpoint_dir) and os.listdir(checkpoint_dir) and load_checkpoint:
+        try:
+            model.load_weights(checkpoint_file)
+        except Exception as e:
+            print(e)
 
     model.fit(
         train_dataset,

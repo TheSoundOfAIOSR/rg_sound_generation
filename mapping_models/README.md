@@ -6,28 +6,29 @@ For a rapid experiment, just use the included trainer script. For example:
 
 ```python
 import tensorflow as tf
-from src import trainer
+from mapping_models import trainer
 
+model = tf.keras.models.load_model('path/to/saved/model')
 
-model = tf.keras.models.Sequential([
-    tf.keras.layers.GRU(32, return_sequences=True),
-    tf.keras.layers.Dense(2, activation='tanh')
-])
-
-
-model.compile(
-    optimizer=tf.keras.optimizers.Adam(learning_rate=0.01),
-    loss=tf.keras.losses.MeanAbsoluteError(),
-    metrics=[tf.keras.losses.MeanSquaredError()]
+trainer.train(
+    model,
+    dataset_dir='your_dataset_dir',
+    model_dir='model_dir_name'
 )
 
-
-if __name__ == '__main__':
-    trainer.train(
-        model,
-        dataset_dir='your_dataset_dir',
-        model_dir='model_dir_name'
-    )
-
 ```
-Complete example: [GRU Test](src/gru_test_model.py)
+Complete example: [GRU Test](examples/gru_test_model.py)
+
+## Installation
+
+Create a virtual environment (recommended)
+
+`virtualenv venv`
+
+Activate it
+
+`venv\scripts\activate`
+
+Install module in edit mode
+
+`python -m pip install -e .`
