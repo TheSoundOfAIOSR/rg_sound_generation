@@ -5,7 +5,7 @@ import os
 import json
 import gin
 import time
-from data_providers import PartialTFRecordProvider
+from mm.data_providers import PartialTFRecordProvider
 from ddsp import spectral_ops
 import ddsp.training.models as models
 import ddsp.training.trainers as trainers

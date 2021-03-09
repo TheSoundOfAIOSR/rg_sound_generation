@@ -1,7 +1,7 @@
 import tensorflow as tf
 import os
 
-from data_providers import CompleteTFRecordProvider
+from mapping_models.data_providers import CompleteTFRecordProvider
 
 
 def create_dataset(

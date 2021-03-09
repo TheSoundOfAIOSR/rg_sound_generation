@@ -5,7 +5,8 @@ Run from command line:
 
 import tensorflow as tf
 import click
-import sys
+
+from mapping_models import trainer
 
 
 def features_map(features):
@@ -59,9 +60,6 @@ def features_map(features):
               help='Name of checkpoint directory, will be created inside the main checkpoint directory')
 @click.option('--epochs', default=1, help='Number of training epochs')
 def train(dataset_dir, model_dir_name, epochs):
-    sys.path.append('..')
-    import trainer
-
     model = tf.keras.models.Sequential([
         tf.keras.layers.GRU(32, return_sequences=True),
         tf.keras.layers.Dense(2, activation='tanh')

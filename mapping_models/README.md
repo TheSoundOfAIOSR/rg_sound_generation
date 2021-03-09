@@ -6,7 +6,7 @@ For a rapid experiment, just use the included trainer script. For example:
 
 ```python
 import tensorflow as tf
-import trainer
+from mapping_models import trainer
 
 model = tf.keras.models.load_model('path/to/saved/model')
 
@@ -18,3 +18,17 @@ trainer.train(
 
 ```
 Complete example: [GRU Test](examples/gru_test_model.py)
+
+## Installation
+
+Create a virtual environment (recommended)
+
+`virtualenv venv`
+
+Activate it
+
+`venv\scripts\activate`
+
+Install module in edit mode
+
+`python -m pip install -e .`
