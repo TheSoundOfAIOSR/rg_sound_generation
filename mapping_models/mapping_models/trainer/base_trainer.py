@@ -35,12 +35,11 @@ def create_dataset(
     return dataset
 
 
-def get_callbacks(checkpoint_file):
+def get_callbacks(checkpoint_file, min_lr=1e-7):
     def scheduler(epoch, lr):
-        if epoch < 10:
-            return lr
-        else:
-            return lr * 0.9
+        if (epoch + 1) % 5 == 0:
+            return max(lr * 0.9, min_lr)
+        return lr
 
     checkpoint = tf.keras.callbacks.ModelCheckpoint(
         filepath=checkpoint_file,
@@ -61,12 +60,17 @@ def train(
         epochs=20,
         steps_per_epoch=100,
         validation_steps=10,
+        batch_size=16,
+        verbose=2,
         load_checkpoint=False
 ):
     # create datasets
-    train_dataset = create_dataset(dataset_dir=dataset_dir, split='train', map_func=features_map)
-    valid_dataset = create_dataset(dataset_dir=dataset_dir, split='valid', map_func=features_map)
-    test_dataset = create_dataset(dataset_dir=dataset_dir, split='test', map_func=features_map)
+    train_dataset = create_dataset(dataset_dir=dataset_dir, split='train',
+                                   map_func=features_map, batch_size=batch_size)
+    valid_dataset = create_dataset(dataset_dir=dataset_dir, split='valid',
+                                   map_func=features_map, batch_size=batch_size)
+    test_dataset = create_dataset(dataset_dir=dataset_dir, split='test',
+                                  map_func=features_map, batch_size=batch_size)
 
     # build model
     x_train, y_train = next(iter(train_dataset))
@@ -89,7 +93,8 @@ def train(
         steps_per_epoch=steps_per_epoch,
         validation_data=valid_dataset,
         validation_steps=validation_steps,
-        callbacks=get_callbacks(checkpoint_file)
+        callbacks=get_callbacks(checkpoint_file),
+        verbose=verbose
     )
 
     # evaluate model
