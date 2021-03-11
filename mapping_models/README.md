@@ -17,8 +17,8 @@ trainer.train(
 )
 
 ```
-Complete example: [GRU Test](examples/gru_test_model.py)
-Colab notebook to train example models: [Colab](https://colab.research.google.com/github/TheSoundOfAIOSR/rg_sound_generation/blob/main/members/fabio/run_training.ipynb)
+Complete example: [GRU Test](examples/gru_test_model.py)  
+Colab notebook to train example models: [Colab](https://colab.research.google.com/github/TheSoundOfAIOSR/rg_sound_generation/blob/main/mapping_models/examples/run_training.ipynb)
 
 ## Installation
 

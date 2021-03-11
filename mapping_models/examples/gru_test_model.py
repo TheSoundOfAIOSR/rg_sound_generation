@@ -5,8 +5,6 @@ Run from command line:
 
 import tensorflow as tf
 import click
-import sys
-sys.path.append('..')
 from mapping_models import trainer
 
 

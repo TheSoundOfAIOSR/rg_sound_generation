@@ -11,8 +11,6 @@ import click
 
 from tensorflow.keras.layers import Input, concatenate, Conv1D, MaxPool1D, Flatten
 from tensorflow.keras.layers import Dense, Reshape
-import sys
-sys.path.append('..')
 from mapping_models import trainer
 
 
