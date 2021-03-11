@@ -5,7 +5,8 @@ Run from command line:
 
 import tensorflow as tf
 import click
-
+import sys
+sys.path.append('..')
 from mapping_models import trainer
 
 
@@ -48,7 +49,8 @@ def features_map(features):
     ld_scaled = tf.expand_dims(ld_scaled, axis=-1)
     z = tf.reshape(z, shape=(sequence_length, 16))
 
-    inputs = tf.concat([note_number, velocity, instrument_source, qualities, z], axis=-1)
+    inputs = tf.concat([note_number, velocity, instrument_source, qualities, z],
+                       axis=-1)
     targets = tf.concat([f0_scaled, ld_scaled], axis=-1)
 
     return inputs, targets
@@ -56,8 +58,9 @@ def features_map(features):
 
 @click.command()
 @click.option('--dataset_dir', help='Location of root directory of the dataset')
-@click.option('--model_dir_name',
-              help='Name of checkpoint directory, will be created inside the main checkpoint directory')
+@click.option('--model_dir_name', help='Name of checkpoint directory, will be '
+                                       'created inside the main checkpoint '
+                                       'directory')
 @click.option('--epochs', default=1, help='Number of training epochs')
 def train(dataset_dir, model_dir_name, epochs):
     model = tf.keras.models.Sequential([
