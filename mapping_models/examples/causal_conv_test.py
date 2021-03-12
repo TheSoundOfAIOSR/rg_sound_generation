@@ -10,7 +10,7 @@ import tensorflow as tf
 import click
 
 from tensorflow.keras.layers import Input, concatenate, Conv1D, MaxPool1D, Flatten
-from tensorflow.keras.layers import Dense, Reshape
+from tensorflow.keras.layers import Dense, Reshape, Dropout
 from mapping_models import trainer
 
 
@@ -44,10 +44,10 @@ def features_map(features):
     instrument_source = instrument_source / 2
 
     # Prepare dataset for a sequence to sequence mapping
-    note_number = convert_to_sequence(note_number) # 1000, 1
+    note_number = convert_to_sequence(note_number)  # 1000, 1
     velocity = convert_to_sequence(velocity)
     instrument_source = convert_to_sequence(instrument_source)
-    qualities = convert_to_sequence(qualities) # 1000, 10
+    qualities = convert_to_sequence(qualities)  # 1000, 10
 
     f0_scaled = tf.expand_dims(f0_scaled, axis=-1)
     ld_scaled = tf.expand_dims(ld_scaled, axis=-1)
@@ -60,7 +60,7 @@ def features_map(features):
         'qualities': qualities,
         'latent_vector': z
     }
-    
+
     outputs = {
         'f0_scaled': f0_scaled,
         'ld_scaled': ld_scaled
@@ -69,38 +69,75 @@ def features_map(features):
     return inputs, outputs
 
 
-def create_model():
+def create_model_single_stage():
     _pitch = Input(shape=(1000, 1), name='pitch')
     _velocity = Input(shape=(1000, 1), name='velocity')
     _instrument_source = Input(shape=(1000, 1), name='instrument_source')
     _qualities = Input(shape=(1000, 10), name='qualities')
     _latent_sample = Input(shape=(1000, 16), name='latent_vector')
-    
-    _input = concatenate([_instrument_source, _qualities, _latent_sample], axis=-1, name='concat_1')
-    
+
+    _input = concatenate([_instrument_source, _qualities, _latent_sample, _velocity, _pitch], axis=-1, name='concat_1')
+
     x = _input
-    
+
     for i in range(0, 4):
-        n_filters = 2**(4 + i)
+        n_filters = 2 ** (5 + i)
         x = Conv1D(n_filters, 5, activation='relu', strides=2, padding='causal', name=f'conv_{i + 1}')(x)
         x = MaxPool1D(pool_size=2, name=f'pool_{i + 1}')(x)
-    
+
     x = Flatten(name='flatten')(x)
-    
-    _pitch_x = Reshape((1000, ), name='pitch_reshaped')(_pitch)
-    _pitch_x = Dense(512, activation='relu', name='pitch_dense_1')(_pitch_x)
-    _f0_x = concatenate([x, _pitch_x], name='concat_f0')
-    
-    _velocity_x = Reshape((1000, ), name='velocity_reshaped')(_velocity)
-    _velocity_x = Dense(512, activation='relu', name='velocity_dense_1')(_velocity_x)
-    _ld_x = concatenate([x, _velocity_x], name='concat_ld')
-    
-    _f0_scaled = Dense(1000, activation='linear', name='f0_scaled')(_f0_x)
-    _ld_scaled = Dense(1000, activation='linear', name='ld_scaled')(_ld_x)
-    
+
+    for i in range(0, 2):
+        x = Dense(256, activation='relu')(x)
+        x = Dropout(0.25)(x)
+
+    _f0_scaled = Dense(1000, activation='linear', name='f0_scaled')(x)
+    _ld_scaled = Dense(1000, activation='linear', name='ld_scaled')(x)
+
     model = tf.keras.models.Model([_instrument_source, _qualities, _latent_sample, _velocity, _pitch],
                                   [_f0_scaled, _ld_scaled], name='cc')
     return model
+
+
+def create_model_multi_stage():
+    _pitch = Input(shape=(1000, 1), name='pitch')
+    _velocity = Input(shape=(1000, 1), name='velocity')
+    _instrument_source = Input(shape=(1000, 1), name='instrument_source')
+    _qualities = Input(shape=(1000, 10), name='qualities')
+    _latent_sample = Input(shape=(1000, 16), name='latent_vector')
+
+    _input = concatenate([_instrument_source, _qualities, _latent_sample], axis=-1, name='concat_1')
+
+    x = _input
+
+    for i in range(0, 4):
+        n_filters = 2 ** (4 + i)
+        x = Conv1D(n_filters, 5, activation='relu', strides=2, padding='causal', name=f'conv_{i + 1}')(x)
+        x = MaxPool1D(pool_size=2, name=f'pool_{i + 1}')(x)
+
+    x = Flatten(name='flatten')(x)
+
+    _pitch_x = Reshape((1000,), name='pitch_reshaped')(_pitch)
+    _pitch_x = Dense(512, activation='relu', name='pitch_dense_1')(_pitch_x)
+    _f0_x = concatenate([x, _pitch_x], name='concat_f0')
+
+    _velocity_x = Reshape((1000,), name='velocity_reshaped')(_velocity)
+    _velocity_x = Dense(512, activation='relu', name='velocity_dense_1')(_velocity_x)
+    _ld_x = concatenate([x, _velocity_x], name='concat_ld')
+
+    _f0_scaled = Dense(1000, activation='linear', name='f0_scaled')(_f0_x)
+    _ld_scaled = Dense(1000, activation='linear', name='ld_scaled')(_ld_x)
+
+    model = tf.keras.models.Model([_instrument_source, _qualities, _latent_sample, _velocity, _pitch],
+                                  [_f0_scaled, _ld_scaled], name='cc')
+    return model
+
+
+def create_model(model_type='multi_stage'):
+    assert model_type.lower() in ['multi_stage', 'single_stage']
+    if model_type == 'multi_stage':
+        return create_model_multi_stage()
+    return create_model_single_stage()
 
 
 @click.command()
@@ -109,8 +146,9 @@ def create_model():
               help='Name of checkpoint directory, will be created inside the main checkpoint directory')
 @click.option('--epochs', default=1, help='Number of training epochs')
 @click.option('--batch_size', default=64, help='Batch size')
-def train(dataset_dir, model_dir_name, epochs, batch_size):
-    model = create_model()
+@click.option('--model_type', default='single_stage', help='Choose the type of model to use')
+def train(dataset_dir, model_dir_name, epochs, batch_size, model_type):
+    model = create_model(model_type)
 
     model.compile(
         optimizer=tf.keras.optimizers.Adam(learning_rate=3e-4),
