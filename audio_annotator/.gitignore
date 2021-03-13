@@ -1,6 +1,4 @@
-.idea
-venv
+*.sqlite
+static
 *.wav
 *.png
-*.json
-__pyc*

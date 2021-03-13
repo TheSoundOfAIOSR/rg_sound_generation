@@ -1,0 +1,63 @@
+{% extends 'base.html' %}
+
+{% block header %}
+  <h1>Annotate</h1>
+{% endblock %}
+
+{% block content %}
+
+<div class="w3-container w3-cell">
+    <div class="w3-section">
+        <button onclick="display('spec')" class="w3-button w3-black">Spectrogram</button>
+    </div>
+
+    <div class="s3-section">
+        <audio controls>
+            <source src="{{ url_for('static', filename=file_name) }}" type="audio/wav">
+            Your browser does not support the audio element.
+        </audio>
+    </div>
+
+    <hr />
+
+    <div>
+        <h3>Choose the qualities</h3>
+
+        <div>
+            <form method="post" action="{{ url_for('sample.show_sample', sample_id=sample_id) }}">
+                {% for item in items %}
+                <div class="w3-section">
+                    <label>{{ item.label }}</label>
+                    <select class="w3-select" name="{{ item.id }}">
+                        {% for option in item.options %}
+                            <option value="{{ option }}">{{ option }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% endfor %}
+
+                <input type="submit" class="w3-button w3-black" value="Submit">
+            </form>
+        </div>
+
+    </div>
+</div>
+
+<div class="w3-container w3-cell">
+    <div>
+        <img id="spec" class="w3-hide" src="{{ url_for('static', filename=image_name) }}" />
+    </div>
+</div>
+
+<script>
+function display(id) {
+  var x = document.getElementById(id);
+  if (x.className.indexOf("w3-show") == -1) {
+    x.className += " w3-show";
+  } else {
+    x.className = x.className.replace(" w3-show", "");
+  }
+}
+</script>
+
+{% endblock %}

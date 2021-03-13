@@ -1,0 +1,16 @@
+DROP TABLE IF EXISTS user;
+DROP TABLE IF EXISTS sample;
+
+CREATE TABLE user (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT UNIQUE NOT NULL,
+    password TEXT NOT NULL
+);
+
+CREATE TABLE sample (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    file_name TEXT NOT NULL,
+    file_path TEXT NOT NULL,
+    quality_1 TEXT NOT NULL,
+    quality_2 TEXT NOT NULL
+);

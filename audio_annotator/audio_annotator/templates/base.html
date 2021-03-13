@@ -1,0 +1,26 @@
+<!doctype html>
+<title>Audio Annotator</title>
+<link rel="stylesheet" href="https://www.w3schools.com/w3css/4/w3.css">
+<div class="w3-padding-large">
+    <h1>Audio Annotator</h1>
+    <div class="w3-bar">
+    {% if g.user %}
+      <span class="w3-bar-item w3-green">Logged in as {{ g.user['username'] }}</span>
+      <a class="w3-bar-item w3-button w3-black" href="{{ url_for('sample.next_sample') }}">Next Sample</a>
+      <a class="w3-bar-item w3-button w3-black" href="{{ url_for('auth.logout') }}">Logout</a>
+    {% else %}
+      <a class="w3-bar-item w3-button w3-black" href="{{ url_for('auth.register') }}">Register</a>
+      <a class="w3-bar-item w3-button w3-black" href="{{ url_for('auth.login') }}">Login</a>
+    {% endif %}
+    </div>
+</div>
+<div class="w3-padding-large">
+  <div>
+    {% block header %}{% endblock %}
+  </div>
+  {% for message in get_flashed_messages() %}
+    <div class="w3-panel w3-red">{{ message }}</div>
+  {% endfor %}
+  <hr />
+  {% block content %}{% endblock %}
+</div>
