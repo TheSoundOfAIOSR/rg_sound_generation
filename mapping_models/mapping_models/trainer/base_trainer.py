@@ -44,6 +44,7 @@ def get_callbacks(checkpoint_file, min_lr=1e-7):
     checkpoint = tf.keras.callbacks.ModelCheckpoint(
         filepath=checkpoint_file,
         save_weights_only=True,
+        save_best_only=True,
         verbose=0,
         save_freq='epoch'
     )

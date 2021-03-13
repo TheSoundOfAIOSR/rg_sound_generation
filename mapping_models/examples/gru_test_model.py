@@ -56,11 +56,11 @@ def features_map(features):
 
 @click.command()
 @click.option('--dataset_dir', help='Location of root directory of the dataset')
-@click.option('--model_dir_name', help='Name of checkpoint directory, will be '
-                                       'created inside the main checkpoint '
-                                       'directory')
+@click.option('--model_dir_name',
+              help='Name of checkpoint directory, will be created inside the main checkpoint directory')
 @click.option('--epochs', default=1, help='Number of training epochs')
-def train(dataset_dir, model_dir_name, epochs):
+@click.option('--batch_size', default=64, help='Batch size')
+def train(dataset_dir, model_dir_name, epochs, batch_size):
     model = tf.keras.models.Sequential([
         tf.keras.layers.GRU(32, return_sequences=True),
         tf.keras.layers.Dense(2, activation='tanh')
@@ -72,12 +72,21 @@ def train(dataset_dir, model_dir_name, epochs):
         metrics=[tf.keras.losses.MeanSquaredError()]
     )
 
+    total_examples = 32690
+    validation_examples = 2081
+    steps = int(total_examples / batch_size)
+    validation_steps = int(validation_examples / batch_size)
+
     trainer.train(
         model,
         dataset_dir=dataset_dir,
         model_dir=model_dir_name,
         epochs=epochs,
-        features_map=features_map
+        features_map=features_map,
+        steps_per_epoch=steps,
+        validation_steps=validation_steps,
+        batch_size=batch_size,
+        verbose=True
     )
 
 
