@@ -149,6 +149,7 @@ def create_model(model_type='multi_stage'):
 @click.option('--model_type', default='single_stage', help='Choose the type of model to use')
 def train(dataset_dir, model_dir_name, epochs, batch_size, model_type):
     model = create_model(model_type)
+    tf.keras.utils.plot_model(model, show_shapes=True, to_file='images/causal_conv_1.png.png')
 
     model.compile(
         optimizer=tf.keras.optimizers.Adam(learning_rate=3e-4),
