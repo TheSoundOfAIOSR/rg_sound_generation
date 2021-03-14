@@ -1,23 +1,20 @@
 import os
 
+from dotenv import load_dotenv
 from flask import Flask, render_template
 
 
-def create_app(test_config=None):
+def create_app():
     from audio_annotator import db, auth, sample
 
+    load_dotenv()
     app = Flask(__name__, instance_relative_config=True)
     # The configuration files are located in the instance folder
     # which is created outside the audio_annotator package
     app.config.from_mapping(
-        SECRET_KEY='dev',
+        SECRET_KEY=os.environ.get('FLASK_SECRET_KEY') or 'xyz',
         DATABASE=os.path.join(app.instance_path, 'db.sqlite')
     )
-
-    # if test_config is None:
-    #     app.config.from_pyfile('config.py')
-    # else:
-    #     app.config.from_mapping(test_config)
 
     try:
         os.makedirs(app.instance_path)

@@ -2,3 +2,5 @@
 static
 *.wav
 *.png
+*.env
+venv
