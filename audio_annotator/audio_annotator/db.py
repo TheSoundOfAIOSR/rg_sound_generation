@@ -45,10 +45,9 @@ def init_db_command():
 
 
 @click.command('build-db')
-@click.option('--audio_dir')
 @with_appcontext
-def build_db_command(audio_dir):
-    assert os.path.isdir(audio_dir), f'{audio_dir} must be a directory'
+def build_db_command():
+    audio_dir = os.path.join('audio_annotator', 'static')
     files = [x for x in os.listdir(audio_dir) if x.lower().endswith('.wav')]
     init_db()
     click.echo('Database initialized')
@@ -63,7 +62,14 @@ def build_db_command(audio_dir):
     click.echo('Database built')
 
 
+@click.command('generate-spectrograms')
+def generate_spectrograms():
+    from audio_annotator.create_spectrograms import create_spectrograms
+    create_spectrograms()
+
+
 def init_app(app: Flask):
     app.teardown_appcontext(close_db)
     app.cli.add_command(init_db_command)
     app.cli.add_command(build_db_command)
+    app.cli.add_command(generate_spectrograms)

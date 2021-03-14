@@ -7,11 +7,12 @@ from tqdm import tqdm
 
 
 def create_spectrograms():
-    files = [x for x in os.listdir('static') if x.lower().endswith('.wav')]
+    audio_dir = os.path.join('audio_annotator', 'static')
+    files = [x for x in os.listdir(audio_dir) if x.lower().endswith('.wav')]
 
     for f in tqdm(files):
-        audio_path = os.path.join('static', f)
-        image_path = os.path.join('static', f'{os.path.splitext(f)[0]}.png')
+        audio_path = os.path.join(audio_dir, f)
+        image_path = os.path.join(audio_dir, f'{os.path.splitext(f)[0]}.png')
         audio, sr = librosa.load(audio_path)
         mel = librosa.feature.melspectrogram(
             audio,
