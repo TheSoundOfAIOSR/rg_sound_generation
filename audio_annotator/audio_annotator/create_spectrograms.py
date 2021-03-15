@@ -23,7 +23,6 @@ def create_spectrograms():
         )
         log_mel = librosa.power_to_db(mel)
 
-        plt.clf()
         plt.figure(figsize=(4, 3))
         librosa.display.specshow(
             log_mel,
@@ -34,6 +33,7 @@ def create_spectrograms():
         )
         plt.tight_layout()
         plt.savefig(image_path)
+        plt.close()
 
 
 if __name__ == '__main__':
