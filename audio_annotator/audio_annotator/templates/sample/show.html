@@ -11,7 +11,7 @@
         <button onclick="display('spec')" class="w3-button w3-black">Spectrogram</button>
     </div>
 
-    <div class="s3-section">
+    <div class="w3-section">
         <audio controls>
             <source src="{{ url_for('static', filename=file_name) }}" type="audio/wav">
             Your browser does not support the audio element.
@@ -25,17 +25,13 @@
 
         <div>
             <form method="post" action="{{ url_for('sample.show_sample', sample_id=sample_id) }}">
-                {% for item in items %}
-                <div class="w3-section">
-                    <label>{{ item.label }}</label>
-                    <select class="w3-select" name="{{ item.id }}">
-                        {% for option in item.options %}
-                            <option value="{{ option }}">{{ option }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                {% endfor %}
-
+                {%  for quality in qualities %}
+                    <div>
+                        <input name="q_{{ quality }}" id="q_{{ quality }}" class="w3-check" type="checkbox">
+                        <label for="q_{{ quality }}">{{ quality }}</label>
+                    </div>
+                {%  endfor %}
+                <hr />
                 <input type="submit" class="w3-button w3-black" value="Submit">
             </form>
         </div>

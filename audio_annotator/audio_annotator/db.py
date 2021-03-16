@@ -5,6 +5,7 @@ import click
 from flask import current_app, g, Flask
 from flask.cli import with_appcontext
 from tqdm import tqdm
+from audio_annotator.qualities import qualities
 
 
 # Note: g is a special object that is unique for each request
@@ -54,9 +55,10 @@ def build_db_command():
     db = get_db()
     for file_name in tqdm(files):
         file_path = os.path.join(audio_dir, file_name)
+        query = 'INSERT INTO sample (file_name, file_path, ' + ', '.join([f'q_{q}' for q in qualities])
+        query += ') VALUES (?, ?, ' + '?,' * (len(qualities) - 1) + '?)'
         db.execute(
-            'INSERT INTO sample (file_name, file_path, quality_1, quality_2)'
-            'VALUES (?, ?, ?, ?)', (file_name, file_path, 'Unsure', 'Unsure')
+            query, [file_name, file_path, ] + [0] * len(qualities)
         )
     db.commit()
     click.echo('Database built')

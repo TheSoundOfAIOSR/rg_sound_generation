@@ -1,7 +1,8 @@
 import os
 
 from flask import Blueprint, render_template, flash, redirect, url_for, request
-from audio_annotator import db, auth, forms
+from audio_annotator import db, auth
+from audio_annotator.qualities import qualities
 
 
 bp = Blueprint('sample', __name__, url_prefix='/sample')
@@ -12,35 +13,41 @@ bp = Blueprint('sample', __name__, url_prefix='/sample')
 def show_sample(sample_id):
     database = db.get_db()
     if request.method == 'POST':
+        s = database.execute(
+            'SELECT * FROM sample WHERE id = ?',
+            (sample_id,)
+        ).fetchone()
+        if s is None:
+            flash('No such file found')
+            return render_template('index.html')
+        form_data = request.form
+        values = [f'q_{q}' in form_data.keys() for q in qualities]
+        current_values = [s[f'q_{q}'] for q in qualities]
+        updated_values = [v + current_values[i] for i, v in enumerate(values)]
+        query = ' = ?, '.join([f'q_{q}' for q in qualities])
+        query = 'UPDATE sample SET ' + query + ' = ? WHERE id = ?'
         database.execute(
-            'UPDATE sample SET quality_1 = ?, quality_2 = ? WHERE id = ?',
-            (request.form['0'], request.form['1'], sample_id)
+            query,
+            updated_values + [sample_id]
         )
         database.commit()
         flash('Annotation saved')
-
-    sample = database.execute(
+        return redirect(url_for('sample.next_sample'))
+    s = database.execute(
         'SELECT * FROM sample WHERE id = ?',
         (sample_id, )
     ).fetchone()
-    if sample is None:
+    if s is None:
         flash('No such file found')
         return render_template('index.html')
     else:
-        file_name = sample['file_name']
+        file_name = s['file_name']
         image_name = f'{os.path.splitext(file_name)[0]}.png'
-        items = []
-        for i, item in enumerate(forms.qualities_form):
-            new_item = item.copy()
-            current_value = sample[f'quality_{i + 1}']
-            current_index = item['options'].index(current_value)
-            new_item['options'][0], new_item['options'][current_index] = current_value, new_item['options'][0]
-            items.append(new_item)
         return render_template(
             'sample/show.html',
             file_name=file_name,
             image_name=image_name,
-            items=items,
+            qualities=qualities,
             sample_id=sample_id
         )
 
