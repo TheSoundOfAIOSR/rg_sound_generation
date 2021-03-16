@@ -11,7 +11,6 @@ from sound_generator.ddsp_generator import DDSPGenerator, DDSPDataProcessor
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 base_path = os.path.dirname(os.path.abspath(sound_generator.__file__))
-print(base_path)
 # Create Data Processors
 z_data_processor = ZDataProcessor()
 f0_ld_data_processor = F0LoudnessDataProcessor()

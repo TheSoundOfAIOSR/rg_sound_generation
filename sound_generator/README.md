@@ -21,6 +21,15 @@ sound_generator
     - z_generator
 ```
 
+Create a virtual environment and install required packages
+
+```commandline
+pip install virtualenv
+virtualenv venv
+venv\Scripts\activate
+pip install -r requirements.txt
+```
+
 Now the module can be imported and used
 
 ```python
@@ -36,6 +45,8 @@ inputs = {
 
 audio = get_prediction(inputs)
 ```
+Or take a look at this [notebook](test_sound_generator.ipynb)
+
 The `latent_sample` must be a list of 16 floating point values between -7 and +7
 
 The `velocity` can be one of `[25, 50, 75, 100, 127]`
