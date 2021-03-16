@@ -14,3 +14,4 @@ This is a repo of all the various scripts and tools we are creating or forking w
 |Prepare Partial and Complete TFRecords|Complete dataset for experimenting with mapping networks or heuristics|[Link](https://github.com/TheSoundOfAIOSR/rg_sound_generation/blob/main/members/fabio/prepare_partial_complete_tfrecord.ipynb)|
 |Audio Annotator Web|Flask app to tag or label audio samples|[Link](https://github.com/TheSoundOfAIOSR/rg_sound_generation/tree/main/audio_annotator)|
 |Mapping Models|Installable Mapping Models package for training and inference|[Link](https://github.com/TheSoundOfAIOSR/rg_sound_generation/tree/main/mapping_models)|
+|Sound Generator|End to end inference pipeline for sound generation|[Link](https://github.com/TheSoundOfAIOSR/rg_sound_generation/tree/main/sound_generator)|
