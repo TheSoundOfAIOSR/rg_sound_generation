@@ -1,10 +1,8 @@
 ## Sound Generator
 
-**not ready for production**
-
 This repo contains the end to end inference pipeline for sound generation
 
-## Usage
+## Development
 
 First create a directory in this folder to store checkpoints, download the checkpoints from [Google Drive](https://drive.google.com/drive/folders/1mH8Pqgwxb6nJsx_mCnD9dMBO8qlrmwUq?usp=sharing)
 
@@ -46,6 +44,39 @@ inputs = {
 audio = get_prediction(inputs)
 ```
 Or take a look at this [notebook](test_sound_generator.ipynb)
+
+## Production
+
+Build and run in a docker container
+
+```commandline
+docker build -t <image_tag> .
+docker run --rm -it -p 80:80 --name <container_name> <image_tag>
+```
+
+Call the endpoint to get prediction
+
+```python
+import requests
+import json
+import numpy as np
+
+
+URL = 'http://127.0.0.1/api'
+
+res = requests.post(URL, json={
+    'velocity': 75,
+    'pitch': 60,
+    'source': 'acoustic',
+    'qualities': ['bright', 'percussive'],
+    'latent_sample': [0.] * 16
+})
+
+audio = json.loads(res.text)['audio']
+audio = np.squeeze(audio)
+```
+
+## Inputs
 
 The `latent_sample` must be a list of 16 floating point values between -7 and +7
 
