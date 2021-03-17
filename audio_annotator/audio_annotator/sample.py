@@ -8,6 +8,21 @@ from audio_annotator.qualities import qualities
 bp = Blueprint('sample', __name__, url_prefix='/sample')
 
 
+@bp.route('/stats', methods=['GET'])
+@auth.login_required
+def show_stats():
+    database = db.get_db()
+    query = 'SELECT'
+    for q in qualities:
+        query += f' SUM(q_{q}),'
+    query = query[:-1] + ' FROM sample'
+    samples = database.execute(
+        query
+    ).fetchone()
+    counts = dict((qualities[i], s) for i, s in enumerate(samples))
+    return render_template('stats.html', counts=counts)
+
+
 @bp.route('/<int:sample_id>', methods=['GET', 'POST'])
 @auth.login_required
 def show_sample(sample_id):

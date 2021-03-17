@@ -1,0 +1,15 @@
+{% extends 'base.html' %}
+
+{% block header %}
+  <h1>Stats</h1>
+{% endblock %}
+
+{% block content %}
+    <div>
+        <ul>
+            {% for key, value in counts.items() %}
+                <li>{{ key }}: {{ value }}</li>
+            {%  endfor %}
+        </ul>
+    </div>
+{% endblock %}
