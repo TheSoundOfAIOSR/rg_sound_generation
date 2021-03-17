@@ -7,10 +7,10 @@ git clone \this\rep
 cd \this\repo
 
 docker build -t <image_name> .
-docker run --rm -it -p 5000:5000 --name <container_name> <image_name>
+docker run --rm -it -p 80:80 --name <container_name> <image_name>
 ```
 
-Now you should be able to visit the app on http://127.0.0.1:5000
+Now you should be able to visit the app on http://127.0.0.1:80
 
 ### Without Docker
 
@@ -32,7 +32,7 @@ set FLASK_ENV=development
 flask build-db
 flask generate-spectrograms
 
-flask run
+waitress-serve --port 80 --call "audio_annotator:create_app"
 ```
 
-Now you should be able to visit the app on http://127.0.0.1:5000
+Now you should be able to visit the app on http://127.0.0.1:80

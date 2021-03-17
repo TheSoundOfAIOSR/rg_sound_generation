@@ -31,3 +31,4 @@ tqdm==4.59.0
 urllib3==1.26.3
 Werkzeug==1.0.1
 matplotlib==3.3.4
+waitress==2.0.0

@@ -10,3 +10,5 @@ instance
 .idea
 README.md
 .dockerignore
+.git
+.gitignore
