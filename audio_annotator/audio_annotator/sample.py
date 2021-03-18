@@ -64,7 +64,6 @@ def show_sample(sample_id):
         )
         database.commit()
         flash('Annotation saved')
-        print(description)
         return redirect(url_for('sample.next_sample'))
     s = database.execute(
         'SELECT * FROM sample WHERE id = ?',
