@@ -25,12 +25,20 @@
 
         <div>
             <form method="post" action="{{ url_for('sample.show_sample', sample_id=sample_id) }}">
-                {%  for quality in qualities %}
-                    <div>
-                        <input name="q_{{ quality }}" id="q_{{ quality }}" class="w3-check" type="checkbox">
-                        <label for="q_{{ quality }}">{{ quality }}</label>
+                {%  for i, p in pairs %}
+                    <div class="w3-container">
+                    {%  for quality in p %}
+                        <input name="p_{{ i }}" class="w3-radio" type="radio" value="{{ quality }}">
+                        <label>{{ quality }}</label>
+                    {% endfor %}
+                    <input name="p_{{ i }}" class="w3-radio" type="radio" value="unsure">
+                    <label>unsure</label>
                     </div>
                 {%  endfor %}
+                <br />
+                <label>Describe the sample (eg. dark and distorted) </label>
+                <br />
+                <input type="text" name="description">
                 <hr />
                 <input type="submit" class="w3-button w3-black" value="Submit">
             </form>

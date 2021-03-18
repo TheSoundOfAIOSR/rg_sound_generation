@@ -30,5 +30,6 @@ CREATE TABLE sample (
     q_harmonic INTEGER NOT NULL,
     q_disharmonic INTEGER NOT NULL,
     q_soft INTEGER NOT NULL,
-    q_hard INTEGER NOT NULL
+    q_hard INTEGER NOT NULL,
+    description TEXT
 );

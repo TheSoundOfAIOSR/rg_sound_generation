@@ -1,17 +1,33 @@
 import os
+import io
+import pandas as pd
 
-from flask import Blueprint, render_template, flash, redirect, url_for, request
+from flask import Blueprint, render_template, flash, redirect, url_for, request, send_file
 from audio_annotator import db, auth
-from audio_annotator.qualities import qualities
+from audio_annotator.qualities import qualities, pairs
 
 
 bp = Blueprint('sample', __name__, url_prefix='/sample')
 
 
-@bp.route('/stats', methods=['GET'])
+@bp.route('/stats', methods=['GET', 'POST'])
 @auth.login_required
 def show_stats():
     database = db.get_db()
+    if request.method == 'POST':
+        db_df = pd.read_sql_query('SELECT * FROM sample', database)
+        csv_stream = io.StringIO()
+        db_df.to_csv(csv_stream, index=False)
+        byte_stream = io.BytesIO()
+        byte_stream.write(csv_stream.getvalue().encode())
+        byte_stream.seek(0)
+        csv_stream.close()
+        return send_file(
+            byte_stream,
+            as_attachment=True,
+            attachment_filename='db.csv',
+            mimetype='text/csv'
+        )
     query = 'SELECT'
     for q in qualities:
         query += f' SUM(q_{q}),'
@@ -35,18 +51,20 @@ def show_sample(sample_id):
         if s is None:
             flash('No such file found')
             return render_template('index.html')
-        form_data = request.form
-        values = [f'q_{q}' in form_data.keys() for q in qualities]
+        present_qualities = [value for key, value in list(request.form.items()) if key != 'description']
+        description = request.form['description']
+        values = [int(q in present_qualities) for q in qualities]
         current_values = [s[f'q_{q}'] for q in qualities]
         updated_values = [v + current_values[i] for i, v in enumerate(values)]
         query = ' = ?, '.join([f'q_{q}' for q in qualities])
-        query = 'UPDATE sample SET ' + query + ' = ? WHERE id = ?'
+        query = 'UPDATE sample SET ' + query + ' = ?, description = ? WHERE id = ?'
         database.execute(
             query,
-            updated_values + [sample_id]
+            updated_values + [description, sample_id]
         )
         database.commit()
         flash('Annotation saved')
+        print(description)
         return redirect(url_for('sample.next_sample'))
     s = database.execute(
         'SELECT * FROM sample WHERE id = ?',
@@ -62,7 +80,7 @@ def show_sample(sample_id):
             'sample/show.html',
             file_name=file_name,
             image_name=image_name,
-            qualities=qualities,
+            pairs=[p for p in enumerate(pairs)],
             sample_id=sample_id
         )
 

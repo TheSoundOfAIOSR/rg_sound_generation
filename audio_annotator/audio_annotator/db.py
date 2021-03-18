@@ -58,7 +58,7 @@ def build_db_command():
         query = 'INSERT INTO sample (file_name, file_path, ' + ', '.join([f'q_{q}' for q in qualities])
         query += ') VALUES (?, ?, ' + '?,' * (len(qualities) - 1) + '?)'
         db.execute(
-            query, [file_name, file_path, ] + [0] * len(qualities)
+            query, [file_name, file_path, ] + [0] * len(qualities),
         )
     db.commit()
     click.echo('Database built')

@@ -11,5 +11,9 @@
                 <li>{{ key }}: {{ value }}</li>
             {%  endfor %}
         </ul>
+        <hr />
+        <form method="post" action="{{ url_for('sample.show_stats') }}">
+            <input type="submit" value="Export" class="w3-button w3-black">
+        </form>
     </div>
 {% endblock %}
