@@ -1,8 +1,10 @@
-## Sound Generator
+# Sound Generator
 
-This repo contains the end to end inference pipeline for sound generation
+End to end inference pipeline for sound generation
 
-## Development
+## Setup
+
+### Download Models
 
 First create a directory in this folder to store checkpoints, download the checkpoints from [Google Drive](https://drive.google.com/drive/folders/1mH8Pqgwxb6nJsx_mCnD9dMBO8qlrmwUq?usp=sharing)
 
@@ -18,6 +20,8 @@ sound_generator
     - f0_ld_generator
     - z_generator
 ```
+
+### Development
 
 Create a virtual environment and install required packages
 
@@ -43,9 +47,8 @@ inputs = {
 
 audio = get_prediction(inputs)
 ```
-Or take a look at this [notebook](test_sound_generator.ipynb)
 
-## Production
+### Production
 
 Build and run in a docker container
 
@@ -62,7 +65,7 @@ import json
 import numpy as np
 
 
-URL = 'http://127.0.0.1/api'
+URL = 'http://127.0.0.1/sound'
 
 res = requests.post(URL, json={
     'velocity': 75,
