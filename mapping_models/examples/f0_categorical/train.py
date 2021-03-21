@@ -6,12 +6,14 @@ from data import data_generator, complete_record_generator
 from model import create_model
 
 
-@click.command('start')
+@click.command()
 @click.option('--dataset_dir')
 @click.option('--model_dir')
 @click.option('--batch_size', default=8)
 @click.option('--epochs', default=100)
-def train(dataset_dir, model_dir, batch_size, epochs):
+@click.option('--num_train_ex', default=32690)
+@click.option('--num_valid_ex', default=2081)
+def train(dataset_dir, model_dir, batch_size, epochs, num_train_ex, num_valid_ex):
     click.echo('Creating data generators..')
     train_generator = data_generator(complete_record_generator(
         dataset_dir=dataset_dir,
@@ -32,16 +34,24 @@ def train(dataset_dir, model_dir, batch_size, epochs):
     model_path = os.path.join(model_dir, 'best.h5')
     if not os.path.isdir(model_dir):
         os.mkdir(model_dir)
+    elif os.path.isfile(model_path):
+        click.echo('Loading best weights from previous training..')
+        model.load_weights(model_path)
+    
+    steps_per_epoch = max(1, int(num_train_ex/batch_size))
+    validation_steps = max(1, int(num_valid_ex/batch_size))
+
+    click.echo(f'steps_per_epoch: {steps_per_epoch}, validation_steps: {validation_steps}')
 
     click.echo('Starting training..')
     _ = model.fit(
         train_generator,
         validation_data=valid_generator,
-        steps_per_epoch=int(32690/batch_size),
-        validation_steps=int(2081/batch_size),
+        steps_per_epoch=steps_per_epoch,
+        validation_steps=validation_steps,
         epochs=epochs,
         callbacks=[
-            tf.keras.callbacks.EarlyStopping(monitor='val_accuracy', patience=5),
+            tf.keras.callbacks.EarlyStopping(monitor='val_accuracy', patience=10),
             tf.keras.callbacks.ModelCheckpoint(
                 model_path, monitor='val_accuracy', save_best_only=True
             )
