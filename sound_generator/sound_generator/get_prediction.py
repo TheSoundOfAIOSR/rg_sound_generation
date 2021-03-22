@@ -39,5 +39,6 @@ def get_prediction(inputs):
         'f0_ld_inputs': f0_ld_inputs,
         'f0_ld_outputs': f0_ld_outputs
     })
+
     audio = ddsp_model.predict(ddsp_inputs)
     return audio.numpy()
