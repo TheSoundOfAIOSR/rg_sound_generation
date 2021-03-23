@@ -6,7 +6,6 @@ __pycache__
 .pytest_cache
 *.wav
 *.png
-instance
 .idea
 README.md
 .dockerignore
