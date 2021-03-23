@@ -7,12 +7,15 @@
 {% block content %}
 
 <div class="w3-container w3-cell">
+
     <div class="w3-section">
+        <button onclick="play()" class="w3-button w3-black">Play</button>
+        <button onclick="stop()" class="w3-button w3-black">Stop</button>
         <button onclick="display('spec')" class="w3-button w3-black">Spectrogram</button>
     </div>
 
     <div class="w3-section">
-        <audio controls>
+        <audio id="aud">
             <source src="{{ url_for('static', filename=file_name) }}" type="audio/wav">
             Your browser does not support the audio element.
         </audio>
@@ -26,13 +29,17 @@
         <div>
             <form method="post" action="{{ url_for('sample.show_sample', sample_id=sample_id) }}">
                 {%  for i, p in pairs %}
-                    <div class="w3-container">
+                    <div class="w3-row-padding">
                     {%  for quality in p %}
-                        <input name="p_{{ i }}" class="w3-radio" type="radio" value="{{ quality }}">
-                        <label>{{ quality }}</label>
+                        <div class="w3-third">
+                            <input name="p_{{ i }}" class="w3-radio" type="radio" value="{{ quality }}">
+                            <label>{{ quality }}</label>
+                        </div>
                     {% endfor %}
-                    <input name="p_{{ i }}" class="w3-radio" type="radio" value="unsure">
-                    <label>unsure</label>
+                        <div class="w3-third">
+                            <input name="p_{{ i }}" class="w3-radio" type="radio" value="unsure">
+                            <label>unsure</label>
+                        </div>
                     </div>
                 {%  endfor %}
                 <br />
@@ -56,12 +63,26 @@
 <script>
 function display(id) {
   var x = document.getElementById(id);
-  if (x.className.indexOf("w3-show") == -1) {
+  if (x.className.indexOf("w3-show") === -1) {
     x.className += " w3-show";
   } else {
     x.className = x.className.replace(" w3-show", "");
   }
 }
+
+function play() {
+    stop()
+
+    var current_audio = document.getElementById('aud');
+    current_audio.play();
+}
+
+function stop() {
+    var current_audio = document.getElementById('aud');
+    current_audio.pause();
+    current_audio.currentTime=0;
+}
+
 </script>
 
 {% endblock %}
