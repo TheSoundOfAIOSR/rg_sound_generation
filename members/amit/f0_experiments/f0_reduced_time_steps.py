@@ -1,11 +1,12 @@
 import tensorflow as tf
+import numpy as np
 import os
 import click
 
 from tensorflow.keras.layers import Input, concatenate, Conv1D, MaxPool1D, Flatten
 from tensorflow.keras.layers import Dense, Dropout, RepeatVector
 from tfrecord_provider import CompleteTFRecordProvider
-from ddsp.core import midi_to_unit
+from ddsp import core
 
 
 def create_model():
@@ -35,7 +36,7 @@ def create_model():
         x = Dense(256, activation='relu')(x)
         x = Dropout(0.25)(x)
 
-    _f0_scaled = Dense(500, activation='linear', name='f0_scaled')(x)
+    _f0_scaled = Dense(1000, activation='linear', name='f0_scaled')(x)
     _ld_scaled = Dense(1000, activation='linear', name='ld_scaled')(x)
 
     model = tf.keras.models.Model([_instrument_source, _qualities, _latent_sample, _velocity, _pitch],
@@ -57,18 +58,27 @@ def data_transformation(features):
             for each MIDI pitch in f0_scaled scale
     """
     note_number = tf.cast(features['note_number'], tf.float32)
-    pitch = midi_to_unit(note_number, clip=True, midi_min=0, midi_max=127)
+    pitch = core.midi_to_unit(note_number, clip=True, midi_min=0, midi_max=127)
     velocity = (features['velocity'] - 25) / 25
     velocity_categorical = tf.keras.utils.to_categorical(velocity, num_classes=5)
     instrument_source = tf.keras.utils.to_categorical(features['instrument_source'], num_classes=3)
     qualities = features['qualities']
     ld_scaled = features['ld_scaled']
-    # ignoring the last 2 seconds
-    f0_scaled = features['f0_scaled'][:, :500]
-    # clip f0_scaled between two octaves
-    f0_scaled_max = midi_to_unit(note_number + 2., clip=True, midi_min=0, midi_max=127)
-    f0_scaled_min = midi_to_unit(note_number - 2., clip=True, midi_min=0, midi_max=127)
-    f0_scaled = tf.clip_by_value(f0_scaled, f0_scaled_min, f0_scaled_max)
+
+    f0_hz = features['f0_hz']
+    f0_root = core.midi_to_hz(note_number)
+
+    for i in range(3):
+        note = core.hz_to_midi(f0_hz)
+
+        f0_hz = np.where(note > note_number + 6, f0_hz / 2.0, f0_hz)
+        f0_hz = np.where(note < note_number - 6, f0_hz * 2.0, f0_hz)
+
+    note = core.hz_to_midi(f0_hz)
+    f0_hz = np.where(np.abs(note - note_number) > 1.0, f0_root, f0_hz)
+    midi = core.hz_to_midi(f0_hz)
+    f0_scaled = core.midi_to_unit(midi, midi_min=np.array([0]), midi_max=np.array([127]), clip=True)
+
     batch_size = features['z'].shape[0]
 
     inputs = {
@@ -99,10 +109,11 @@ def data_generator_iof(data_iterable):
 
 @click.command()
 @click.option('--dataset_dir')
-@click.option('--resume_from')
+@click.option('--resume_from', default=None)
 @click.option('--batch_size', default=32)
 @click.option('--epochs', default=100)
-def train(dataset_dir, resume_from, batch_size, epochs):
+@click.option('--tag', default='f0_scaled')
+def train(dataset_dir, resume_from, batch_size, epochs, tag):
     data_iterables = {}
 
     click.echo('creating data iterables..')
@@ -123,6 +134,7 @@ def train(dataset_dir, resume_from, batch_size, epochs):
 
     steps = int(32690 / batch_size)
     validation_steps = int(2090 / batch_size)
+    model_checkpoint_path = f'checkpoints/{tag}_val_loss_' + '{val_loss:.4f}.h5'
 
     click.echo('starting training..')
 
@@ -133,16 +145,20 @@ def train(dataset_dir, resume_from, batch_size, epochs):
         validation_steps=validation_steps,
         epochs=epochs,
         callbacks=[
-            tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=8),
+            tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=7),
             tf.keras.callbacks.ModelCheckpoint(
-                'checkpoints/f0_clipped_val_loss_{val_loss:.4f}.h5',
+                model_checkpoint_path,
                 save_best_only=True, monitor='val_loss'
             ),
             tf.keras.callbacks.CSVLogger(
-                'logs/f0_clipped.csv', separator=",",
+                f'logs/{tag}.csv', separator=",",
                 append=True
             ),
-            tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', patience=4)
+            tf.keras.callbacks.ReduceLROnPlateau(
+                monitor='val_loss',
+                patience=4,
+                verbose=True
+            )
         ]
     )
 
