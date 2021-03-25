@@ -5,6 +5,7 @@ import click
 from tensorflow.keras.layers import Input, concatenate, Conv1D, MaxPool1D, Flatten
 from tensorflow.keras.layers import Dense, Dropout, RepeatVector
 from tfrecord_provider import CompleteTFRecordProvider
+from ddsp.core import midi_to_unit
 
 
 def create_model():
@@ -34,7 +35,7 @@ def create_model():
         x = Dense(256, activation='relu')(x)
         x = Dropout(0.25)(x)
 
-    _f0_scaled = Dense(498, activation='linear', name='f0_scaled')(x)
+    _f0_scaled = Dense(500, activation='linear', name='f0_scaled')(x)
     _ld_scaled = Dense(1000, activation='linear', name='ld_scaled')(x)
 
     model = tf.keras.models.Model([_instrument_source, _qualities, _latent_sample, _velocity, _pitch],
@@ -47,14 +48,27 @@ def create_model():
 
 
 def data_transformation(features):
-    pitch = tf.cast(features['note_number'], tf.float32) / 127.
+    """
+    Iteration 2:
+        Reduced time steps to exclude first 8 ms and last 2 seconds
+        Pitch as categorical input
+        Clip f0_scaled to +/- 1 semitone
+            This will require finding the +1 and -1 pitch range
+            for each MIDI pitch in f0_scaled scale
+    """
+    note_number = tf.cast(features['note_number'], tf.float32)
+    pitch = midi_to_unit(note_number, clip=True, midi_min=0, midi_max=127)
     velocity = (features['velocity'] - 25) / 25
     velocity_categorical = tf.keras.utils.to_categorical(velocity, num_classes=5)
     instrument_source = tf.keras.utils.to_categorical(features['instrument_source'], num_classes=3)
     qualities = features['qualities']
     ld_scaled = features['ld_scaled']
-    # ignoring first 8 ms and the last 2 seconds
-    f0_scaled = features['f0_scaled'][:, 2:500]
+    # ignoring the last 2 seconds
+    f0_scaled = features['f0_scaled'][:, :500]
+    # clip f0_scaled between two octaves
+    f0_scaled_max = midi_to_unit(note_number + 2., clip=True, midi_min=0, midi_max=127)
+    f0_scaled_min = midi_to_unit(note_number - 2., clip=True, midi_min=0, midi_max=127)
+    f0_scaled = tf.clip_by_value(f0_scaled, f0_scaled_min, f0_scaled_max)
     batch_size = features['z'].shape[0]
 
     inputs = {
@@ -85,9 +99,10 @@ def data_generator_iof(data_iterable):
 
 @click.command()
 @click.option('--dataset_dir')
+@click.option('--resume_from')
 @click.option('--batch_size', default=32)
 @click.option('--epochs', default=100)
-def train(dataset_dir, batch_size, epochs):
+def train(dataset_dir, resume_from, batch_size, epochs):
     data_iterables = {}
 
     click.echo('creating data iterables..')
@@ -102,6 +117,10 @@ def train(dataset_dir, batch_size, epochs):
     model = create_model()
     print(model.summary())
 
+    if resume_from is not None:
+        click.echo(f'Resuming training from checkpoint {resume_from}')
+        model.load_weights(resume_from)
+
     steps = int(32690 / batch_size)
     validation_steps = int(2090 / batch_size)
 
@@ -114,15 +133,16 @@ def train(dataset_dir, batch_size, epochs):
         validation_steps=validation_steps,
         epochs=epochs,
         callbacks=[
-            tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=5),
+            tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=8),
             tf.keras.callbacks.ModelCheckpoint(
-                'checkpoints/f0_scaled_val_loss_{val_loss:.4f}.h5',
+                'checkpoints/f0_clipped_val_loss_{val_loss:.4f}.h5',
                 save_best_only=True, monitor='val_loss'
             ),
             tf.keras.callbacks.CSVLogger(
-                'logs/f0_scaled.csv', separator=",",
-                append=False
-            )
+                'logs/f0_clipped.csv', separator=",",
+                append=True
+            ),
+            tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', patience=4)
         ]
     )
 
