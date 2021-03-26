@@ -20,6 +20,7 @@ class ZDataProcessor:
             'reverb': 8,
             'tempo_sync': 9
         }
+        self.pitch = 60
 
     def process(self, inputs):
         velocity = inputs.get('velocity') or 75
@@ -27,6 +28,7 @@ class ZDataProcessor:
         source = inputs.get('source') or 'acoustic'
         qualities = inputs.get('qualities') or []
         latent_sample = inputs.get('latent_sample') or [0.] * 16
+        self.pitch = pitch
 
         velocity = np.expand_dims([velocity / 127.], axis=0).astype('float32')
         pitch = np.expand_dims([pitch / 127.], axis=0).astype('float32')
