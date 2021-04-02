@@ -30,20 +30,21 @@
             <form method="post" action="{{ url_for('sample.show_sample', sample_id=sample_id) }}">
                 {%  for i, p in pairs %}
                     <div class="w3-row-padding">
-                    {%  for quality in p %}
                         <div class="w3-third">
-                            <input name="p_{{ i }}" class="w3-radio" type="radio" value="{{ quality }}">
-                            <label>{{ quality }}</label>
+                          <input name="p_{{ i }}" class="w3-radio" type="radio" value="{{ p[0] }}">
+                          <label>{{ p[0] }}</label>
                         </div>
-                    {% endfor %}
                         <div class="w3-third">
                             <input name="p_{{ i }}" class="w3-radio" type="radio" value="unsure">
-                            <label>unsure</label>
+                        </div>
+                        <div class="w3-third">
+                          <input name="p_{{ i }}" class="w3-radio" type="radio" value="{{ p[1] }}">
+                          <label>{{ p[1] }}</label>
                         </div>
                     </div>
                 {%  endfor %}
                 <br />
-                <label>Describe the sample (eg. dark and distorted) </label>
+                <label>Using one or two adjectives, please describe the sample: </label>
                 <br />
                 <input type="text" name="description">
                 <hr />
