@@ -44,7 +44,8 @@ def create_decoder(latent_dim, num_features):
 
     x = UpSampling1D(2)(x)
     x = Reshape((1024, 24))(x)
-    x = Conv1D(num_features, 64, padding='same', activation='sigmoid', name='decoder_output')(x)
+    x = Conv1D(num_features, 64, padding='same', activation='relu')(x)
+    x = Dense(num_features, activation='sigmoid', name='decoder_output')(x)
 
     return tf.keras.models.Model(
         _input, x,
@@ -52,13 +53,21 @@ def create_decoder(latent_dim, num_features):
     )
 
 
-def create_vae(latent_dim, num_features):
-    encoder = create_encoder(latent_dim, num_features)
-    decoder = create_decoder(latent_dim, num_features)
+class VAE(tf.keras.models.Model):
+    def __init__(self, encoder, decoder, **kwargs):
+        super(VAE, self).__init__(**kwargs)
+        self.encoder = encoder
+        self.decoder = decoder
 
-    _input = Input(shape=(1024, 16), name='vae_input')
-
-    z, _, _ = encoder(_input)
-    _output = decoder(z)
-
-    return tf.keras.models.Model(_input, _output, name='vae')
+    def call(self, inputs):
+        z, z_mean, z_log_var = self.encoder(inputs)
+        reconstruction = self.decoder(z)
+        reconstruction_loss = tf.reduce_mean(
+            tf.reduce_sum(tf.keras.losses.binary_crossentropy(inputs, reconstruction), axis=1)
+        )
+        kl_loss = tf.reduce_mean(
+            tf.reduce_sum(-0.5 * (1 + z_log_var - tf.square(z_mean) - tf.exp(z_log_var)), axis=1)
+        )
+        total_loss = reconstruction_loss + kl_loss
+        self.add_loss(total_loss)
+        return reconstruction
