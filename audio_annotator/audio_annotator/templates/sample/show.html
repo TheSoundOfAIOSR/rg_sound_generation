@@ -31,10 +31,14 @@
                 {%  for i, p in pairs %}
                     <div class="w3-row-padding">
                         <div class="w3-third">
-                          <input name="p_{{ i }}" class="w3-radio" type="radio" value="{{ p[0] }}">
-                          <label>{{ p[0] }}</label>
+                          <div class="w3-half">
+                            <label style="width: 10px;">{{ p[0] }}</label>
+                          </div>
+                          <div class="w3-half">
+                            <input name="p_{{ i }}" class="w3-radio" type="radio" value="{{ p[0] }}">
+                          </div>
                         </div>
-                        <div class="w3-third">
+                        <div class="w3-third" style="padding-left: 40px;">
                             <input name="p_{{ i }}" class="w3-radio" type="radio" value="unsure">
                         </div>
                         <div class="w3-third">
