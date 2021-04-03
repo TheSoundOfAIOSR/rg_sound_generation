@@ -3,3 +3,4 @@ static
 *.wav
 *.png
 venv
+pre.csv
