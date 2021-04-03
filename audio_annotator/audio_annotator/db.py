@@ -90,7 +90,7 @@ def load_pre_db():
 
         row_id = row[0]
 
-        values = [df.loc[row_id, f'q_{q}'] for q in qualities]
+        values = [int(df.loc[row_id, f'q_{q}']) for q in qualities]
         description = df.loc[row_id, 'description']
         if str(description).lower() == 'nan':
             description = ''
@@ -103,6 +103,8 @@ def load_pre_db():
             query,
             values
         )
+    db.commit()
+    click.echo('Database saved')
 
 
 def init_app(app: Flask):
