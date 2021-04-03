@@ -70,8 +70,44 @@ def generate_spectrograms():
     create_spectrograms()
 
 
+@click.command('load-pre-db')
+@with_appcontext
+def load_pre_db():
+    import pandas as pd
+
+    if not os.path.isfile('pre.csv'):
+        click.echo('Could not find pre.csv, no data to pre-load')
+        return
+
+    df = pd.read_csv('pre.csv', index_col=0)
+    db = get_db()
+
+    click.echo('Loading data from pre.csv')
+
+    for row in tqdm(df.iterrows()):
+        query = ' = ?, '.join([f'q_{q}' for q in qualities])
+        query = 'UPDATE sample SET ' + query + ' = ?, description = ? WHERE id = ?'
+
+        row_id = row[0]
+
+        values = [df.loc[row_id, f'q_{q}'] for q in qualities]
+        description = df.loc[row_id, 'description']
+        if str(description).lower() == 'nan':
+            description = ''
+        else:
+            description = str(description)
+        values.append(description)
+        values.append(row_id)
+
+        db.execute(
+            query,
+            values
+        )
+
+
 def init_app(app: Flask):
     app.teardown_appcontext(close_db)
     app.cli.add_command(init_db_command)
     app.cli.add_command(build_db_command)
     app.cli.add_command(generate_spectrograms)
+    app.cli.add_command(load_pre_db)

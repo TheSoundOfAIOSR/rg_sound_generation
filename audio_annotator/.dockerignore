@@ -11,3 +11,6 @@ README.md
 .dockerignore
 .git
 .gitignore
+static
+instance
+venv

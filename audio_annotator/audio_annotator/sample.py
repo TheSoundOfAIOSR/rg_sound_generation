@@ -56,11 +56,13 @@ def show_sample(sample_id):
         values = [int(q in present_qualities) for q in qualities]
         current_values = [s[f'q_{q}'] for q in qualities]
         updated_values = [v + current_values[i] for i, v in enumerate(values)]
+        current_description = s['description'] or ''
+        updated_description = current_description + f',{description}'
         query = ' = ?, '.join([f'q_{q}' for q in qualities])
         query = 'UPDATE sample SET ' + query + ' = ?, description = ? WHERE id = ?'
         database.execute(
             query,
-            updated_values + [description, sample_id]
+            updated_values + [updated_description, sample_id]
         )
         database.commit()
         flash('Annotation saved')
