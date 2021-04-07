@@ -8,17 +8,27 @@ logging.basicConfig(level=logging.DEBUG)
 class SGServerInterface(WebsocketServer):
     def __init__(self, **kwargs):
         super(SGServerInterface, self).__init__(**kwargs)
+        self.state = "Initializing"
         self._register(self.get_prediction)
+        self._register(self.setup_model)
+        self._register(self.status)
+        self.state = "Initialized"
 
-    async def _consumer(self, websocket, message):
+    async def _consumer(self, ws, message):
         ret = await self.dispatch(message)
         async for gen in ret:
-            await websocket.send(gen)
+            await ws.send_json(gen)
 
     async def get_prediction(self, data):
-        ret = get_prediction(data).tolist()
-        data = json.dumps({"resp": ret})
-        return self.make_data_stream(data)
+        self.state = "Processing"
+        yield {"resp": get_prediction(data).tolist()}
+        self.state = "Processed"
+
+    async def setup_model(self):
+        yield {"resp": True}
+
+    async def status(self):
+        yield {"resp": self.state}
 
 
 if __name__ == "__main__":
