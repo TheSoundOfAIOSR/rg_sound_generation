@@ -15,3 +15,4 @@ Maps note_number, velocity, instrument_source, qualities, z to f0_scaled and ld_
  - MSE error on test set:0.0186 
  - Tensorboard: [TCN] https://tensorboard.dev/experiment/N7lWbOeGSW6QF6jQIzdXwg/#scalars
  
+For mapping from note_number, velocity, instrument_source, qualities, z to f0_variance and ld_scaled:[Tensorboard](https://tensorboard.dev/experiment/bSRGcVSkR1Ktk3qgMgfyIQ/#scalars)  
