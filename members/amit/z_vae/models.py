@@ -12,7 +12,7 @@ def create_encoder(latent_dim, num_features):
 
     _input = Input(shape=(1024, num_features), name='encoder_input')
 
-    x = conv_block(_input, 1024, 512, 4)
+    x = conv_block(_input, 64, 64, 4)
 
     for filters in [128] * 3 + [256, 512]:
         x = conv_block(x, filters, 64, 1)
@@ -36,10 +36,10 @@ def create_decoder(latent_dim, num_features):
 
     _input = Input(shape=(latent_dim, ), name='decoder_input')
 
-    x = Dense(3 * 512, activation='relu')(_input)
-    x = Reshape((3, 512))(x)
+    x = Dense(4 * 512, activation='relu')(_input)
+    x = Reshape((4, 512))(x)
 
-    for filters in [256, 512] + [128] * 3:
+    for filters in [256] + [128] * 3:
         x = up_sample_block(x, filters, 64, 1)
 
     x = UpSampling1D(2)(x)
