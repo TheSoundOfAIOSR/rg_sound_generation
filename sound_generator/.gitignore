@@ -1,4 +1,6 @@
-checkpoints*
 .idea
 __pycache__
 venv
+checkpoint
+*ckpt*
+*.gin
