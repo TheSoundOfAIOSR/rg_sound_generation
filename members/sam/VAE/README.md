@@ -1,7 +1,7 @@
 # Nsynth Guitar VAE
 
 ## Overview
-This process creates Mel spectograms of the guitar instrument group of Nsynth dataset, then trains a VAE on the guitar Mel spectograms.
+This process creates Mel spectograms of the guitar subset of the Nsynth dataset, then trains a VAE on these spectograms.
 In order for the notebooks to run properly, you need to [download](https://magenta.tensorflow.org/datasets/nsynth#files) each Nsynth json/wav file.
 
 ## Convert wav to Mel spectograms
