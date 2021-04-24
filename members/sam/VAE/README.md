@@ -6,7 +6,7 @@ In order for the notebooks to run properly, you need to [download](https://magen
 
 ## Convert wav to Mel spectograms
 Use the notebook, **Nsynth-Convert.ipynb**, in order to create Mel spectograms from each dataset. 
-This saves each spectogram into the local Download folder, feel free to change this to wherever you'd like. 
+This saves each spectogram into a local *Download/guitar/* folder, feel free to change this to wherever you'd like. 
 If you change the address, please change the references to the load data in the other notebooks as well. 
 
 ## Create and Train VAE
