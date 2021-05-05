@@ -1,53 +1,41 @@
+import random
 import os
 import numpy as np
-import librosa
 import data_loader
 
+from audio_processing import get_mel_spectrogram
 from typing import Dict
 from loguru import logger
 
 
-examples, features = None, None
+class DataGenerator:
+    def __init__(self, conf:Dict, batch_size: int = 8):
+        assert "csv_file_path" in conf
+        assert "base_dir" in conf
+        self.conf = conf.copy()
+        self.batch_size = batch_size
+        self.train, self.valid = data_loader.data_loader(conf)
+        self.num_train = len(self.train)
+        self.num_valid = len(self.valid)
 
+        logger.info("DataGenerator instantiated")
 
-def get_mel_spectrogram(conf: Dict, audio_file_path: str) -> np.ndarray:
-    assert os.path.isfile(audio_file_path), f"No file found at {audio_file_path}"
-    audio, _ = librosa.load(audio_file_path, sr=conf.get("sample_rate"), mono=True)
-    mel_spec = librosa.feature.melspectrogram(
-        audio,
-        sr=conf.get("sample_rate"),
-        n_fft=conf.get("n_fft"),
-        hop_length=conf.get("hop_len"),
-        n_mels=conf.get("n_mels")
-    )
-    return librosa.power_to_db(mel_spec)
+    def generator(self, set_name: str):
+        assert set_name in ["train", "valid"]
+        while True:
+            x_batch = np.zeros((self.batch_size, self.conf.get("n_mels"), self.conf.get("time_steps")))
+            y_batch = np.zeros((self.batch_size, self.conf.get("num_classes")))
+            indices = np.random.randint(0, eval(f"self.num_{set_name}"), size=(self.batch_size,))
+            current_items = list(eval(f"self.{set_name}.items()"))
 
+            for i, index in enumerate(indices):
+                key, value = random.choice(current_items)
+                file_path = os.path.join(self.conf.get("base_dir"), f"{key}.wav")
 
-def data_generator(conf: Dict, set_name: str, batch_size: int = 8) -> (np.ndarray, np.ndarray):
-    global examples, features
-    if examples is None or features is None:
-        examples, features = data_loader.data_loader(conf.get("csv_file_path"), conf.get("base_dir"))
-    current_examples = examples.get(set_name)
-    file_names = list(current_examples.keys())
-    logger.info(f"Found {len(file_names)} files in set {set_name}")
+                for j, feature in enumerate(self.conf.get("features")):
+                    y_batch[i, j] = int(value[feature] < 50 - self.conf.get("threshold"))
+                    y_batch[i, j + 1] = int(value[feature] > 50 + self.conf.get("threshold"))
 
-    while True:
-        x_batch = np.zeros((batch_size, conf.get("n_mels"), conf.get("time_steps")))
-        y_batch = np.zeros((batch_size, conf.get("num_classes")))
-        indices = np.random.randint(0, len(file_names), size=(batch_size,))
+                x_batch[i] = get_mel_spectrogram(file_path, self.conf) * self.conf.get("scale_factor")
 
-        for i, index in enumerate(indices):
-            file_name = file_names[index]
-            example = current_examples[file_name]
-
-            for j, feature in enumerate(features):
-                value = example["features"][feature]
-                left = bool(value < 50 - conf.get("threshold"))
-                right = bool(value > 50 + conf.get("threshold"))
-                y_batch[i, j * 2] = left
-                y_batch[i, j * 2 + 1] = right
-
-            file_path = example["file_path"]
-            x_batch[i] = get_mel_spectrogram(conf, file_path) * conf.get("scale_factor")
-
-        yield x_batch, y_batch
+            yield x_batch, y_batch

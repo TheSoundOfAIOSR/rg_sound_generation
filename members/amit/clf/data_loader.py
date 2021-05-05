@@ -1,60 +1,55 @@
 import os
 import pandas as pd
+import random
 
-from typing import Dict, List
+from typing import Dict
 from loguru import logger
-from tqdm import tqdm
 
 
-train_files = []
-valid_files = []
-test_files = []
+def data_loader(conf: Dict, valid_split: float = 0.2) -> (Dict, Dict):
+    file_path = conf["csv_file_path"]
+    base_dir = conf["base_dir"]
+    features = conf["features"]
 
-
-def create_file_path(file_name: str, base_dir: str) -> (str, str):
-    def read_subset(subset):
-        return [x for x in os.listdir(os.path.join(base_dir, subset, "audio")) if x.lower().endswith(".wav")]
-
-    def get_path(subset, file_name):
-        return os.path.join(base_dir, subset, "audio", file_name)
-
-    global train_files, valid_files, test_files
-
-    if not bool(train_files):
-        train_files = read_subset("train")
-    if not bool(valid_files):
-        valid_files = read_subset("valid")
-    if not bool(test_files):
-        test_files = read_subset("test")
-
-    if file_name in train_files:
-        return get_path("train", file_name), "train"
-    if file_name in valid_files:
-        return get_path("valid", file_name), "valid"
-    if file_name in test_files:
-        return get_path("test", file_name), "test"
-    raise FileNotFoundError(f"File {file_name} not found")
-
-
-def data_loader(file_path: str, base_dir: str) -> (Dict, List):
     assert os.path.isfile(file_path), f"Could not find the file {file_path}"
-    examples = {
-        "train": {},
-        "valid": {},
-        "test": {}
-    }
+    assert os.path.isdir(base_dir), f"Could not find the dir {base_dir}"
 
-    logger.info(f"Reading file {file_path}")
+    def normalize(example):
+        count = example["count"]
+        if count == 1:
+            return example
+        updated = {}
+        for feature in features:
+            updated[feature] = example[feature] / count
+        return updated
+
+
+    logger.info("Loading csv and checking audio files")
     df = pd.read_csv(file_path, index_col=0)
-    features = [x for x in df.columns if x not in ["audio_file", "user_id", "description"]]
 
-    logger.info("Populating examples dictionary")
-    for i, row in tqdm(df.iterrows()):
-        file_name = row["audio_file"]
-        file_name = f"{file_name}.wav"
-        file_path, set_name = create_file_path(file_name, base_dir)
-        examples[set_name][file_name] = {
-            "features": dict((feature, row[feature]) for feature in features),
-            "file_path": file_path
-        }
-    return examples, features
+    logger.info("Creating dataset")
+    examples = {}
+
+    for i, row in df.iterrows():
+        audio_file_name = os.path.splitext(row["audio_file"])[0]
+        current_example = dict((feature, row[feature]) for feature in features)
+        if audio_file_name in examples:
+            for feature in features:
+                examples[audio_file_name][feature] += current_example[feature]
+            examples[audio_file_name]["count"] += 1
+        else:
+            examples[audio_file_name] = current_example
+            examples[audio_file_name]["count"] = 1
+
+    logger.info("Creating train and valid splits")
+    train = {}
+    valid = {}
+
+    for key, value in examples.items():
+        assert os.path.isfile(os.path.join(base_dir, f"{key}.wav")), f"File not found {key}.wav"
+        if random.randint(0, 99) < valid_split * 100:
+            valid[key] = normalize(value)
+        else:
+            train[key] = normalize(value)
+
+    return train, valid

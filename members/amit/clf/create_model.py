@@ -20,10 +20,10 @@ def create_model(conf: Dict) -> tf.keras.Model:
         num_filters = min(2**(5 + i), 512)
         x = conv_block(x, num_filters)
     x = Flatten()(x)
-    x = Dropout(0.25)(x)
-    x = Dense(512, activation="relu")(x)
-    x = Dropout(0.25)(x)
-    output_ = Dense(conf.get("num_classes"), activation='sigmoid')(x)
+    x = Dropout(0.4)(x)
+    x = Dense(256, activation="relu")(x)
+    x = Dropout(0.4)(x)
+    output_ = Dense(conf.get("num_classes"), activation='relu')(x)
 
     model = tf.keras.models.Model(input_, output_)
 

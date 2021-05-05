@@ -22,26 +22,39 @@ if gpus:
 
 def train(conf: Dict) -> Any:
 
+    batch_size = 4
     model = create_model.create_model(conf)
-    train_gen = data_generator.data_generator(conf, "train", 8)
-    valid_gen = data_generator.data_generator(conf, "valid", 8)
-    test_gen = data_generator.data_generator(conf, "test", 8)
+    data_gen = data_generator.DataGenerator(conf, batch_size)
 
     logger.info("Starting training")
 
     _ = model.fit(
-        train_gen,
-        steps_per_epoch=100,
-        validation_data=valid_gen,
-        validation_steps=25,
-        epochs=40
+        data_gen.generator("train"),
+        steps_per_epoch=int(data_gen.num_train / batch_size),
+        validation_data=data_gen.generator("valid"),
+        validation_steps=int(data_gen.num_valid / batch_size),
+        epochs=100,
+        callbacks=[
+            tf.keras.callbacks.EarlyStopping(monitor="val_loss", patience=10),
+            tf.keras.callbacks.ReduceLROnPlateau(monitor="val_loss", patience=6),
+            tf.keras.callbacks.ModelCheckpoint(
+                f"checkpoints/{conf.get('model_name')}" + "_{val_loss:.4f}.h5",
+                monitor="val_loss", save_best_only=True, save_weights_only=False
+            )
+        ],
+        verbose=2
     )
 
     logger.info("Training finished")
-    _ = model.evaluate(test_gen, steps=10)
-
 
 
 if __name__ == "__main__":
     conf = config.get_config()
-    train(conf)
+    all_features = conf.get("all_features")
+    for f in all_features:
+        conf["features"] = [f]
+        conf["model_name"] = f
+        logger.info(f"Starting training for output: {f}")
+        logger.info("With configuration:")
+        logger.info(conf)
+        train(conf)
