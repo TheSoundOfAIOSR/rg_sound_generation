@@ -38,7 +38,7 @@ def train(conf: Dict) -> Any:
             tf.keras.callbacks.EarlyStopping(monitor="val_loss", patience=10),
             tf.keras.callbacks.ReduceLROnPlateau(monitor="val_loss", patience=6),
             tf.keras.callbacks.ModelCheckpoint(
-                f"checkpoints/{conf.get('model_name')}" + "_{val_loss:.4f}.h5",
+                f"checkpoints/{conf.get('model_name')}" + "_loss_{val_loss:.4f}_acc_{val_accuracy:.2f}.h5",
                 monitor="val_loss", save_best_only=True, save_weights_only=False
             )
         ],

@@ -23,7 +23,7 @@ def create_model(conf: Dict) -> tf.keras.Model:
     x = Dropout(0.4)(x)
     x = Dense(256, activation="relu")(x)
     x = Dropout(0.4)(x)
-    output_ = Dense(conf.get("num_classes"), activation='relu')(x)
+    output_ = Dense(conf.get("num_classes"), activation='softmax')(x)
 
     model = tf.keras.models.Model(input_, output_)
 
@@ -31,8 +31,8 @@ def create_model(conf: Dict) -> tf.keras.Model:
     opt = tf.keras.optimizers.Adam(learning_rate=conf.get("learning_rate"))
     model.compile(
         optimizer=opt,
-        loss="binary_crossentropy",
+        loss="categorical_crossentropy",
         metrics=["accuracy"]
     )
-    print(model.summary())
+    # print(model.summary())
     return model

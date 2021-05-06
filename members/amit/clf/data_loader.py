@@ -6,10 +6,11 @@ from typing import Dict
 from loguru import logger
 
 
-def data_loader(conf: Dict, valid_split: float = 0.2) -> (Dict, Dict):
+def data_loader(conf: Dict) -> (Dict, Dict):
     file_path = conf["csv_file_path"]
     base_dir = conf["base_dir"]
     features = conf["features"]
+    valid_split = conf["valid_split"]
 
     assert os.path.isfile(file_path), f"Could not find the file {file_path}"
     assert os.path.isdir(base_dir), f"Could not find the dir {base_dir}"
@@ -29,6 +30,8 @@ def data_loader(conf: Dict, valid_split: float = 0.2) -> (Dict, Dict):
 
     logger.info("Creating dataset")
     examples = {}
+
+    logger.info(f"Validation split is {valid_split}")
 
     for i, row in df.iterrows():
         audio_file_name = os.path.splitext(row["audio_file"])[0]

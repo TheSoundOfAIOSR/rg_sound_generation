@@ -22,6 +22,11 @@ class DataGenerator:
 
     def generator(self, set_name: str):
         assert set_name in ["train", "valid"]
+
+        min_level = 50 - self.conf.get("threshold")
+        max_level = 50 + self.conf.get("threshold")
+
+        logger.info(f"Min level {min_level}, Max level {max_level}")
         while True:
             x_batch = np.zeros((self.batch_size, self.conf.get("n_mels"), self.conf.get("time_steps")))
             y_batch = np.zeros((self.batch_size, self.conf.get("num_classes")))
@@ -31,10 +36,14 @@ class DataGenerator:
             for i, index in enumerate(indices):
                 key, value = random.choice(current_items)
                 file_path = os.path.join(self.conf.get("base_dir"), f"{key}.wav")
-
                 for j, feature in enumerate(self.conf.get("features")):
-                    y_batch[i, j] = int(value[feature] < 50 - self.conf.get("threshold"))
-                    y_batch[i, j + 1] = int(value[feature] > 50 + self.conf.get("threshold"))
+                    current_val = int(value[feature])
+                    current_class = 1
+                    if current_val < min_level:
+                        current_class = 0
+                    elif current_val > max_level:
+                        current_class = 2
+                    y_batch[i, j + current_class] = 1.
 
                 x_batch[i] = get_mel_spectrogram(file_path, self.conf) * self.conf.get("scale_factor")
 
