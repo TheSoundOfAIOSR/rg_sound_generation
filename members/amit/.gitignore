@@ -1,2 +1,4 @@
 checkpoints
 *.h5
+tmp
+logs

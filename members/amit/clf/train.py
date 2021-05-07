@@ -40,9 +40,10 @@ def train(conf: Dict) -> Any:
             tf.keras.callbacks.ModelCheckpoint(
                 f"checkpoints/{conf.get('model_name')}" + "_loss_{val_loss:.4f}_acc_{val_accuracy:.2f}.h5",
                 monitor="val_loss", save_best_only=True, save_weights_only=False
-            )
+            ),
+            tf.keras.callbacks.CSVLogger(f"logs/{conf.get('model_name')}.csv", separator=",", append=False)
         ],
-        verbose=2
+        verbose=True
     )
 
     logger.info("Training finished")
