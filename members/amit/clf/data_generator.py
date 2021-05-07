@@ -3,8 +3,8 @@ import shutil
 import os
 import numpy as np
 import data_loader
+import audio_processing
 
-from audio_processing import get_mel_spectrogram
 from typing import Dict
 from loguru import logger
 from tqdm import tqdm
@@ -26,7 +26,10 @@ class DataGenerator:
         self.num_train = 0
         self.num_valid = 0
         self.classes = [0, 1, 2]
-
+        self.input_shapes = {
+            "spec": (),
+            "hpss": ()
+        }
         logger.info("DataGenerator instantiated")
         self.preprocess()
         logger.info("Preprocessing complete")
@@ -34,11 +37,13 @@ class DataGenerator:
     def preprocess(self):
         logger.info("Preprocessing examples")
 
-        for c in self.classes:
-            folder = os.path.join(self.conf.get("preprocess_dir"), str(c))
+        folder = os.path.join(self.conf.get("preprocess_dir"))
 
+        if self.conf.get("reset_data"):
             if os.path.isdir(folder):
                 shutil.rmtree(folder)
+
+        if not os.path.isdir(folder):
             os.mkdir(folder)
 
         min_level = 50 - self.conf.get("threshold")
@@ -59,10 +64,20 @@ class DataGenerator:
                 elif current_val > max_level:
                     current_class = 2
 
-            target_file_path = os.path.join(self.conf.get("preprocess_dir"), str(current_class), f"{key}.npy")
+            target_file_path = os.path.join(self.conf.get("preprocess_dir"), key)
 
-            x = get_mel_spectrogram(file_path, self.conf) * self.conf.get("scale_factor")
-            np.save(target_file_path, x)
+            if not os.path.isfile(f"{target_file_path}.spec.npy"):
+                spec, hpss = audio_processing.get_features(file_path, self.conf)
+                self.input_shapes["spec"] = spec.shape
+                self.input_shapes["hpss"] = hpss.shape
+                np.save(f"{target_file_path}.spec", spec * self.conf.get("scale_factor"))
+                np.save(f"{target_file_path}.hpss", hpss * self.conf.get("scale_factor"))
+            elif len(self.input_shapes["spec"]) == 0:
+                spec = np.load(f"{target_file_path}.spec.npy")
+                hpss = np.load(f"{target_file_path}.hpss.npy")
+                self.input_shapes["spec"] = spec.shape
+                self.input_shapes["hpss"] = hpss.shape
+
 
             if random.randint(0, 99) < valid_split:
                 self.valid[current_class].append(target_file_path)
@@ -80,19 +95,23 @@ class DataGenerator:
 
     def generator(self, set_name: str):
         assert set_name in ["train", "valid"], "Set name must be either train or valid"
-        joint_counter = 0
 
         while True:
-            x_batch = np.zeros((self.batch_size, self.conf.get("n_mels"), self.conf.get("time_steps")))
+            joint_counter = random.randint(0, 9)
+
+            spec_batch = np.zeros((self.batch_size,) + self.input_shapes["spec"])
+            hpss_batch = np.zeros((self.batch_size,) + self.input_shapes["hpss"])
             y_batch = np.zeros((self.batch_size, self.conf.get("num_classes")))
             current_set = eval(f"self.{set_name}")
 
             for i in range(0, self.batch_size):
                 target_class = joint_counter % len(self.classes)
                 example_file = random.choice(current_set[target_class])
-                example = np.load(example_file)
-                x_batch[i] = example
+                example_spec = np.load(f"{example_file}.spec.npy")
+                example_hpss = np.load(f"{example_file}.hpss.npy")
+                spec_batch[i] = example_spec
+                hpss_batch[i] = example_hpss
                 y_batch[i, target_class] = 1.
                 joint_counter += 1
 
-            yield x_batch, y_batch
+            yield {"spec": spec_batch, "hpss": hpss_batch}, {"output": y_batch}

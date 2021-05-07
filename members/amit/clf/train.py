@@ -20,11 +20,15 @@ if gpus:
         logger.error(e)
 
 
-def train(conf: Dict) -> Any:
+def train(conf: Dict, dry: bool = False) -> Any:
 
     batch_size = 4
-    model = create_model.create_model(conf)
     data_gen = data_generator.DataGenerator(conf, batch_size)
+    print(data_gen.input_shapes)
+    model = create_model.create_model(conf, data_gen.input_shapes, False)
+
+    if dry:
+        return
 
     logger.info("Starting training")
 
@@ -36,10 +40,10 @@ def train(conf: Dict) -> Any:
         epochs=100,
         callbacks=[
             tf.keras.callbacks.EarlyStopping(monitor="val_loss", patience=10),
-            tf.keras.callbacks.ReduceLROnPlateau(monitor="val_loss", patience=6),
+            tf.keras.callbacks.ReduceLROnPlateau(monitor="val_loss", patience=6, verbose=True),
             tf.keras.callbacks.ModelCheckpoint(
                 f"checkpoints/{conf.get('model_name')}" + "_loss_{val_loss:.4f}_acc_{val_accuracy:.2f}.h5",
-                monitor="val_loss", save_best_only=True, save_weights_only=False
+                monitor="val_loss", save_best_only=True, save_weights_only=False, verbose=True
             ),
             tf.keras.callbacks.CSVLogger(f"logs/{conf.get('model_name')}.csv", separator=",", append=False)
         ],
@@ -51,6 +55,7 @@ def train(conf: Dict) -> Any:
 
 if __name__ == "__main__":
     conf = config.get_config()
+    dry = conf.get("dry_run")
     all_features = conf.get("all_features")
     for f in all_features:
         conf["features"] = [f]
@@ -58,4 +63,6 @@ if __name__ == "__main__":
         logger.info(f"Starting training for output: {f}")
         logger.info("With configuration:")
         logger.info(conf)
-        train(conf)
+        train(conf, dry)
+        if dry:
+            break
