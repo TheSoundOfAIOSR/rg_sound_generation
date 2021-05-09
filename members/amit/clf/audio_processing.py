@@ -27,10 +27,12 @@ def get_hpr(audio: np.ndarray, params: Dict) -> (np.ndarray, np.ndarray, np.ndar
 
 def get_features(file_path: str, params: Dict):
     audio, _ = librosa.load(file_path, sr=params.get("sample_rate"), mono=True)
+    audio = np.squeeze(audio)[:params.get("sample_rate") * params.get("clip_audio_at")]
     h, p, r = get_hpr(audio, params)
     h, p, r = np.abs(h).mean(axis=-1), np.abs(p).mean(axis=-1), np.abs(r).mean(axis=-1)
     dim = h.shape[0]
     hpss = np.concatenate([h, p, r], axis=-1)
     hpss = np.reshape(hpss, (dim * 3, 1))
     spec = get_mel_spectrogram(audio, params)
+    spec = np.clip(spec, params.get("clip_at"), np.max(spec))
     return spec, hpss

@@ -1,6 +1,6 @@
 import tensorflow as tf
-import create_model
-import data_generator
+import create_model_binary
+import data_generator_binary
 import config
 
 from typing import Dict, Any
@@ -22,10 +22,11 @@ if gpus:
 
 def train(conf: Dict, dry: bool = False) -> Any:
 
-    batch_size = 6
-    data_gen = data_generator.DataGenerator(conf, batch_size)
+    batch_size = 4
+    data_gen = data_generator_binary.DataGenerator(conf, batch_size)
     print(data_gen.input_shapes)
-    model = create_model.create_model(conf, data_gen.input_shapes, False)
+    model = create_model_binary.create_model(conf, data_gen.input_shapes, True)
+    # model = create_model_binary.create_rnn_model(conf, data_gen.input_shapes, True)
 
     if dry:
         return
@@ -39,8 +40,8 @@ def train(conf: Dict, dry: bool = False) -> Any:
         validation_steps=int(data_gen.num_valid / batch_size),
         epochs=100,
         callbacks=[
-            tf.keras.callbacks.EarlyStopping(monitor="val_loss", patience=10),
-            tf.keras.callbacks.ReduceLROnPlateau(monitor="val_loss", patience=6, verbose=True),
+            tf.keras.callbacks.EarlyStopping(monitor="val_loss", patience=15),
+            tf.keras.callbacks.ReduceLROnPlateau(monitor="val_loss", patience=5, verbose=True),
             tf.keras.callbacks.ModelCheckpoint(
                 f"checkpoints/{conf.get('model_name')}" + "_loss_{val_loss:.4f}_acc_{val_accuracy:.2f}.h5",
                 monitor="val_loss", save_best_only=True, save_weights_only=False, verbose=True

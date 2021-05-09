@@ -14,7 +14,7 @@ def data_loader(conf: Dict) -> (Dict, Dict):
     assert os.path.isfile(file_path), f"Could not find the file {file_path}"
     assert os.path.isdir(base_dir), f"Could not find the dir {base_dir}"
 
-    def normalize(example):
+    def normalize(example: Dict) -> Dict:
         count = example["count"]
         if count == 1:
             return example
@@ -23,6 +23,8 @@ def data_loader(conf: Dict) -> (Dict, Dict):
             updated[feature] = example[feature] / count
         return updated
 
+    def extract_file_name(file_name: str) -> str:
+        return file_name.split("+")[-1]
 
     logger.info("Loading csv and checking audio files")
     df = pd.read_csv(file_path, index_col=0)
@@ -32,6 +34,9 @@ def data_loader(conf: Dict) -> (Dict, Dict):
 
     for i, row in df.iterrows():
         audio_file_name = os.path.splitext(row["audio_file"])[0]
+        if not conf.get("pitch_shifted"):
+            audio_file_name = extract_file_name(audio_file_name)
+
         current_example = dict((feature, row[feature]) for feature in features)
         if audio_file_name in examples:
             for feature in features:

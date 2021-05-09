@@ -12,20 +12,20 @@ from pprint import pprint
 
 
 class DataGenerator:
-    def __init__(self, conf:Dict, batch_size: int = 8):
+    def __init__(self, conf: Dict, batch_size: int = 8):
         assert "csv_file_path" in conf
         assert "base_dir" in conf
         self.conf = conf.copy()
         self.batch_size = batch_size
         self.examples = data_loader.data_loader(conf)
         self.num_examples = len(self.examples)
-        self.train = {0: [], 1: [], 2: []}
-        self.valid = {0: [], 1: [], 2: []}
-        self.train_counts = {0: 0, 1: 0, 2: 0}
-        self.valid_counts = {0: 0, 1: 0, 2: 0}
+        self.train = {0: [], 1: []}
+        self.valid = {0: [], 1: []}
+        self.train_counts = {0: 0, 1: 0}
+        self.valid_counts = {0: 0, 1: 0}
         self.num_train = 0
         self.num_valid = 0
-        self.classes = [0, 1, 2]
+        self.classes = [0, 1]
         self.input_shapes = {
             "spec": (),
             "hpss": ()
@@ -36,6 +36,7 @@ class DataGenerator:
 
     def preprocess(self):
         logger.info("Preprocessing examples")
+        logger.info(f"{self.input_shapes['spec']} = Current input shape for spec")
 
         folder = os.path.join(self.conf.get("preprocess_dir"))
 
@@ -58,11 +59,14 @@ class DataGenerator:
 
             for j, feature in enumerate(self.conf.get("features")):
                 current_val = int(value[feature])
-                current_class = 1
+                current_class = -1
                 if current_val < min_level:
                     current_class = 0
                 elif current_val > max_level:
-                    current_class = 2
+                    current_class = 1
+
+            if current_class == -1:
+                continue
 
             target_file_path = os.path.join(self.conf.get("preprocess_dir"), key)
 
@@ -75,9 +79,10 @@ class DataGenerator:
             elif len(self.input_shapes["spec"]) == 0:
                 spec = np.load(f"{target_file_path}.spec.npy")
                 hpss = np.load(f"{target_file_path}.hpss.npy")
+                logger.info("Setting input shapes based on previous files")
+                logger.info(f"{spec.shape}, {hpss.shape}")
                 self.input_shapes["spec"] = spec.shape
                 self.input_shapes["hpss"] = hpss.shape
-
 
             if random.randint(0, 99) < valid_split:
                 self.valid[current_class].append(target_file_path)
@@ -97,21 +102,18 @@ class DataGenerator:
         assert set_name in ["train", "valid"], "Set name must be either train or valid"
 
         while True:
-            joint_counter = random.randint(0, 9)
-
             spec_batch = np.zeros((self.batch_size,) + self.input_shapes["spec"])
             hpss_batch = np.zeros((self.batch_size,) + self.input_shapes["hpss"])
-            y_batch = np.zeros((self.batch_size, self.conf.get("num_classes")))
+            y_batch = np.zeros((self.batch_size, ))
             current_set = eval(f"self.{set_name}")
 
             for i in range(0, self.batch_size):
-                target_class = joint_counter % len(self.classes)
+                target_class = random.choice([0, 1])
                 example_file = random.choice(current_set[target_class])
                 example_spec = np.load(f"{example_file}.spec.npy") * self.conf.get("scale_factor")
                 example_hpss = np.load(f"{example_file}.hpss.npy") * self.conf.get("scale_factor")
                 spec_batch[i] = example_spec
                 hpss_batch[i] = example_hpss
-                y_batch[i, target_class] = 1.
-                joint_counter += 1
+                y_batch[i] = target_class
 
             yield {"spec": spec_batch, "hpss": hpss_batch}, {"output": y_batch}
