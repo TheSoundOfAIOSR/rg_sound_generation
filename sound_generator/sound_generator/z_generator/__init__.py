@@ -1,2 +1,2 @@
-from sound_generator.z_generator.model import ZGenerator
-from sound_generator.z_generator.data_processor import ZDataProcessor
+from .model import ZGenerator
+from .data_processor import ZDataProcessor

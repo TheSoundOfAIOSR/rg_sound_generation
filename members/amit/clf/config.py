@@ -15,7 +15,7 @@ def get_config() -> Dict:
         "num_classes": 3,
         "n_fft": 2048,
         "hop_len": 512,
-        "n_mels": 256,
+        "n_mels": 64,
         "scale_factor": 1.0,
         "learning_rate": 2e-4,
         "threshold": 25,

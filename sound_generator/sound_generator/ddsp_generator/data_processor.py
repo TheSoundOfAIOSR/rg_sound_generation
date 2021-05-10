@@ -1,12 +1,15 @@
+from typing import Dict
 import numpy as np
-
 from ddsp.core import midi_to_unit
 from ddsp.training.preprocessing import F0LoudnessPreprocessor
 
 
 class DDSPDataProcessor:
+    """
+    Prepares data to be fed into DDSP Generator
+    """
     @staticmethod
-    def process(inputs, target_pitch=None):
+    def process(inputs: Dict, target_pitch: int = None) -> Dict:
         f0_ld_inputs, f0_ld_outputs = inputs.get('f0_ld_inputs'), inputs.get('f0_ld_outputs')
         f0_scaled, ld_scaled = f0_ld_outputs
 

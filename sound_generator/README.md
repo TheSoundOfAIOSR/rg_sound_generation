@@ -21,7 +21,7 @@ sound_generator
     - z_generator
 ```
 
-### Development
+### Virtualenv
 
 Create a virtual environment and install required packages
 
@@ -48,7 +48,7 @@ inputs = {
 audio = get_prediction(inputs)
 ```
 
-### Production
+### Docker
 
 Build and run in a docker container
 
@@ -91,11 +91,3 @@ The `source` can be one of `["acoustic", "electronic", "synthetic"]`
 
 The list `qualities` can be a have a number of qualities from `["bright", "dark", "distortion", "fast_decay", "long_release",
 "multiphonic", "nonlinear_env", "percussive", "reverb", "tempo_sync"]`
-
-## To Do
-
-* Both the `z_generator` and `f0_ld_generator` models need to see significant improvemnts
-* End to end training with ddsp autoencoder to fine tune the models
-* Either categorical outputs for `loudness_db` and `f0_hz` or smoothing to be applied on current predictions or both
-* More quality/ descriptor tags are to be used
-* Final version should generate only the C note (MIDI pitch 60)

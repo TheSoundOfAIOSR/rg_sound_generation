@@ -1,11 +1,12 @@
+from typing import Dict
 import tensorflow as tf
-
 from tensorflow.keras.layers import Dense, Reshape, Input, Conv1D, concatenate
 from tensorflow.keras.layers import BatchNormalization, UpSampling1D, Activation
+from loguru import logger
 
 
 class ZGenerator:
-    def __init__(self, checkpoint_path):
+    def __init__(self, checkpoint_path: str):
         self.model = None
         self.checkpoint_path = checkpoint_path
         self._load_model()
@@ -18,7 +19,10 @@ class ZGenerator:
         _z_input = Input(shape=(16, ), name='z_input')
 
         # there is no causality in this input, the temporal dimension is just for convenience
-        _input = concatenate([_instrument_source, _qualities, _z_input, _velocity, _pitch], axis=-1, name='concat_1')
+        _input = concatenate(
+            [_instrument_source, _qualities, _z_input, _velocity, _pitch],
+            axis=-1, name='concat_1'
+        )
 
         x = Dense(256, activation='relu', name='dense_1')(_input)
         x = Reshape((1, 256), name='reshape_1')(x)
@@ -34,10 +38,14 @@ class ZGenerator:
         x = Dense(1000, activation='linear', name='dense_2')(x)
         _output = Reshape((1000, 16), name='z_output')(x)
 
-        self.model = tf.keras.models.Model([_instrument_source, _qualities, _z_input, _velocity, _pitch], _output,
-                                      name='z_generator')
+        self.model = tf.keras.models.Model(
+            [_instrument_source, _qualities, _z_input, _velocity, _pitch],
+            _output, name='z_generator'
+        )
+        logger.info("Loading model checkpoint")
         self.model.load_weights(self.checkpoint_path)
         self.model.trainable = False
 
-    def predict(self, inputs):
+    def predict(self, inputs: Dict) -> tf.Tensor:
+        logger.info("Fetching prediction")
         return self.model.predict(inputs)
