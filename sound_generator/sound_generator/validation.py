@@ -38,7 +38,7 @@ def validate_input(inputs: Dict) -> bool:
             for val in latent_sample:
                 assert type(val) == int or type(val) == float, "latent_sample values " \
                                                                "must be either float or int"
-                assert val < -7. or val > 7., "latent_sample values must be between -7 and +7"
+                assert -7. <= val <= 7., f"latent_sample values must be between -7 and +7, instead found {val}"
 
         velocity = inputs.get("velocity")
         if velocity is not None:

@@ -46,6 +46,7 @@ inputs = {
 }
 
 audio = get_prediction(inputs)
+assert audio is not None
 ```
 
 ### Docker
@@ -68,12 +69,14 @@ import numpy as np
 URL = 'http://127.0.0.1/sound'
 
 res = requests.post(URL, json={
-    'velocity': 75,
+    'velocity': 50,
     'pitch': 60,
     'source': 'acoustic',
     'qualities': ['bright', 'percussive'],
     'latent_sample': [0.] * 16
 })
+
+assert res.status_code == 200
 
 audio = json.loads(res.text)['audio']
 audio = np.squeeze(audio)
