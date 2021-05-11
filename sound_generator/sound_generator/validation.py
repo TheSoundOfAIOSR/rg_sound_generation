@@ -35,6 +35,8 @@ def validate_input(inputs: Dict) -> bool:
         latent_sample = inputs.get("latent_sample")
         if latent_sample is not None:
             assert isinstance(latent_sample, list), f"latent_sample must be a list, not {type(latent_sample)}"
+            assert len(latent_sample) == 16, f"latent_sample must have 16 elements, " \
+                                             f"instead found {len(latent_sample)} elements"
             for val in latent_sample:
                 assert type(val) == int or type(val) == float, "latent_sample values " \
                                                                "must be either float or int"
@@ -57,8 +59,11 @@ def validate_input(inputs: Dict) -> bool:
             assert source in expected_sources, f"source must be one of {expected_sources}"
 
         qualities = inputs.get("qualities")
+        qualities = list(set(qualities))
         if qualities is not None:
             assert isinstance(qualities, list), f"qualities must be a list, not {type(qualities)}"
+            assert len(qualities) <= 10, f"qualities must have up to 10 unique values, " \
+                                         f"instead found {len(qualities)} unique values"
             for q in qualities:
                 assert q in expected_qualities, f"qualities must be one of {expected_qualities}"
 

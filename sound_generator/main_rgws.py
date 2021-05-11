@@ -1,4 +1,4 @@
-import json, asyncio, logging
+import asyncio, logging
 from rgws.interface import WebsocketServer
 from sound_generator import get_prediction
 
@@ -21,7 +21,8 @@ class SGServerInterface(WebsocketServer):
 
     async def get_prediction(self, data):
         self.state = "Processing"
-        yield {"resp": get_prediction(data).tolist()}
+        resp, success = get_prediction(data)
+        yield {"resp": resp.tolist(), "success": success}
         self.state = "Processed"
 
     async def setup_model(self):

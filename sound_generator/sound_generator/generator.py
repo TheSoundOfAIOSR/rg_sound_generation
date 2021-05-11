@@ -1,5 +1,6 @@
 import os
-from typing import Dict, Any
+from typing import Dict
+import numpy as np
 from loguru import logger
 from .z_generator import ZGenerator, ZDataProcessor
 from .f0_ld_generator import F0LoudnessGenerator, F0LoudnessDataProcessor
@@ -16,7 +17,7 @@ class SoundGenerator:
             cls._instance = super(SoundGenerator, cls).__new__(cls)
         return cls._instance
 
-    def build(self):
+    def _build(self):
         self.base_path = os.path.dirname(os.path.abspath(__file__))
         self.z_model_path = os.path.join(self.base_path,
                                          'checkpoints/z_generator/cp.ckpt')
@@ -41,6 +42,7 @@ class SoundGenerator:
         return self._models_loaded
 
     def load_models(self):
+        self._build()
         try:
             logger.info("Loading models")
             logger.info("Verifying model checkpoints")
@@ -64,30 +66,34 @@ class SoundGenerator:
         except Exception as e:
             logger.error(e)
 
-    def predict(self, inputs: Dict) -> Any:
-        if not self._models_loaded:
-            logger.error("Models are not loaded yet. Have you "
-                         "downloaded the pretrained checkpoints?")
-            return None
+    def predict(self, inputs: Dict) -> (np.ndarray, bool):
+        """
+        Returns predicted audio and if prediction successful(True or False)
+        """
+        try:
+            assert self.models_loaded, "Models must be loaded before getting " \
+                                       "prediction. Have you downloaded the checkpoints yet?"
+            logger.info("Processing input for z_generator")
+            z_inputs = self.z_data_processor.process(inputs)
+            logger.info("Getting output from z_generator")
+            z_outputs = self.z_model.predict(z_inputs)
 
-        logger.info("Processing input for z_generator")
-        z_inputs = self.z_data_processor.process(inputs)
-        logger.info("Getting output from z_generator")
-        z_outputs = self.z_model.predict(z_inputs)
+            logger.info("Processing input for f0_ld_generator")
+            f0_ld_inputs = self.f0_ld_data_processor.process({
+                'z_inputs': z_inputs,
+                'z_outputs': z_outputs
+            })
+            logger.info("Getting output from f0_ld_generator")
+            f0_ld_outputs = self.f0_ld_model.predict(f0_ld_inputs)
 
-        logger.info("Processing input for f0_ld_generator")
-        f0_ld_inputs = self.f0_ld_data_processor.process({
-            'z_inputs': z_inputs,
-            'z_outputs': z_outputs
-        })
-        logger.info("Getting output from f0_ld_generator")
-        f0_ld_outputs = self.f0_ld_model.predict(f0_ld_inputs)
-
-        logger.info("Processing input for ddsp_generator")
-        ddsp_inputs = self.ddsp_data_processor.process({
-            'f0_ld_inputs': f0_ld_inputs,
-            'f0_ld_outputs': f0_ld_outputs
-        }, target_pitch=self.z_data_processor.pitch)
-        logger.info("Getting output from ddsp_generator")
-        audio = self.ddsp_model.predict(ddsp_inputs)
-        return audio.numpy()
+            logger.info("Processing input for ddsp_generator")
+            ddsp_inputs = self.ddsp_data_processor.process({
+                'f0_ld_inputs': f0_ld_inputs,
+                'f0_ld_outputs': f0_ld_outputs
+            }, target_pitch=self.z_data_processor.pitch)
+            logger.info("Getting output from ddsp_generator")
+            audio = self.ddsp_model.predict(ddsp_inputs)
+            return audio.numpy(), True
+        except Exception as e:
+            logger.error(e)
+        return np.zeros((1, )), False

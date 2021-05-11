@@ -10,10 +10,8 @@ app = Flask(__name__)
 @app.route('/sound/', methods=['POST'])
 def api():
     data = json.loads(request.data)
-    prediction = get_prediction(data)
-    if prediction is not None:
-        return jsonify({'audio': prediction.tolist()}), 200
-    return jsonify({}), 400
+    prediction, success = get_prediction(data)
+    return jsonify({'audio': prediction.tolist(), 'success': success})
 
 
 if __name__ == '__main__':

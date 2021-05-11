@@ -45,8 +45,7 @@ inputs = {
     'latent_sample': [0.] * 16
 }
 
-audio = get_prediction(inputs)
-assert audio is not None
+audio, _ = get_prediction(inputs)
 ```
 
 ### Docker
@@ -75,8 +74,6 @@ res = requests.post(URL, json={
     'qualities': ['bright', 'percussive'],
     'latent_sample': [0.] * 16
 })
-
-assert res.status_code == 200
 
 audio = json.loads(res.text)['audio']
 audio = np.squeeze(audio)
