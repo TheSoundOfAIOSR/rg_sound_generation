@@ -21,6 +21,8 @@
 
 <button onclick="play()">Play</button>
 <button onclick="stop()">Stop</button>
+<h3>Volume</h3>
+<input type="range" id="volume-control" min="0" max="100" />
 
 <h3>Qualities</h3>
 <table style="width: 80%">
@@ -28,7 +30,7 @@
     <tr>
         <td style="text-align: right">{{ left }}</td>
 <!--        <td><input type="range" min="0" max="99" id="{{ q }}" name="{{ q }}" form="main_form" oninput="updateVal('{{ q }}')"></td>-->
-        <td><input type="range" min="0" max="99" id="{{ q }}" name="{{ q }}" form="main_form""></td>
+        <td><input type="range" min="0" max="99" id="{{ q }}" name="{{ q }}" form="main_form" /></td>
         <td style="text-align: left">{{ right }}</td>
 <!--        <td>Value=<span id="{{ q }}_value">50</span></td>-->
     </tr>
@@ -47,18 +49,21 @@
     <input type="submit" value="Submit">
 </form>
 
+<input type="checkbox" id="was_played" name="was_played" form="main_form" hidden>
+
 <script>
-    // function updateVal(item) {
-    //     let outputName = item.concat('_value');
-    //     let slider = document.getElementById(item);
-    //     let output = document.getElementById(outputName);
-    //
-    //     output.innerHTML = slider.value;
-    // }
+
+    let current_audio = document.getElementById('aud');
+    let volume = document.querySelector("#volume-control");
+    let divObject = document.getElementById('spectrogram_container');
+    let toggleButton = document.getElementById('show_button');
+    let was_played_input = document.getElementById('was_played')
+
+    volume.addEventListener("change", function(e) {
+        current_audio.volume = e.currentTarget.value / 100;
+    })
 
     function toggleSpectrogram() {
-        let divObject = document.getElementById('spectrogram_container');
-        let toggleButton = document.getElementById('show_button');
         divObject.hidden = !divObject.hidden;
         if (toggleButton.innerHTML === 'Show') {
             toggleButton.innerHTML = 'Hide'
@@ -68,16 +73,14 @@
     }
 
     function stop() {
-        let current_audio = document.getElementById('aud');
         current_audio.pause();
         current_audio.currentTime=0;
     }
 
     function play() {
         stop()
-
-        let current_audio = document.getElementById('aud');
         current_audio.play();
+        was_played_input.checked = true;
     }
 
 </script>

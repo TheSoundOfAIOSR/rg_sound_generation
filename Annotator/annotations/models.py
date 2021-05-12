@@ -19,6 +19,7 @@ class Annotation(models.Model):
     rich_vs_sparse = models.IntegerField()
     soft_vs_hard = models.IntegerField()
     description = models.CharField(max_length=200)
+    was_played = models.BooleanField(blank=True, null=True)
 
     def __str__(self):
         return f'{self.pk}_{self.user.username}_{self.audio_file}'

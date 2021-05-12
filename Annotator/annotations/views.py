@@ -3,7 +3,7 @@ import json
 import random
 
 from django.views.generic import TemplateView
-from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.shortcuts import render
 from annotations.models import Annotation
 
@@ -18,16 +18,16 @@ def get_audio_spectrogram_file():
     return audio_file, spectrogram_file
 
 
-class StatisticsView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):
+class StatisticsView(LoginRequiredMixin, TemplateView):
     template_name = 'annotation_stats.html'
 
     def get_context_data(self, **kwargs):
         context = super(StatisticsView, self).get_context_data(**kwargs)
-        context['total_count'] = Annotation.objects.count()
+        current_count = int(Annotation.objects.count())
+        context['total_count'] = current_count
+        context['level1'] = max(5000 - current_count, 0)
+        context['level2'] = max(10000 - current_count, 0)
         return context
-
-    def test_func(self):
-        return self.request.user.is_staff
 
 
 class CreateAnnotationView(LoginRequiredMixin, TemplateView):
@@ -56,14 +56,16 @@ class CreateAnnotationView(LoginRequiredMixin, TemplateView):
 
     def post(self, request):
         result = json.loads(json.dumps(request.POST))
+        was_played = result.get('was_played')
+        was_played = False if was_played is None else True
         annotation_object = Annotation()
         for _, _, q in self.qualities:
             vars(annotation_object)[q] = result[q]
         annotation_object.audio_file = self.get_context_data().get('audio_file_name')
         annotation_object.user = self.request.user
         annotation_object.description = result.get('description')
+        annotation_object.was_played = was_played
         annotation_object.save()
-
         # How many have you annotated?
         user_annotations = Annotation.objects.filter(user=self.request.user)
         return render(request, 'annotation_submit.html', {'count': len(user_annotations)})
