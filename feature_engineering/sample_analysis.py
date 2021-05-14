@@ -16,8 +16,8 @@ def lr_scheduler():
     return tf.keras.callbacks.LearningRateScheduler(scheduler)
 
 
-def decompose(file_path, display_plot=True):
-    assert os.path.isfile(file_path), "file not found"
+def decompose(file_path, display_plot=True, verbose=True):
+    assert os.path.isfile(file_path), f"file {file_path} not found"
     audio, sample_rate = sf.read(file_path)
     # audio, sample_rate = sf.read('samples/guitar_synthetic_000-060-025.wav')
     # audio, sample_rate = sf.read('samples/guitar_acoustic_019-060-075.wav')
@@ -48,7 +48,8 @@ def decompose(file_path, display_plot=True):
 
         harmonic_model.fit(audio, audio,
                            epochs=epochs,
-                           callbacks=[lr_scheduler()])
+                           callbacks=[lr_scheduler()],
+                           verbose=verbose)
 
         harmonic_frequencies = harmonic_model.harmonic_frequencies
 
