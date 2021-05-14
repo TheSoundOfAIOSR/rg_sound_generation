@@ -1,3 +1,4 @@
+import os
 import tensorflow as tf
 import numpy as np
 import sound_models as sm
@@ -15,8 +16,9 @@ def lr_scheduler():
     return tf.keras.callbacks.LearningRateScheduler(scheduler)
 
 
-def main():
-    audio, sample_rate = sf.read('samples/guitar_electronic_003-060-050.wav')
+def decompose(file_path, display_plot=True):
+    assert os.path.isfile(file_path), "file not found"
+    audio, sample_rate = sf.read(file_path)
     # audio, sample_rate = sf.read('samples/guitar_synthetic_000-060-025.wav')
     # audio, sample_rate = sf.read('samples/guitar_acoustic_019-060-075.wav')
 
@@ -35,7 +37,7 @@ def main():
     epochs = 500
     refinement_steps = 1
 
-    for i in range(refinement_steps):
+    for _ in range(refinement_steps):
         harmonic_model = sm.HarmonicModel(
             harmonic_frequencies, n_samples, sample_rate, frame_step)
 
@@ -53,29 +55,34 @@ def main():
     harmonic = harmonic_model(audio)
     residual = audio - harmonic
 
-    sf.write('samples/original.wav', np.squeeze(audio.numpy()), sample_rate)
-    sf.write('samples/harmonic.wav', np.squeeze(harmonic.numpy()), sample_rate)
-    sf.write('samples/residual.wav', np.squeeze(residual.numpy()), sample_rate)
+    output_dir = os.path.dirname(file_path)
+    file_name = os.path.basename(file_path)
+    file_name, ext = os.path.splitext(file_name)
 
-    for i in range(3):  # range(harmonic_model.n_harmonics):
-        phase_diff = harmonic_model.harmonic_phase_diffs[:, :, i]
-        amplitude = harmonic_model.harmonic_amplitudes[:, :, i]
-        phase_shift = harmonic_model.harmonic_phase_shifts[:, :, i]
+    sf.write(os.path.join(output_dir, f'{file_name}_original{ext}'), np.squeeze(audio.numpy()), sample_rate)
+    sf.write(os.path.join(output_dir, f'{file_name}_harmonic{ext}'), np.squeeze(harmonic.numpy()), sample_rate)
+    sf.write(os.path.join(output_dir, f'{file_name}_residual{ext}'), np.squeeze(residual.numpy()), sample_rate)
 
-        phase_diff = np.squeeze(phase_diff.numpy())
-        amplitude = np.squeeze(amplitude.numpy())
-        phase_shift = np.squeeze(phase_shift.numpy())
+    if display_plot:
+        for i in range(3):  # range(harmonic_model.n_harmonics):
+            phase_diff = harmonic_model.harmonic_phase_diffs[:, :, i]
+            amplitude = harmonic_model.harmonic_amplitudes[:, :, i]
+            phase_shift = harmonic_model.harmonic_phase_shifts[:, :, i]
 
-        plt.figure(i)
-        plt.subplot(3, 1, 1)
-        plt.plot(phase_diff)
-        plt.subplot(3, 1, 2)
-        plt.plot(amplitude)
-        plt.subplot(3, 1, 3)
-        plt.plot(phase_shift)
+            phase_diff = np.squeeze(phase_diff.numpy())
+            amplitude = np.squeeze(amplitude.numpy())
+            phase_shift = np.squeeze(phase_shift.numpy())
 
-    plt.show()
+            plt.figure(i)
+            plt.subplot(3, 1, 1)
+            plt.plot(phase_diff)
+            plt.subplot(3, 1, 2)
+            plt.plot(amplitude)
+            plt.subplot(3, 1, 3)
+            plt.plot(phase_shift)
+
+        plt.show()
 
 
 if __name__ == '__main__':
-    main()
+    decompose('samples/guitar_electronic_003-060-050.wav')

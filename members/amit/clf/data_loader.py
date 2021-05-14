@@ -2,6 +2,7 @@ import os
 import pandas as pd
 import random
 
+from uuid import uuid4
 from typing import Dict
 from loguru import logger
 
@@ -33,6 +34,7 @@ def data_loader(conf: Dict) -> (Dict, Dict):
     examples = {}
 
     for i, row in df.iterrows():
+        key = str(uuid4())
         audio_file_name = os.path.splitext(row["audio_file"])[0]
         if not conf.get("pitch_shifted"):
             audio_file_name = extract_file_name(audio_file_name)
@@ -40,16 +42,17 @@ def data_loader(conf: Dict) -> (Dict, Dict):
         current_example = dict((feature, row[feature]) for feature in features)
         if audio_file_name in examples:
             for feature in features:
-                examples[audio_file_name][feature] += current_example[feature]
-            examples[audio_file_name]["count"] += 1
+                examples[key][feature] += current_example[feature]
+            examples[key]["count"] += 1
         else:
-            examples[audio_file_name] = current_example
-            examples[audio_file_name]["count"] = 1
+            examples[key] = current_example
+            examples[key]["count"] = 1
+        examples[key]["audio_file_name"] = audio_file_name
 
-    normalized = {}
+    # normalized = {}
+    #
+    # for key, value in examples.items():
+    #     assert os.path.isfile(os.path.join(base_dir, f"{key}.wav")), f"File not found {key}.wav"
+    #     normalized[key] = normalize(value)
 
-    for key, value in examples.items():
-        assert os.path.isfile(os.path.join(base_dir, f"{key}.wav")), f"File not found {key}.wav"
-        normalized[key] = normalize(value)
-
-    return normalized
+    return examples

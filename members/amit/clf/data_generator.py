@@ -53,7 +53,8 @@ class DataGenerator:
         logger.info(f"Min level {min_level}, Max level {max_level}")
 
         for key, value in tqdm(self.examples.items()):
-            file_path = os.path.join(self.conf.get("base_dir"), f"{key}.wav")
+            audio_file_name = value["audio_file_name"]
+            file_path = os.path.join(self.conf.get("base_dir"), f"{audio_file_name}.wav")
             current_class = 1
 
             for j, feature in enumerate(self.conf.get("features")):
@@ -64,7 +65,7 @@ class DataGenerator:
                 elif current_val > max_level:
                     current_class = 2
 
-            target_file_path = os.path.join(self.conf.get("preprocess_dir"), key)
+            target_file_path = os.path.join(self.conf.get("preprocess_dir"), audio_file_name)
 
             if not os.path.isfile(f"{target_file_path}.spec.npy"):
                 spec, hpss = audio_processing.get_features(file_path, self.conf)
