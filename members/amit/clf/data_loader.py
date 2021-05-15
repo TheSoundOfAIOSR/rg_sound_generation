@@ -34,8 +34,8 @@ def data_loader(conf: Dict) -> (Dict, Dict):
     examples = {}
 
     for i, row in df.iterrows():
-        key = str(uuid4())
         audio_file_name = os.path.splitext(row["audio_file"])[0]
+        key = audio_file_name
         if not conf.get("pitch_shifted"):
             audio_file_name = extract_file_name(audio_file_name)
 
@@ -49,10 +49,10 @@ def data_loader(conf: Dict) -> (Dict, Dict):
             examples[key]["count"] = 1
         examples[key]["audio_file_name"] = audio_file_name
 
-    # normalized = {}
-    #
-    # for key, value in examples.items():
-    #     assert os.path.isfile(os.path.join(base_dir, f"{key}.wav")), f"File not found {key}.wav"
-    #     normalized[key] = normalize(value)
+    normalized = {}
 
-    return examples
+    for key, value in examples.items():
+        assert os.path.isfile(os.path.join(base_dir, f"{key}.wav")), f"File not found {key}.wav"
+        normalized[key] = normalize(value)
+        normalized[key]["audio_file_name"] = value["audio_file_name"]
+    return normalized
