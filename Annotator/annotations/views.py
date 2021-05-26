@@ -61,7 +61,7 @@ class CreateAnnotationView(LoginRequiredMixin, TemplateView):
         annotation_object = Annotation()
         for _, _, q in self.qualities:
             vars(annotation_object)[q] = result[q]
-        annotation_object.audio_file = self.get_context_data().get('audio_file_name')
+        annotation_object.audio_file = result.get('audio_file_name')
         annotation_object.user = self.request.user
         annotation_object.description = result.get('description')
         annotation_object.was_played = was_played

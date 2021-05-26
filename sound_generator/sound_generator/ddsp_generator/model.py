@@ -3,9 +3,10 @@ import tensorflow as tf
 import ddsp.training
 import gin
 from loguru import logger
+from ..interfaces import BaseModel
 
 
-class DDSPGenerator:
+class DDSPGenerator(BaseModel):
     """
     DDSP Generator
     """

@@ -2,9 +2,10 @@ from typing import Dict
 import tensorflow as tf
 from tensorflow.keras.layers import Input, concatenate, Conv1D, MaxPool1D, Flatten, Dense, Dropout
 from loguru import logger
+from ..interfaces import BaseModel
 
 
-class F0LoudnessGenerator:
+class F0LoudnessGenerator(BaseModel):
     def __init__(self, checkpoint_path):
         self.model = None
         self.checkpoint_path = checkpoint_path

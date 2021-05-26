@@ -89,8 +89,9 @@ class SoundGenerator:
             logger.info("Processing input for ddsp_generator")
             ddsp_inputs = self.ddsp_data_processor.process({
                 'f0_ld_inputs': f0_ld_inputs,
-                'f0_ld_outputs': f0_ld_outputs
-            }, target_pitch=self.z_data_processor.pitch)
+                'f0_ld_outputs': f0_ld_outputs,
+                'target_pitch': self.z_data_processor.pitch
+            })
             logger.info("Getting output from ddsp_generator")
             audio = self.ddsp_model.predict(ddsp_inputs)
             return audio.numpy(), True

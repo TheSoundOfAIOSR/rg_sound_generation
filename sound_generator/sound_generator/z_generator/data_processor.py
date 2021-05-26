@@ -1,9 +1,9 @@
 from typing import Dict
-
 import numpy as np
+from ..interfaces import DataProcessor
 
 
-class ZDataProcessor:
+class ZDataProcessor(DataProcessor):
     def __init__(self):
         self.source_to_index = {
             'acoustic': 0,

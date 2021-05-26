@@ -1,9 +1,9 @@
 from typing import Dict
-
 import numpy as np
+from ..interfaces import DataProcessor
 
 
-class F0LoudnessDataProcessor:
+class F0LoudnessDataProcessor(DataProcessor):
     def __init__(self, sequence_length: int=1000):
         self.sequence_length = sequence_length
 

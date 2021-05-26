@@ -3,9 +3,10 @@ import tensorflow as tf
 from tensorflow.keras.layers import Dense, Reshape, Input, Conv1D, concatenate
 from tensorflow.keras.layers import BatchNormalization, UpSampling1D, Activation
 from loguru import logger
+from ..interfaces import BaseModel
 
 
-class ZGenerator:
+class ZGenerator(BaseModel):
     def __init__(self, checkpoint_path: str):
         self.model = None
         self.checkpoint_path = checkpoint_path

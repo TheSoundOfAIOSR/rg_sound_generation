@@ -5,7 +5,7 @@ from typing import Dict
 def get_config() -> Dict:
     conf = {
         "base_dir": "D:\soundofai\\pitch_shifted_all",
-        "csv_file_path": "D:\soundofai\\annot_data\\data\\may_13.csv",
+        "csv_file_path": "D:\soundofai\\annot_data\\data\\may_24.csv",
         "preprocess_dir": "tmp",
         "audio_duration": 4,
         "clip_at": -30,
@@ -18,7 +18,7 @@ def get_config() -> Dict:
         "n_mels": 128,
         "scale_factor": 1.0,
         "learning_rate": 2e-4,
-        "threshold": 18,
+        "threshold": 35,
         "all_features": [
             'bright_vs_dark', 'full_vs_hollow', 'smooth_vs_rough',
             'warm_vs_metallic', 'clear_vs_muddy', 'thin_vs_thick',

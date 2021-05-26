@@ -1,8 +1,5 @@
 import os
 import pandas as pd
-import random
-
-from uuid import uuid4
 from typing import Dict
 from loguru import logger
 
@@ -20,7 +17,7 @@ def data_loader(conf: Dict) -> (Dict, Dict):
         if count == 1:
             return example
         updated = {}
-        for feature in features:
+        for i, feature in enumerate(features):
             updated[feature] = example[feature] / count
         return updated
 
