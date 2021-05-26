@@ -8,6 +8,10 @@ For the dataset generation you have to upload the nsynth audio files to your goo
 
 For the dataset generation you have to upload the nsynth audio files to your google drive: `/My Drive/nsynth_guitar/train/audio`.
 
+### Harmonic dataset demo
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/TheSoundOfAIOSR/rg_sound_generation/blob/main/members/fabio/harmonic_dataset_demo.ipynb)
+
+
 ### GRU Mapping model training
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/TheSoundOfAIOSR/rg_sound_generation/blob/main/members/fabio/gru_mapping_model_training.ipynb)
 
