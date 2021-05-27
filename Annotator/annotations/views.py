@@ -2,6 +2,7 @@ import os
 import json
 import random
 
+from pprint import pprint
 from django.views.generic import TemplateView
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.shortcuts import render
@@ -52,10 +53,14 @@ class CreateAnnotationView(LoginRequiredMixin, TemplateView):
             'audio_file_name': audio_file_name,
             'spectrogram_file_name': spectrogram_file_name
         })
+        # print(f"Sent to user {self.request.user}:")
+        # pprint(context)
         return context
 
     def post(self, request):
         result = json.loads(json.dumps(request.POST))
+        # print(f"Received from user {self.request.user}:")
+        # pprint(result)
         was_played = result.get('was_played')
         was_played = False if was_played is None else True
         annotation_object = Annotation()
