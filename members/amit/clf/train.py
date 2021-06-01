@@ -64,5 +64,3 @@ if __name__ == "__main__":
         logger.info("With configuration:")
         logger.info(conf)
         train(conf, dry)
-        if dry:
-            break
