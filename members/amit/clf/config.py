@@ -4,15 +4,16 @@ from typing import Dict
 
 def get_config() -> Dict:
     conf = {
-        "base_dir": "D:\soundofai\\pitch_shifted_all",
-        "csv_file_path": "D:\soundofai\\annot_data\\data\\may_31_new.csv",
+        "base_dir": "D:\soundofai\\all_nsynth_audio",
+        "csv_file_path": "D:\soundofai\\annot_data\\data\\june_06.csv",
+        "fb_categorical_file": "..\\fb_categorical.json",
         "preprocess_dir": "tmp",
         "audio_duration": 4,
         "clip_at": -30,
         "epsilon": 1e-5,
         "clip_audio_at": 2,
         "sample_rate": 16000,
-        "num_classes": 3,
+        "num_classes": 12,
         "n_fft": 2048,
         "hop_len": 512,
         "n_mels": 128,
@@ -25,7 +26,7 @@ def get_config() -> Dict:
             'pure_vs_noisy', 'rich_vs_sparse', 'soft_vs_hard'
         ],
         "features": ["bright_vs_dark"],
-        "model_name": "bright_vs_dark",
+        "model_name": "fb_qualities",
         "valid_split": 0.4,
         "dry_run": False,
         "reset_data": False,

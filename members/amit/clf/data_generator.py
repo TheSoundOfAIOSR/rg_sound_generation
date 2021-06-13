@@ -12,7 +12,7 @@ from pprint import pprint
 
 
 class DataGenerator:
-    def __init__(self, conf:Dict, batch_size: int = 8):
+    def __init__(self, conf: Dict, batch_size: int = 8):
         assert "csv_file_path" in conf
         assert "base_dir" in conf
         self.conf = conf.copy()

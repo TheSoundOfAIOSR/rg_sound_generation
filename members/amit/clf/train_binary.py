@@ -2,7 +2,6 @@ import tensorflow as tf
 import create_model_binary
 import data_generator_binary
 import config
-
 from typing import Dict, Any
 from loguru import logger
 
@@ -21,11 +20,10 @@ if gpus:
 
 
 def train(conf: Dict, dry: bool = False) -> Any:
-
     batch_size = 4
     data_gen = data_generator_binary.DataGenerator(conf, batch_size)
     print(data_gen.input_shapes)
-    model = create_model_binary.create_model(conf, data_gen.input_shapes, True)
+    model = create_model_binary.create_model(conf, data_gen.input_shapes)
     # model = create_model_binary.create_rnn_model(conf, data_gen.input_shapes, True)
 
     if dry:
@@ -65,5 +63,3 @@ if __name__ == "__main__":
         logger.info("With configuration:")
         logger.info(conf)
         train(conf, dry)
-        if dry:
-            break

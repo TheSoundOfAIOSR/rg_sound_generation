@@ -22,6 +22,7 @@ def find_fb_qualities(file_path: str,
     """
     audio = get_audio(file_path)
     spec = get_spectrogram(audio)
+    max_time = int(spec.shape[1] / 2)
 
     found = []
     raw = {}
@@ -29,8 +30,9 @@ def find_fb_qualities(file_path: str,
     for q in fb_qualities.keys():
         r = fb_qualities[q]["range"]
         slice_range = hz_to_band(r)
-        sliced_spec = spec[slice_range[0]: slice_range[1], :]
-        ratio = np.sum(sliced_spec) / np.sum(spec)
+        sliced_spec = spec[slice_range[0]: slice_range[1], :max_time]
+
+        ratio = np.sum(sliced_spec) / np.sum(spec[:, :max_time])
 
         high_thres = fb_qualities[q].get("r_thres_high") or 1.0
         low_thres = fb_qualities[q].get("r_thres_low") or 0.
@@ -41,6 +43,8 @@ def find_fb_qualities(file_path: str,
         if return_all:
             raw[q] = {
                 "ratio": ratio,
+                "band_amp": np.sum(sliced_spec),
+                "total_amp": np.sum(spec[:, :max_time]),
                 "r_thres_high": high_thres,
                 "r_thres_low": low_thres
             }
