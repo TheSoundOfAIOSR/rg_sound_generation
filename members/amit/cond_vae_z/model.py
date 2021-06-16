@@ -11,17 +11,16 @@ def sample_from_latent_space(inputs):
 
 def create_encoder():
     encoder_input = tf.keras.layers.Input(shape=(input_size, output_dim), name="encoder_input")
+    x = tf.keras.layers.Lambda(lambda x: tf.expand_dims(x, axis=-1))(encoder_input)
 
-    x = encoder_input
-
-    filters = [32, 32, 64, 64, 128]
-    kernels = [7, 7, 5, 5, 3, 3]
+    filters = [32, 32, 64, 64]
+    kernels = [7,  7,  5,  5]
 
     for f, k in zip(filters, kernels):
-        x = tf.keras.layers.Conv1D(f, k, padding=padding)(x)
+        x = tf.keras.layers.Conv2D(f, k, padding=padding)(x)
         x = tf.keras.layers.BatchNormalization()(x)
         x = tf.keras.layers.Activation("tanh")(x)
-        x = tf.keras.layers.MaxPool1D(2)(x)
+        x = tf.keras.layers.MaxPool2D(2)(x)
 
     flattened = tf.keras.layers.Flatten()(x)
     hidden = tf.keras.layers.Dense(hidden_units, activation="relu")(flattened)
@@ -40,19 +39,20 @@ def create_decoder():
     inputs = tf.keras.layers.concatenate([z_input, note_number, instrument_id])
     hidden = tf.keras.layers.Dense(hidden_units, activation="relu")(inputs)
     up_input = tf.keras.layers.Dense(4096, activation="relu")(hidden)
-    x = tf.keras.layers.Reshape((32, 128))(up_input)
+    x = tf.keras.layers.Reshape((64, 1, 64))(up_input)
 
-    filters = reversed([32, 32, 64, 64, 128])
-    kernels = reversed([7, 7, 5, 5, 3, 3])
+    filters = reversed([32, 32, 64, 64])
+    kernels = reversed([7,  7,  5,  5])
 
     for f, k in zip(filters, kernels):
-        x = tf.keras.layers.UpSampling1D(2)(x)
-        x = tf.keras.layers.Conv1D(f, k, padding=padding)(x)
+        x = tf.keras.layers.UpSampling2D(2)(x)
+        x = tf.keras.layers.Conv2D(f, k, padding=padding)(x)
         x = tf.keras.layers.BatchNormalization()(x)
         x = tf.keras.layers.Activation("tanh")(x)
 
-    reconstructed = tf.keras.layers.Conv1D(output_dim, 3, padding=padding, activation="tanh")(x)
+    reconstructed = tf.keras.layers.Conv2D(1, 3, padding=padding, activation="tanh")(x)
+    squeezed = tf.keras.layers.Lambda(lambda x: tf.squeeze(x))(reconstructed)
     return tf.keras.models.Model(
         [z_input, note_number, instrument_id],
-        reconstructed, name="decoder"
+        squeezed, name="decoder"
     )

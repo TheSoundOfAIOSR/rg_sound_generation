@@ -1,7 +1,7 @@
 latent_dim = 4
 output_dim = 16
 input_size = 1024 # time steps
-num_classes = 100
+num_classes = 97
 num_pitches = 128
 hidden_units = 256
 batch_size = 16

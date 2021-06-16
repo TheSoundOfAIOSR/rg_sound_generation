@@ -4,6 +4,17 @@ import tensorflow as tf
 from tfrecord_provider import CompleteTFRecordProvider
 from config import *
 
+with open("instrument_id_map.csv", "r") as f:
+    rows = f.read().splitlines()
+    names = rows[0].split(",")
+    ids = [int(x) for x in rows[1].split(",")]
+    keys_tensor = tf.constant(names)
+    values_tensor = tf.constant(ids)
+    init = tf.lookup.KeyValueTensorInitializer(keys_tensor, values_tensor)
+
+num_instruments = len(ids)
+instrument_to_ids = tf.lookup.StaticHashTable(init, default_value=-1)
+
 
 def create_dataset(
         dataset_dir='nsynth_guitar',
@@ -40,12 +51,12 @@ def map_features(features):
     z = features['z']
     paddings = tf.constant([[0, 24], [0, 0]])
     z_sequence = tf.pad(tf.reshape(z, shape=(1000, output_dim)), paddings) / normalize_factor
-    sample_name = features['sample_name']
+    sample_name = tf.squeeze(features['sample_name'])
     note_number = features['note_number']
     note_number = tf.squeeze(tf.one_hot(note_number, depth=num_pitches))
-    instrument = tf.strings.substr(sample_name, pos=-11, len=3)
-    indices = tf.cast(tf.strings.to_number(instrument), dtype=tf.uint8)
-    instrument_id = tf.squeeze(tf.one_hot(indices, depth=num_classes))
+    instrument = tf.strings.substr(sample_name, pos=7, len=tf.strings.length(sample_name) - 15)
+    index = instrument_to_ids.lookup(instrument)
+    instrument_id = tf.squeeze(tf.one_hot(index, depth=num_instruments))
     return {
         'z_sequence': z_sequence,
         'note_number': note_number,
