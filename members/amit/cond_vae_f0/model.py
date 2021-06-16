@@ -1,5 +1,6 @@
 import tensorflow as tf
 from config import *
+from dataset import num_instruments
 
 
 def sample_from_latent_space(inputs):
@@ -23,7 +24,7 @@ def create_encoder():
 def create_decoder():
     z_input = tf.keras.layers.Input(shape=(latent_dim, ))
     note_number = tf.keras.layers.Input(shape=(num_pitches, ))
-    instrument_id = tf.keras.layers.Input(shape=(num_classes,))
+    instrument_id = tf.keras.layers.Input(shape=(num_instruments,))
     inputs = tf.keras.layers.concatenate([z_input, note_number, instrument_id])
     hidden = tf.keras.layers.Dense(hidden_units, activation="relu")(inputs)
     reconstructed = tf.keras.layers.Dense(input_size, activation="relu")(hidden)
