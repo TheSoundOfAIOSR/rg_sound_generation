@@ -1,0 +1,13 @@
+latent_dim = 4
+output_dim = 16
+input_size = 1024 # time steps
+num_classes = 100
+num_pitches = 128
+hidden_units = 256
+batch_size = 16
+normalize_factor = 9.
+epochs = 20
+steps = int(32690 / batch_size)
+validation_steps = int(2081 / batch_size)
+early_stopping = 5
+padding = "same"

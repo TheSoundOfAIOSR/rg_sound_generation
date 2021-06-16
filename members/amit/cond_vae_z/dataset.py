@@ -1,14 +1,8 @@
-# from f0_scaled to f0_scaled conditioned on instrument_id
 
 import os
 import tensorflow as tf
-import pandas as pd
 from tfrecord_provider import CompleteTFRecordProvider
 from config import *
-
-
-def create_instrument_id_lookup_table() -> tf.lookup.StaticHashTable:
-    df = pd.read_csv()
 
 
 def create_dataset(
@@ -43,7 +37,9 @@ def create_dataset(
 
 
 def map_features(features):
-    f0_scaled = features['f0_scaled']
+    z = features['z']
+    paddings = tf.constant([[0, 24], [0, 0]])
+    z_sequence = tf.pad(tf.reshape(z, shape=(1000, output_dim)), paddings) / normalize_factor
     sample_name = features['sample_name']
     note_number = features['note_number']
     note_number = tf.squeeze(tf.one_hot(note_number, depth=num_pitches))
@@ -51,7 +47,7 @@ def map_features(features):
     indices = tf.cast(tf.strings.to_number(instrument), dtype=tf.uint8)
     instrument_id = tf.squeeze(tf.one_hot(indices, depth=num_classes))
     return {
-        'f0_scaled': f0_scaled,
+        'z_sequence': z_sequence,
         'note_number': note_number,
         'instrument_id': instrument_id
     }
