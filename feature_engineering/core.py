@@ -145,60 +145,69 @@ def generate_h_mag(h_freq, sample_rate, frame_step,
     return h_mag
 
 
-def harmonicity_measure(h_freq, h_mag, h_phase, residual,
-                          sample_rate, frame_step):
-    f_diff = h_freq[:, 1:, :] - h_freq[:, :-1, :]
-    m_diff = h_freq[:, 1:, :] - h_freq[:, :-1, :]
+def compute_transients_weight(h_freq, h_mag, h_phase, residual,
+                              sample_rate, frame_step):
+    h_freq_w = h_freq - tf.math.reduce_mean(h_freq, axis=1, keepdims=True)
+    h_freq_w = tf.math.abs(h_freq_w)
+
+    h_mag_w = h_mag[:, 1:, :] - h_mag[:, :-1, :]
+    h_mag_w = tf.concat([h_mag_w, h_mag_w[:, -1:, :]], axis=1)
+    h_mag_w = tf.math.abs(h_mag_w)
 
     g_phase = tsms.core.generate_phase(h_freq, sample_rate, frame_step)
     p_diff = tsms.core.phase_diff(h_phase, g_phase)
     p_diff = tsms.core.phase_diff(p_diff[:, 1:, :], p_diff[:, :-1, :])
-    p_diff = p_diff / (2.0 * np.pi)
-
-    f_diff = tf.concat([f_diff, f_diff[:, -1:, :]], axis=1)
-    f_diff = tf.math.abs(f_diff)
-
-    m_diff = tf.concat([m_diff, m_diff[:, -1:, :]], axis=1)
-    m_diff = tf.math.abs(m_diff)
-
     p_diff = tf.concat([p_diff, p_diff[:, -1:, :]], axis=1)
-    p_diff = tf.math.abs(p_diff)
-
-    f_diff = tf.nn.max_pool1d(
-        f_diff, [1, 4, 1], 1, padding='SAME', data_format='NWC')
-
-    m_diff = tf.nn.max_pool1d(
-        m_diff, [1, 4, 1], 1, padding='SAME', data_format='NWC')
-
     p_diff = tf.nn.max_pool1d(
         p_diff, [1, 4, 1], 1, padding='SAME', data_format='NWC')
+    h_phase_w = tf.math.abs(p_diff)
 
-    # weights to remove
-    f_diff_weight = 1e-1 / (f_diff + 1e-1)
-    m_diff_weight = 1e-1 / (m_diff + 1e-1)
-    p_diff_weight = 1e-1 / (p_diff + 1e-1)
+    h_mag = h_mag / tf.math.reduce_max(h_mag)
+    h_mag_mean = tf.math.reduce_mean(h_mag, axis=2)
+    h_mag_mean = tf.where(h_mag_mean == 0.0, 1e-9, h_mag_mean)
 
-    weight = tsms.core.lin_to_db(h_mag) + librosa.A_weighting(h_freq)
-    weight = weight - tf.math.reduce_max(weight)
-    weight = (tf.maximum(weight, -100.0) + 100.0) / 100.0
+    h_freq_w = tf.math.reduce_mean(h_freq_w * h_mag, axis=2) / h_mag_mean
+    h_mag_w = tf.math.reduce_mean(h_mag_w * h_mag, axis=2) / h_mag_mean
+    h_phase_w = tf.math.reduce_mean(h_phase_w * h_mag, axis=2) / h_mag_mean
 
-    weight = weight * f_diff_weight * m_diff_weight * p_diff_weight
+    return h_freq_w, h_mag_w, h_phase_w
 
-    # weight = h_mag / tf.math.reduce_max(h_mag)
+
+def harmonicity_measure(h_freq, h_mag, h_phase, residual,
+                        sample_rate, frame_step):
+    h_freq_w, h_mag_w, h_phase_w = compute_transients_weight(
+        h_freq, h_mag, h_phase, residual, sample_rate, frame_step)
+
+    h_phase_w = tf.where(h_phase_w > tf.math.reduce_mean(h_phase_w), 0.0, 1.0)
+
+    db_limit = -80
+    mag_w = tsms.core.lin_to_db(h_mag) + librosa.A_weighting(h_freq)
+    mag_w = mag_w - tf.math.reduce_max(mag_w)
+    mag_w = (tf.maximum(mag_w, db_limit) - db_limit) / (-db_limit)
+
+    # mag_w = h_mag / tf.math.reduce_max(h_mag)
 
     harmonics = h_freq.shape[-1]
     harmonic_indices = tf.range(1, harmonics + 1, dtype=tf.float32)
     harmonic_indices = harmonic_indices[tf.newaxis, tf.newaxis, :]
-    mean_weight = tf.reduce_mean(tf.square(weight)) + 1e-9
 
-    f0_variance = tf.reduce_mean(
-        tf.square(weight * (h_freq / harmonic_indices - h_freq[:, :, :1])),
-        axis=-1) / mean_weight
+    f0 = tsms.core.harmonic_analysis_to_f0(h_freq, h_mag)
+    f0 = tf.concat([f0, f0[:, -1:, :]], axis=1)
+    # f0 = h_freq[:, :, :1]
+    f = h_freq / harmonic_indices
 
-    f0_variance = tf.math.reduce_mean(f0_variance)
+    mag_w_mean = tf.math.reduce_mean(mag_w, axis=2)
+    mag_w_mean = tf.where(mag_w_mean == 0.0, 1e-9, mag_w_mean)
 
-    harmonic = 1.0 / f0_variance
-    inhamonic = f0_variance
+    f_variance = tf.math.reduce_mean(
+        mag_w * tf.square(f - f0), axis=2) / tf.reduce_max(mag_w_mean)
+
+    f_variance *= h_phase_w
+
+    f_variance = tf.math.reduce_mean(f_variance)
+
+    harmonic = 1.0 / f_variance
+    inhamonic = f_variance
 
     den = harmonic + inhamonic
     harmonic = harmonic / den
@@ -207,15 +216,17 @@ def harmonicity_measure(h_freq, h_mag, h_phase, residual,
     return harmonic, inhamonic
 
 
-def even_odd_measure(h_freq, h_mag, h_phase, residual, sample_rate, frame_step):
-    weight = tsms.core.lin_to_db(h_mag) + librosa.A_weighting(h_freq)
-    weight = weight - tf.math.reduce_max(weight)
-    weight = (tf.maximum(weight, -100.0) + 100.0) / 100.0
+def even_odd_measure(h_freq, h_mag, h_phase, residual,
+                     sample_rate, frame_step):
+    db_limit = -80
+    mag_w = tsms.core.lin_to_db(h_mag) + librosa.A_weighting(h_freq)
+    mag_w = mag_w - tf.math.reduce_max(mag_w)
+    mag_w = (tf.maximum(mag_w, db_limit) - db_limit) / (-db_limit)
 
-    # weight = h_mag / tf.math.reduce_max(h_mag)
+    # mag_w = h_mag / tf.math.reduce_max(h_mag)
 
-    even_mean = tf.math.reduce_mean(weight[:, :, 1::2])
-    odd_mean = tf.math.reduce_mean(weight[:, :, 0::2])
+    even_mean = tf.math.reduce_mean(mag_w[:, :, 1::2])
+    odd_mean = tf.math.reduce_mean(mag_w[:, :, 0::2])
 
     den = even_mean + odd_mean
     even = even_mean / den
@@ -224,4 +235,53 @@ def even_odd_measure(h_freq, h_mag, h_phase, residual, sample_rate, frame_step):
     return even, odd
 
 
+def sparse_rich_measure(h_freq, h_mag, h_phase, residual,
+                             sample_rate, frame_step):
+    db_limit = -60
+    mag_w = tsms.core.lin_to_db(h_mag)  # + librosa.A_weighting(h_freq)
+    mag_w = mag_w - tf.math.reduce_max(mag_w)
+    mag_w = (tf.maximum(mag_w, db_limit) - db_limit) / (-db_limit)
 
+    num_nonzero = tf.math.count_nonzero(
+        tf.math.reduce_sum(mag_w, axis=2), axis=1, dtype=tf.float32)
+
+    h_mag_mean = tf.math.reduce_sum(mag_w, axis=1) / num_nonzero
+    h_mag_mean = tf.math.reduce_mean(h_mag_mean)
+
+    sparse = 1.0 - h_mag_mean
+    rich = h_mag_mean
+
+    return sparse, rich
+
+
+def hard_soft_attack_measure(h_freq, h_mag, h_phase, residual,
+                             sample_rate, frame_step):
+    h_freq_w, h_mag_w, h_phase_w = compute_transients_weight(
+        h_freq, h_mag, h_phase, residual, sample_rate, frame_step)
+
+    # db_limit = -100
+    # mag_w = tsms.core.lin_to_db(h_mag) + librosa.A_weighting(h_freq)
+    # mag_w = mag_w - tf.math.reduce_max(mag_w)
+    # mag_w = (tf.maximum(mag_w, db_limit) - db_limit) / (-db_limit)
+
+    mag_w = h_mag / tf.math.reduce_max(h_mag)
+
+    mag_w_mean = tf.math.reduce_mean(mag_w, axis=2)
+    # mag_w_mean = tf.where(mag_w_mean == 0.0, 1e-9, mag_w_mean)
+
+    # h_freq_w *= mag_w_mean
+    # h_mag_w *= mag_w_mean
+    # h_phase_w *= mag_w_mean
+
+    plt.figure()
+    plt.plot(np.squeeze(h_freq_w.numpy()))
+
+    plt.figure()
+    plt.plot(np.squeeze(h_mag_w.numpy()))
+
+    plt.figure()
+    plt.plot(np.squeeze(h_phase_w.numpy()))
+
+    plt.show()
+
+    return 0.0, 0.0
