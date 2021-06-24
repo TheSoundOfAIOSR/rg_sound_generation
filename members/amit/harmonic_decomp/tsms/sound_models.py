@@ -1,6 +1,6 @@
 import tensorflow as tf
 import numpy as np
-from tsms import core
+from . import core
 
 
 class ResidualError(tf.keras.losses.Loss):

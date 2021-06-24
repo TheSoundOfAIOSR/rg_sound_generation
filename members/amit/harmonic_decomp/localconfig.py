@@ -19,6 +19,8 @@ class LocalConfig:
     csv_log_file = "logs.csv"
     final_conv_shape = (16, 2, 288)
     final_conv_units = 16 * 2 * 288
+    best_loss = 2.5 # 1e6
+    sample_rate = 16000
 
     _instance = None
 

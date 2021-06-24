@@ -19,9 +19,7 @@ def train(conf: LocalConfig):
 
     optimizer = tf.keras.optimizers.Adam(learning_rate=conf.learning_rate)
 
-    best_loss = 1e6
     last_good_epoch = 0
-
 
     print("="*20, "Encoder", "="*20)
     print(encoder.summary())
@@ -114,7 +112,7 @@ def train(conf: LocalConfig):
 
         write_log(conf, epoch, losses, val_losses)
 
-        if valid_loss < best_loss:
+        if valid_loss < conf.best_loss:
             last_good_epoch = epoch
             best_loss = valid_loss
             print(f"Best loss updated to {best_loss: .4f}, saving model weights")

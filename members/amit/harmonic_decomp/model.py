@@ -2,13 +2,14 @@ import tensorflow as tf
 from localconfig import LocalConfig
 
 
-def create_encoder(conf: LocalConfig):
-    def sample_from_latent_space(inputs):
-        z_mean, z_log_variance = inputs
-        batch_size = tf.shape(z_mean)[0]
-        epsilon = tf.random.normal(shape=(batch_size, conf.latent_dim))
-        return z_mean + tf.exp(0.5 * z_log_variance) * epsilon
+def sample_from_latent_space(inputs):
+    z_mean, z_log_variance = inputs
+    batch_size = tf.shape(z_mean)[0]
+    epsilon = tf.random.normal(shape=(batch_size, LocalConfig().latent_dim))
+    return z_mean + tf.exp(0.5 * z_log_variance) * epsilon
 
+
+def create_encoder(conf: LocalConfig):
     def conv_block(x, f, k):
         x = tf.keras.layers.Conv2D(f, k, padding=conf.padding,
                                    kernel_initializer=tf.initializers.glorot_uniform)(x)
@@ -33,7 +34,7 @@ def create_encoder(conf: LocalConfig):
     for i in range(1, len(filters)):
         f, k = next(filters_kernels)
         wrapper[f"block_{i + 1}"] = conv_block(wrapper[f"out_{i}"], f, k)
-        wrapper[f"skip_{i + 1}"] = tf.keras.layers.concatenate([wrapper[f"block_{i+1}"], wrapper[f"out_{i}"]])
+        wrapper[f"skip_{i + 1}"] = tf.keras.layers.concatenate([wrapper[f"block_{i + 1}"], wrapper[f"out_{i}"]])
         wrapper[f"out_{i + 1}"] = tf.keras.layers.MaxPool2D(2)(wrapper[f"skip_{i + 1}"])
 
     flattened = tf.keras.layers.Flatten()(wrapper[f"out_{len(filters)}"])
@@ -52,10 +53,10 @@ def create_encoder(conf: LocalConfig):
 
 
 def create_decoder(conf: LocalConfig):
-    z_input = tf.keras.layers.Input(shape=(conf.latent_dim, ))
-    note_number = tf.keras.layers.Input(shape=(conf.num_pitches, ))
+    z_input = tf.keras.layers.Input(shape=(conf.latent_dim,))
+    note_number = tf.keras.layers.Input(shape=(conf.num_pitches,))
     instrument_id = tf.keras.layers.Input(shape=(conf.num_instruments,))
-    velocity = tf.keras.layers.Input(shape=(conf.num_velocities, ))
+    velocity = tf.keras.layers.Input(shape=(conf.num_velocities,))
     inputs = tf.keras.layers.concatenate([z_input, note_number, velocity, instrument_id])
     hidden = tf.keras.layers.Dense(conf.hidden_dim, activation="relu",
                                    kernel_initializer=tf.initializers.glorot_uniform)(inputs)
