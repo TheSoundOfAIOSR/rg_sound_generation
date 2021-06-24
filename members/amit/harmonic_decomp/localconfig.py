@@ -1,7 +1,7 @@
 class LocalConfig:
     dataset_dir = "D:\soundofai\\cleaned_nsynth"
-    latent_dim = 64
-    hidden_dim = 128
+    latent_dim = 128
+    hidden_dim = 256
     harmonic_frame_steps = 1001
     frame_size = 64
     batch_size = 2
@@ -19,7 +19,7 @@ class LocalConfig:
     csv_log_file = "logs.csv"
     final_conv_shape = (16, 2, 288)
     final_conv_units = 16 * 2 * 288
-    best_loss = 2.5 # 1e6
+    best_loss = 1e6
     sample_rate = 16000
 
     _instance = None
