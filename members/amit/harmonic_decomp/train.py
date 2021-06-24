@@ -75,7 +75,7 @@ def train(conf: LocalConfig):
             step_loss = loss.numpy().mean()
             losses.append(step_loss)
 
-            if step % 100 == 0:
+            if step % conf.step_log_interval == 0 and conf.log_steps:
                 print(f"Step: {step:5d}, Loss at current step: {step_loss:.4f}")
 
         train_loss = sum(losses) / len(losses)

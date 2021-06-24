@@ -52,7 +52,7 @@ def create_encoder(conf: LocalConfig):
     return model
 
 
-def create_decoder(conf: LocalConfig):
+def create_decoder_mlp(conf: LocalConfig):
     z_input = tf.keras.layers.Input(shape=(conf.latent_dim,))
     note_number = tf.keras.layers.Input(shape=(conf.num_pitches,))
     instrument_id = tf.keras.layers.Input(shape=(conf.num_instruments,))
@@ -81,34 +81,39 @@ def create_decoder(conf: LocalConfig):
     tf.keras.utils.plot_model(model, to_file="decoder.png", show_shapes=True)
     return model
 
-# def create_decoder(conf: LocalConfig):
-#     z_input = tf.keras.layers.Input(shape=(conf.latent_dim,))
-#     note_number = tf.keras.layers.Input(shape=(conf.num_pitches,))
-#     instrument_id = tf.keras.layers.Input(shape=(conf.num_instruments,))
-#     velocity = tf.keras.layers.Input(shape=(conf.num_velocities,))
-#     inputs = tf.keras.layers.concatenate([z_input, note_number, velocity, instrument_id])
-#     hidden = tf.keras.layers.Dense(conf.hidden_dim, activation="relu",
-#                                    kernel_initializer=tf.initializers.glorot_uniform)(inputs)
-#     up_input = tf.keras.layers.Dense(conf.final_conv_units, activation="relu",
-#                                      kernel_initializer=tf.initializers.glorot_uniform)(hidden)
-#     x = tf.keras.layers.Reshape(conf.final_conv_shape)(up_input)
-#
-#     filters = reversed([32, 32, 32, 64, 64, 64])
-#     kernels = reversed([3, 3, 3, 3, 3, 3])
-#
-#     for f, k in zip(filters, kernels):
-#         x = tf.keras.layers.UpSampling2D(2)(x)
-#         x = tf.keras.layers.Conv2D(f, k, padding=conf.padding,
-#                                    kernel_initializer=tf.initializers.glorot_uniform)(x)
-#         x = tf.keras.layers.BatchNormalization()(x)
-#         x = tf.keras.layers.Activation("relu")(x)
-#
-#     reconstructed = tf.keras.layers.Conv2D(3, 3, padding=conf.padding, activation="tanh",
-#                                            kernel_initializer=tf.initializers.glorot_uniform)(x)
-#
-#     model = tf.keras.models.Model(
-#         [z_input, note_number, velocity, instrument_id],
-#         reconstructed, name="decoder"
-#     )
-#     tf.keras.utils.plot_model(model, to_file="decoder.png", show_shapes=True)
-#     return model
+
+def create_decoder_conv(conf: LocalConfig):
+    z_input = tf.keras.layers.Input(shape=(conf.latent_dim,))
+    note_number = tf.keras.layers.Input(shape=(conf.num_pitches,))
+    instrument_id = tf.keras.layers.Input(shape=(conf.num_instruments,))
+    velocity = tf.keras.layers.Input(shape=(conf.num_velocities,))
+    inputs = tf.keras.layers.concatenate([z_input, note_number, velocity, instrument_id])
+    hidden = tf.keras.layers.Dense(conf.hidden_dim, activation="relu",
+                                   kernel_initializer=tf.initializers.glorot_uniform)(inputs)
+    up_input = tf.keras.layers.Dense(conf.final_conv_units, activation="relu",
+                                     kernel_initializer=tf.initializers.glorot_uniform)(hidden)
+    x = tf.keras.layers.Reshape(conf.final_conv_shape)(up_input)
+
+    filters = reversed([32, 32, 32, 64, 64, 64])
+    kernels = reversed([3, 3, 3, 3, 3, 3])
+
+    for f, k in zip(filters, kernels):
+        x = tf.keras.layers.UpSampling2D(2)(x)
+        x = tf.keras.layers.Conv2D(f, k, padding=conf.padding,
+                                   kernel_initializer=tf.initializers.glorot_uniform)(x)
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.Activation("relu")(x)
+
+    reconstructed = tf.keras.layers.Conv2D(3, 3, padding=conf.padding, activation="tanh",
+                                           kernel_initializer=tf.initializers.glorot_uniform)(x)
+
+    model = tf.keras.models.Model(
+        [z_input, note_number, velocity, instrument_id],
+        reconstructed, name="decoder"
+    )
+    tf.keras.utils.plot_model(model, to_file="decoder.png", show_shapes=True)
+    return model
+
+
+def create_decoder(conf: LocalConfig):
+    return eval(f"create_decoder_{conf.decoder_type}(conf)")

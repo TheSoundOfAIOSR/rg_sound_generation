@@ -21,6 +21,9 @@ class LocalConfig:
     final_conv_units = 16 * 2 * 288
     best_loss = 1e6
     sample_rate = 16000
+    log_steps = False
+    step_log_interval = 100
+    decoder_type = "mlp" # or "conv"
 
     _instance = None
 
