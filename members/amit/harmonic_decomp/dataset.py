@@ -65,11 +65,10 @@ def map_features(features):
     harmonic_indices = tf.range(1, harmonics + 1, dtype=tf.float32)
     harmonic_indices = harmonic_indices[tf.newaxis, tf.newaxis, :]
     h_freq_centered = h_freq - (f0_mean * harmonic_indices)
-
     h_mag = tf.squeeze(h_mag, axis=0)
     h_freq_centered = tf.squeeze(h_freq_centered, axis=0)
-
-    h_freq_norm = h_freq_centered / f0_mean
+    f0_from_note = tsms.core.midi_to_hz(tf.cast(features["note_number"], dtype=tf.float32))
+    h_freq_norm = h_freq_centered / f0_from_note
     # (h_freq_centered - tf.reduce_mean(h_freq_centered)) / tf.math.reduce_std(h_freq_centered)
     h_mag_norm = h_mag / tf.math.reduce_max(h_mag)
 
@@ -86,7 +85,7 @@ def map_features(features):
         "velocity": tf.squeeze(velocity),
         "note_number": tf.squeeze(note_number),
         "h": h,
-        "mask": mask
+        "mask": mask,
     }
 
 
