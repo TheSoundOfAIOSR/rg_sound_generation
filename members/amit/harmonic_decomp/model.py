@@ -19,10 +19,10 @@ def create_encoder(conf: LocalConfig):
 
     wrapper = {}
 
-    encoder_input = tf.keras.layers.Input(shape=(conf.row_dim, conf.col_dim, 3), name="encoder_input")
+    encoder_input = tf.keras.layers.Input(shape=(conf.row_dim, conf.col_dim, 2), name="encoder_input")
 
-    filters = [32, 32, 32, 64, 64, 64]
-    kernels = [3, 3, 3, 3, 3, 3]
+    filters = [32] * 3 + [64] * 3
+    kernels = [3] * 6
 
     filters_kernels = iter(zip(filters, kernels))
 
@@ -64,15 +64,13 @@ def create_decoder_mlp(conf: LocalConfig):
                                      kernel_initializer=tf.initializers.glorot_uniform)(hidden)
     x = tf.keras.layers.Reshape((128, 72))(up_input)
 
-    h_freq = tf.keras.layers.Dense(1024, activation="tanh")(x)
-    h_mag = tf.keras.layers.Dense(1024, activation="tanh")(x)
-    d_phase = tf.keras.layers.Dense(1024, activation="tanh")(x)
+    h_freq = tf.keras.layers.Dense(1024, activation="linear")(x)
+    h_mag = tf.keras.layers.Dense(1024, activation="linear")(x)
 
     h_freq = tf.keras.layers.Reshape((1024, 128, 1))(h_freq)
     h_mag = tf.keras.layers.Reshape((1024, 128, 1))(h_mag)
-    d_phase = tf.keras.layers.Reshape((1024, 128, 1))(d_phase)
 
-    reconstructed = tf.keras.layers.concatenate([h_freq, h_mag, d_phase])
+    reconstructed = tf.keras.layers.concatenate([h_freq, h_mag])
 
     model = tf.keras.models.Model(
         [z_input, note_number, velocity, instrument_id],
@@ -94,8 +92,8 @@ def create_decoder_conv(conf: LocalConfig):
                                      kernel_initializer=tf.initializers.glorot_uniform)(hidden)
     x = tf.keras.layers.Reshape(conf.final_conv_shape)(up_input)
 
-    filters = reversed([32, 32, 32, 64, 64, 64])
-    kernels = reversed([3, 3, 3, 3, 3, 3])
+    filters = reversed([32] * 3 + [64] * 3)
+    kernels = reversed([3] * 6)
 
     for f, k in zip(filters, kernels):
         x = tf.keras.layers.UpSampling2D(2)(x)
@@ -104,7 +102,7 @@ def create_decoder_conv(conf: LocalConfig):
         x = tf.keras.layers.BatchNormalization()(x)
         x = tf.keras.layers.Activation("relu")(x)
 
-    reconstructed = tf.keras.layers.Conv2D(3, 3, padding=conf.padding, activation="tanh",
+    reconstructed = tf.keras.layers.Conv2D(2, 3, padding=conf.padding, activation="linear",
                                            kernel_initializer=tf.initializers.glorot_uniform)(x)
 
     model = tf.keras.models.Model(
@@ -117,3 +115,23 @@ def create_decoder_conv(conf: LocalConfig):
 
 def create_decoder(conf: LocalConfig):
     return eval(f"create_decoder_{conf.decoder_type}(conf)")
+
+
+def create_vae(conf: LocalConfig):
+    encoder = create_encoder(conf)
+    decoder = create_decoder(conf)
+
+    encoder_input = tf.keras.layers.Input(shape=(conf.row_dim, conf.col_dim, 2))
+    note_number = tf.keras.layers.Input(shape=(conf.num_pitches,))
+    instrument_id = tf.keras.layers.Input(shape=(conf.num_instruments,))
+    velocity = tf.keras.layers.Input(shape=(conf.num_velocities,))
+
+    z, z_mean, z_log_variance = encoder(encoder_input)
+    reconstruction = decoder([z, note_number, velocity, instrument_id])
+
+    model = tf.keras.models.Model(
+        [encoder_input, note_number, instrument_id, velocity],
+        [reconstruction, z_mean, z_log_variance],
+        name="VAE"
+    )
+    return model

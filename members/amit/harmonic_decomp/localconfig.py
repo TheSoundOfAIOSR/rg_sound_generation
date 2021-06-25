@@ -15,15 +15,16 @@ class LocalConfig:
     epochs = 100
     early_stopping = 7
     learning_rate = 2e-8
-    gradient_norm = 2.
+    gradient_norm = 5.
     csv_log_file = "logs.csv"
     final_conv_shape = (16, 2, 288)
     final_conv_units = 16 * 2 * 288
     best_loss = 1e6
     sample_rate = 16000
-    log_steps = False
+    log_steps = True
     step_log_interval = 100
-    decoder_type = "mlp" # or "conv"
+    decoder_type = "conv" # "mlp"
+    kl_weight = 0.1
 
     _instance = None
 
