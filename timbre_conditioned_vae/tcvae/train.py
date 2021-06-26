@@ -30,6 +30,8 @@ def train(conf: LocalConfig):
 
     for epoch in range(0, conf.epochs):
         logger.info(f"Epoch {epoch} started")
+        conf.kl_weight = min(1., conf.kl_weight + epoch * conf.kl_anneal_factor)
+        logger.info(f"Current KL weight at {conf.kl_weight}")
 
         losses = []
         val_losses = []

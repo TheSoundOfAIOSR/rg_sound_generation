@@ -41,7 +41,7 @@ def pad_function(sample, conf: LocalConfig):
 def map_features(features):
     conf = LocalConfig()
 
-    note_number = tf.one_hot(features["note_number"] - 40, depth=conf.num_pitches)
+    note_number = tf.one_hot(features["note_number"] - conf.starting_midi_pitch, depth=conf.num_pitches)
     instrument_id = tf.one_hot(features["instrument_id"], depth=conf.num_instruments)
     velocity = tf.cast(features["velocity"], dtype=tf.float32) / 25. - 1.
     velocity = tf.one_hot(tf.cast(velocity, dtype=tf.uint8), depth=conf.num_velocities)
@@ -64,20 +64,31 @@ def map_features(features):
     harmonic_indices = tf.range(1, harmonics + 1, dtype=tf.float32)
     harmonic_indices = harmonic_indices[tf.newaxis, tf.newaxis, :]
     h_freq_centered = h_freq - (f0_mean * harmonic_indices)
-    h_mag = tf.squeeze(h_mag, axis=0)
-    h_freq_centered = tf.squeeze(h_freq_centered, axis=0)
+    # h_mag = tf.squeeze(h_mag, axis=0)
+    # h_freq_centered = tf.squeeze(h_freq_centered, axis=0)
+
     f0_from_note = tsms.core.midi_to_hz(tf.cast(features["note_number"], dtype=tf.float32))
-    h_freq_norm = h_freq_centered / f0_from_note
+    f0_from_note = tf.ones_like(f0_mean) * f0_from_note
+
+    f_var = f0_from_note * harmonic_indices * conf.st_var
+    h_freq_norm = h_freq_centered / f_var
+    # h_freq_norm = h_freq_centered / f0_from_note
     # (h_freq_centered - tf.reduce_mean(h_freq_centered)) / tf.math.reduce_std(h_freq_centered)
-    h_mag_norm = h_mag / tf.math.reduce_max(h_mag)
+    h_mag = tsms.core.lin_to_db(h_mag)  # + librosa.A_weighting(h_freq)
+    h_mag = h_mag - tf.math.reduce_max(h_mag)
+    h_mag_norm = (tf.maximum(h_mag, conf.db_limit) - conf.db_limit) / (-conf.db_limit)
+    # h_mag_norm = h_mag / tf.math.reduce_max(h_mag)
+
+    h_freq_norm = tf.squeeze(h_freq_norm, axis=0)
+    h_mag_norm = tf.squeeze(h_mag_norm, axis=0)
+
+    mask = tf.ones_like(h_freq_norm)
+    mask = pad_function(mask, conf)
 
     h_freq_norm = tf.expand_dims(pad_function(h_freq_norm, conf), axis=-1)
     h_mag_norm = tf.expand_dims(pad_function(h_mag_norm, conf), axis=-1)
 
     h = tf.concat([h_freq_norm, h_mag_norm], axis=-1)
-
-    mask = tf.ones_like(h_freq_centered)
-    mask = pad_function(mask, conf)
 
     return {
         "instrument_id": tf.squeeze(instrument_id),

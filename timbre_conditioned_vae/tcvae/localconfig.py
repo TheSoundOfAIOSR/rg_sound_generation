@@ -30,7 +30,11 @@ class LocalConfig:
     log_steps = True
     step_log_interval = 100
     decoder_type = "conv" # "mlp"
-    kl_weight = 0.1
+    kl_weight = 0.
+    kl_anneal_factor = 0.1
+    freq_loss_weight = 1000.
+    st_var = (2.0 ** (1.0 / 12.0) - 1.0)
+    db_limit = -120
 
     _instance = None
 
