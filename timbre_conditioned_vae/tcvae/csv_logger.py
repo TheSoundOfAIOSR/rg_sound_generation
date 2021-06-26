@@ -1,7 +1,7 @@
 from typing import List
 import numpy as np
 from matplotlib import pyplot as plt
-from localconfig import LocalConfig
+from .localconfig import LocalConfig
 
 
 def write_log(conf: LocalConfig, epoch: int, train_losses: List[float], val_losses: List[float]):

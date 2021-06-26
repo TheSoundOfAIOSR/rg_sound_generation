@@ -1,9 +1,8 @@
 import os
 import tensorflow as tf
-import numpy as np
-from tfrecord_provider import CompleteTFRecordProvider
-import tsms
-from localconfig import LocalConfig
+from . import tsms
+from .tfrecord_provider import CompleteTFRecordProvider
+from .localconfig import LocalConfig
 
 
 def create_dataset(

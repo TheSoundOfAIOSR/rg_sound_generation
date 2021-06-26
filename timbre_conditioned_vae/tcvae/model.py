@@ -1,5 +1,5 @@
 import tensorflow as tf
-from localconfig import LocalConfig
+from .localconfig import LocalConfig
 
 
 def sample_from_latent_space(inputs):

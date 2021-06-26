@@ -1,32 +1,36 @@
 import os
 import tensorflow as tf
-from dataset import get_dataset
-from model import create_vae
-from losses import harmonic_loss
-from localconfig import LocalConfig
-from csv_logger import write_log
+from loguru import logger
+from .dataset import get_dataset
+from .model import create_vae
+from .losses import harmonic_loss
+from .localconfig import LocalConfig
+from .csv_logger import write_log
 
 
 def train(conf: LocalConfig):
     vae = create_vae(conf)
+    checkpoint_path = os.path.join(conf.checkpoints_dir, f"{conf.model_name}.h5")
 
-    if os.path.isfile("VAE.h5"):
-        print("Loading VAE")
-        vae.load_weights("VAE.h5")
+    if os.path.isfile(checkpoint_path):
+        logger.info("Loading VAE")
+        vae.load_weights(checkpoint_path)
+    else:
+        logger.info(f"No previous checkpoint found at {checkpoint_path}")
 
     optimizer = tf.keras.optimizers.Adam(learning_rate=conf.learning_rate)
 
     best_loss = conf.best_loss
     last_good_epoch = 0
 
-    print("Loading datasets..")
+    logger.info("Loading datasets..")
     train_dataset, valid_dataset, test_dataset = get_dataset(conf)
-    print("Datasets loaded")
+    logger.info("Datasets loaded")
 
 
     for epoch in range(0, conf.epochs):
-        print(f"Epoch {epoch} started")
-        print()
+        logger.info(f"Epoch {epoch} started")
+
         losses = []
         val_losses = []
 
@@ -60,16 +64,15 @@ def train(conf: LocalConfig):
             losses.append(step_loss)
 
             if step % conf.step_log_interval == 0 and conf.log_steps:
-                print(f"Step: {step:5d}, Loss at current step: {step_loss:.4f}, "
+                logger.info(f"Step: {step:5d}, Loss at current step: {step_loss:.4f}, "
                       f"KL Loss: {kl_loss.numpy():.4f}, "
                       f"Reconstruction Loss: {reconstruction_loss.numpy():.4f}")
 
         train_loss = sum(losses) / len(losses)
 
-        print()
-        print(f"Epoch: {epoch} ended")
-        print(f"Training loss: {train_loss:.4f}")
-        print("Starting validation..")
+        logger.info(f"Epoch: {epoch} ended")
+        logger.info(f"Training loss: {train_loss:.4f}")
+        logger.info("Starting validation..")
 
         for valid_step, batch in enumerate(valid):
             h = batch["h"]
@@ -90,18 +93,19 @@ def train(conf: LocalConfig):
             val_losses.append(step_loss)
 
         valid_loss = sum(val_losses) / len(val_losses)
-        print(f"Validation Loss: {valid_loss:.4f}")
+        logger.info(f"Validation Loss: {valid_loss:.4f}")
 
         write_log(conf, epoch, losses, val_losses)
 
         if valid_loss < best_loss:
             last_good_epoch = epoch
             best_loss = valid_loss
-            print(f"Best loss updated to {best_loss: .4f}, saving model weights")
-            vae.save("VAE.h5")
+            logger.info(f"Best loss updated to {best_loss: .4f}, saving model weights")
+            vae.save(checkpoint_path)
+            logger.info(f"Updated model weights saved at {checkpoint_path}")
 
         if epoch - last_good_epoch >= conf.early_stopping:
-            print(f"No improvement for {conf.early_stopping} epochs. Stopping early..")
+            logger.info(f"No improvement for {conf.early_stopping} epochs. Stopping early..")
             break
 
 
