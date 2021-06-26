@@ -30,7 +30,8 @@ def train(conf: LocalConfig):
 
     for epoch in range(0, conf.epochs):
         logger.info(f"Epoch {epoch} started")
-        conf.kl_weight = min(1., conf.kl_weight + epoch * conf.kl_anneal_factor)
+        if epoch > 0:
+            conf.kl_weight += conf.kl_anneal_factor
         logger.info(f"Current KL weight at {conf.kl_weight}")
 
         losses = []
@@ -66,7 +67,7 @@ def train(conf: LocalConfig):
             losses.append(step_loss)
 
             if step % conf.step_log_interval == 0 and conf.log_steps:
-                logger.info(f"Step: {step:5d}, Loss at current step: {step_loss:.4f}, "
+                logger.info(f"Training Step: {step:5d}, Loss at current step: {step_loss:.4f}, "
                       f"KL Loss: {kl_loss.numpy():.4f}, "
                       f"Reconstruction Loss: {reconstruction_loss.numpy():.4f}")
 
@@ -93,6 +94,11 @@ def train(conf: LocalConfig):
 
             step_loss = loss.numpy().mean()
             val_losses.append(step_loss)
+
+            if valid_step % conf.step_log_interval == 0 and conf.log_steps:
+                logger.info(f"Validation Step: {valid_step:5d}, Loss at current step: {step_loss:.4f}, "
+                            f"KL Loss: {kl_loss.numpy():.4f}, "
+                            f"Reconstruction Loss: {reconstruction_loss.numpy():.4f}")
 
         valid_loss = sum(val_losses) / len(val_losses)
         logger.info(f"Validation Loss: {valid_loss:.4f}")

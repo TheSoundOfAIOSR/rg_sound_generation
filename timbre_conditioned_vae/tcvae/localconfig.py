@@ -5,7 +5,7 @@ class LocalConfig:
     dataset_dir = os.path.join(os.getcwd(), "complete_dataset")
     checkpoints_dir = os.path.join(os.getcwd(), "checkpoints")
     model_name = "VAE"
-    latent_dim = 1
+    latent_dim = 64
     hidden_dim = 256
     harmonic_frame_steps = 1001
     frame_size = 64
@@ -17,6 +17,7 @@ class LocalConfig:
     max_num_harmonics = 99
     row_dim = 1024
     col_dim = 128
+    use_decoder_skip = True
     padding = "same"
     epochs = 100
     early_stopping = 7
