@@ -8,6 +8,19 @@ from .localconfig import LocalConfig
 from .csv_logger import write_log
 
 
+gpus = tf.config.experimental.list_physical_devices('GPU')
+if gpus:
+    try:
+        # Currently, memory growth needs to be the same across GPUs
+        for gpu in gpus:
+            tf.config.experimental.set_memory_growth(gpu, True)
+        logical_gpus = tf.config.experimental.list_logical_devices('GPU')
+        logger.info(str(len(gpus)), "Physical GPUs,", str(len(logical_gpus)), "Logical GPUs")
+    except RuntimeError as e:
+        # Memory growth must be set before GPUs have been initialized
+        logger.error(e)
+
+
 def train(conf: LocalConfig):
     vae = create_vae(conf)
     checkpoint_path = os.path.join(conf.checkpoints_dir, f"{conf.model_name}.h5")
@@ -30,8 +43,9 @@ def train(conf: LocalConfig):
 
     for epoch in range(0, conf.epochs):
         logger.info(f"Epoch {epoch} started")
-        if epoch > 0:
+        if (epoch + 1) % conf.kl_anneal_step == 0:
             conf.kl_weight += conf.kl_anneal_factor
+            conf.kl_weight = min(conf.kl_weight_max, conf.kl_weight)
         logger.info(f"Current KL weight at {conf.kl_weight}")
 
         losses = []
@@ -109,12 +123,26 @@ def train(conf: LocalConfig):
             last_good_epoch = epoch
             best_loss = valid_loss
             logger.info(f"Best loss updated to {best_loss: .4f}, saving model weights")
-            vae.save(checkpoint_path)
-            logger.info(f"Updated model weights saved at {checkpoint_path}")
+            model_path = os.path.join(conf.checkpoints_dir,
+                                      f"{epoch}_{conf.model_name}_{best_loss:.4}.h5")
+            vae.save(model_path)
+            logger.info(f"Updated model weights saved at {model_path}")
+            conf.best_model_path = model_path
+        else:
+            logger.info("Validation loss did not improve")
 
         if epoch - last_good_epoch >= conf.early_stopping:
             logger.info(f"No improvement for {conf.early_stopping} epochs. Stopping early..")
             break
+
+        if epoch - last_good_epoch >= conf.lr_plateau:
+            logger.info(f"No improvement for {conf.lr_plateau} epochs. Reducing learning rate")
+            conf.learning_rate *= conf.lr_factor
+            logger.info(f"New learning rate is {conf.learning_rate}")
+
+    if conf.best_model_path is not None:
+        logger.info(f"Best model: {conf.best_model_path}")
+    logger.info("Training finished")
 
 
 if __name__ == "__main__":

@@ -126,8 +126,7 @@ def create_decoder_conv(conf: LocalConfig):
         if conf.use_decoder_skip:
             current_z = reshape_z(block, z_input, conf)
             x = tf.keras.layers.Add()([x, current_z])
-
-        block += 1
+            block += 1
 
     reconstructed = tf.keras.layers.Conv2D(2, 3, padding=conf.padding, activation="linear",
                                            kernel_initializer=tf.initializers.glorot_uniform())(x)

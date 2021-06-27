@@ -5,6 +5,7 @@ class LocalConfig:
     dataset_dir = os.path.join(os.getcwd(), "complete_dataset")
     checkpoints_dir = os.path.join(os.getcwd(), "checkpoints")
     model_name = "VAE"
+    best_model_path = None
     latent_dim = 64
     hidden_dim = 256
     harmonic_frame_steps = 1001
@@ -21,7 +22,9 @@ class LocalConfig:
     padding = "same"
     epochs = 100
     early_stopping = 7
-    learning_rate = 2e-5
+    learning_rate = 0.0003
+    lr_plateau = 4
+    lr_factor = 0.2
     gradient_norm = 5.
     csv_log_file = "logs.csv"
     final_conv_shape = (16, 2, 288) # update to be calculated dynamically
@@ -32,10 +35,13 @@ class LocalConfig:
     step_log_interval = 100
     decoder_type = "conv" # "mlp"
     kl_weight = 0.
+    kl_weight_max = 1.
     kl_anneal_factor = 0.1
-    freq_loss_weight = 1000.
+    kl_anneal_step = 5
+    freq_loss_weight = 1.
     st_var = (2.0 ** (1.0 / 12.0) - 1.0)
     db_limit = -120
+    db_norm = False
 
     _instance = None
 
