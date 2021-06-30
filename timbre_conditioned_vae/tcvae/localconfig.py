@@ -1,10 +1,13 @@
 import os
+import json
+from typing import Dict
 
 
 class LocalConfig:
     dataset_dir = os.path.join(os.getcwd(), "complete_dataset")
     checkpoints_dir = os.path.join(os.getcwd(), "checkpoints")
     model_name = "VAE"
+    run_name = "Default"
     best_model_path = None
     latent_dim = 64
     hidden_dim = 256
@@ -49,3 +52,19 @@ class LocalConfig:
         if cls._instance is None:
             cls._instance = super(LocalConfig, cls).__new__(cls)
         return cls._instance
+
+    def set_config(self, params: Dict):
+        vars(self).update(params)
+
+    def load_config_from_file(self, file_path: str):
+        assert os.path.isfile(file_path)
+
+        with open(file_path, "r") as f:
+            params = json.load(f)
+        self.set_config(params)
+
+    def save_config(self):
+        target_path = os.path.join(self.checkpoints_dir, f"{self.run_name}_{self.model_name}.json")
+
+        with open(target_path, "w") as f:
+            json.dump(vars(self), f)
