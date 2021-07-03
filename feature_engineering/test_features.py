@@ -46,10 +46,24 @@ def main():
     # m0, m1 = core.harmonicity_measure(
     #     h_freq, h_mag, h_phase, residual, sample_rate, frame_step)
 
-    m0, m1 = core.even_odd_measure(
+    # m0, m1 = core.even_odd_measure(
+    #     h_freq, h_mag, h_phase, residual, sample_rate, frame_step)
+
+    # m0, m1 = core.sparse_rich_measure(
+    #     h_freq, h_mag, h_phase, residual, sample_rate, frame_step)
+
+    # m0, m1 = core.vibrato_straight_measure(
+    #     h_freq, h_mag, h_phase, residual, sample_rate, frame_step)
+
+    # m0, m1 = core.hard_soft_attack_measure(
+    #     h_freq, h_mag, h_phase, residual, sample_rate, frame_step)
+
+    # print(m0.numpy(), m1.numpy())
+
+    m = core.dark_measure(
         h_freq, h_mag, h_phase, residual, sample_rate, frame_step)
 
-    print(m0.numpy(), m1.numpy())
+    print(m.numpy())
 
 
 if __name__ == '__main__':
