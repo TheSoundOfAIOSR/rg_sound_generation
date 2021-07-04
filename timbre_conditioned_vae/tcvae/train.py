@@ -81,9 +81,9 @@ def train(conf: LocalConfig):
             losses.append(step_loss)
 
             if step % conf.step_log_interval == 0 and conf.log_steps:
-                logger.info(f"Training Step: {step:5d}, Loss at current step: {step_loss:.4f}, "
-                      f"KL Loss: {kl_loss.numpy():.4f}, "
-                      f"Reconstruction Loss: {reconstruction_loss.numpy():.4f}")
+                logger.info(f"Training Step: {step:5d}, Loss: {step_loss}, "
+                      f"KL Loss: {kl_loss.numpy()}, "
+                      f"R Loss: {reconstruction_loss.numpy()}")
 
         train_loss = sum(losses) / len(losses)
 
@@ -110,9 +110,9 @@ def train(conf: LocalConfig):
             val_losses.append(step_loss)
 
             if valid_step % conf.step_log_interval == 0 and conf.log_steps:
-                logger.info(f"Validation Step: {valid_step:5d}, Loss at current step: {step_loss:.4f}, "
-                            f"KL Loss: {kl_loss.numpy():.4f}, "
-                            f"Reconstruction Loss: {reconstruction_loss.numpy():.4f}")
+                logger.info(f"Validation Step: {valid_step:5d}, Loss: {step_loss}, "
+                            f"KL Loss: {kl_loss.numpy()}, "
+                            f"R Loss: {reconstruction_loss.numpy()}")
 
         valid_loss = sum(val_losses) / len(val_losses)
         logger.info(f"Validation Loss: {valid_loss:.4f}")

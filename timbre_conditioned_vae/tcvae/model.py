@@ -42,16 +42,19 @@ def create_encoder(conf: LocalConfig):
         wrapper[f"skip_{i + 1}"] = tf.keras.layers.concatenate([wrapper[f"block_{i + 1}"], wrapper[f"out_{i}"]])
         wrapper[f"out_{i + 1}"] = tf.keras.layers.MaxPool2D(2, name=f"encoder_pool_{i}")(wrapper[f"skip_{i + 1}"])
 
-    flattened = tf.keras.layers.GlobalAvgPool2D()(wrapper[f"out_{len(filters)}"])
-    # flattened = tf.keras.layers.Flatten()(wrapper[f"out_{len(filters)}"])
-    # hidden = tf.keras.layers.Dense(conf.hidden_dim, activation="relu",
-    # kernel_initializer=tf.initializers.glorot_uniform())(flattened)
+    flattened = tf.keras.layers.TimeDistributed(tf.keras.layers.Flatten())(wrapper[f"out_{len(filters)}"])
+    td_dense = tf.keras.layers.TimeDistributed(
+        tf.keras.layers.Dense(conf.lstm_dim, activation="relu")
+    )(flattened)
+    lstm = tf.keras.layers.Bidirectional(
+        tf.keras.layers.LSTM(conf.lstm_dim, activation="relu",
+                             return_sequences=False, dropout=conf.lstm_dropout))(td_dense)
     z_mean = tf.keras.layers.Dense(conf.latent_dim,
                                    kernel_initializer=tf.initializers.glorot_uniform(),
-                                   name="z_mean")(flattened)
+                                   name="z_mean")(lstm)
     z_log_variance = tf.keras.layers.Dense(conf.latent_dim,
                                            kernel_initializer=tf.initializers.glorot_uniform(),
-                                           name="z_log_variance")(flattened)
+                                           name="z_log_variance")(lstm)
     z = tf.keras.layers.Lambda(sample_from_latent_space)([z_mean, z_log_variance])
     model = tf.keras.models.Model(
         encoder_input, [z, z_mean, z_log_variance], name="encoder"
@@ -81,18 +84,19 @@ def create_decoder(conf: LocalConfig):
         conf = LocalConfig()
     z_input, note_number, instrument_id, velocity = decoder_inputs(conf)
     inputs = tf.keras.layers.concatenate([z_input, note_number, velocity, instrument_id])
-    # hidden = tf.keras.layers.Dense(conf.hidden_dim, activation="relu",
-    #                                kernel_initializer=tf.initializers.glorot_uniform())(inputs)
-    up_input = tf.keras.layers.Dense(192, activation="relu",
-                                     kernel_initializer=tf.initializers.glorot_uniform())(inputs)
-    up_input = tf.keras.layers.RepeatVector(64 * 8)(up_input)
-    x = tf.keras.layers.Reshape(conf.final_conv_shape)(up_input)
-
+    hidden = tf.keras.layers.Dense(conf.hidden_dim, activation="relu",
+                                   kernel_initializer=tf.initializers.glorot_uniform())(inputs)
+    num_repeats = int((conf.final_conv_units // conf.hidden_dim) / 2)
+    repeat = tf.keras.layers.RepeatVector(num_repeats)(hidden)
+    lstm = tf.keras.layers.Bidirectional(
+        tf.keras.layers.LSTM(conf.lstm_dim, activation="relu",
+                             return_sequences=True, dropout=conf.lstm_dropout))(repeat)
+    reshaped = tf.keras.layers.Reshape(conf.final_conv_shape)(lstm)
     filters = list(reversed([32] * 2 + [64] * 2))
     kernels = list(reversed([3] * 4))
     filters_kernels = iter(zip(filters, kernels))
     wrapper = {
-        "up_in_0": x
+        "up_in_0": reshaped
     }
 
     for i in range(0, len(filters)):

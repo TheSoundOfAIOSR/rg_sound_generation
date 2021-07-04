@@ -1,0 +1,1 @@
+{"dataset_dir": "/content/drive/MyDrive/the_sound_of_ai/new_data", "checkpoints_dir": "/content/drive/MyDrive/the_sound_of_ai/new_data/checkpoints", "latent_dim": 16, "batch_size": 12, "db_norm": true, "freq_loss_weight": 1, "model_name": "baseline16", "step_log_interval": 200, "learning_rate": 0.0001, "kl_weight": 1, "best_loss": 0.0456}

@@ -1,8 +1,8 @@
 import os
 import tensorflow as tf
-from . import tsms
 from .tfrecord_provider import CompleteTFRecordProvider
 from .localconfig import LocalConfig
+from .utils import normalize_h_mag, normalize_h_freq
 
 
 def create_dataset(
@@ -41,7 +41,7 @@ def pad_function(sample, conf: LocalConfig):
 def map_features(features):
     conf = LocalConfig()
 
-    note_number = tf.one_hot(features["note_number"] - conf.starting_midi_pitch, depth=conf.num_pitches)
+    note_number = features["note_number"]
     instrument_id = tf.one_hot(features["instrument_id"], depth=conf.num_instruments)
     velocity = tf.cast(features["velocity"], dtype=tf.float32) / 25. - 1.
     velocity = tf.one_hot(tf.cast(velocity, dtype=tf.uint8), depth=conf.num_velocities)
@@ -58,28 +58,11 @@ def map_features(features):
     h_freq = tf.expand_dims(h_freq, axis=0)
     h_mag = tf.expand_dims(h_mag, axis=0)
 
-    f0 = tsms.core.harmonic_analysis_to_f0(h_freq, h_mag)
-    f0_mean = tf.math.reduce_mean(f0, axis=1)
-    harmonics = tf.shape(h_freq)[-1]
-    harmonic_indices = tf.range(1, harmonics + 1, dtype=tf.float32)
-    harmonic_indices = harmonic_indices[tf.newaxis, tf.newaxis, :]
-    h_freq_centered = h_freq - (f0_mean * harmonic_indices)
-    f0_from_note = tsms.core.midi_to_hz(tf.cast(features["note_number"], dtype=tf.float32))
+    h_freq_norm = normalize_h_freq(h_freq, h_mag, note_number)
+    h_mag_norm = normalize_h_mag(h_mag, conf.db_limit)
 
-    if conf.db_norm:
-        f0_from_note = tf.ones_like(f0_mean) * f0_from_note
-        f_var = f0_from_note * harmonic_indices * conf.st_var
-        h_freq_norm = h_freq_centered / f_var
-        h_mag = tsms.core.lin_to_db(h_mag)  # + librosa.A_weighting(h_freq)
-        h_mag = h_mag - tf.math.reduce_max(h_mag)
-        h_mag_norm = (tf.maximum(h_mag, conf.db_limit) - conf.db_limit) / (-conf.db_limit)
-        h_freq_norm = tf.squeeze(h_freq_norm, axis=0)
-        h_mag_norm = tf.squeeze(h_mag_norm, axis=0)
-    else:
-        h_mag = tf.squeeze(h_mag, axis=0)
-        h_freq_centered = tf.squeeze(h_freq_centered, axis=0)
-        h_freq_norm = h_freq_centered / f0_from_note
-        h_mag_norm = h_mag / tf.math.reduce_max(h_mag)
+    h_freq_norm = tf.squeeze(h_freq_norm)
+    h_mag_norm = tf.squeeze(h_mag_norm)
 
     mask = tf.ones_like(h_freq_norm)
     mask = pad_function(mask, conf)
@@ -89,16 +72,20 @@ def map_features(features):
 
     h = tf.concat([h_freq_norm, h_mag_norm], axis=-1)
 
+    note_number = tf.one_hot(note_number - conf.starting_midi_pitch, depth=conf.num_pitches)
+
     return {
         "instrument_id": tf.squeeze(instrument_id),
         "velocity": tf.squeeze(velocity),
         "note_number": tf.squeeze(note_number),
         "h": h,
-        "mask": mask,
+        "mask": mask
     }
 
 
 def get_dataset(conf: LocalConfig):
+    if conf is None:
+        conf = LocalConfig()
     train_path = os.path.join(conf.dataset_dir, "train.tfrecord")
     valid_path = os.path.join(conf.dataset_dir, "valid.tfrecord")
     test_path = os.path.join(conf.dataset_dir, "test.tfrecord")

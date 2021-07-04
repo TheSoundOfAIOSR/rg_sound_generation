@@ -11,6 +11,8 @@ class LocalConfig:
     best_model_path = None
     latent_dim = 16
     hidden_dim = 256
+    lstm_dim = 256
+    lstm_dropout = 0.4
     harmonic_frame_steps = 1001
     frame_size = 64
     batch_size = 2
@@ -21,7 +23,6 @@ class LocalConfig:
     max_num_harmonics = 99
     row_dim = 1024
     col_dim = 128
-    use_decoder_skip = True
     padding = "same"
     epochs = 100
     early_stopping = 7
@@ -36,7 +37,6 @@ class LocalConfig:
     sample_rate = 16000
     log_steps = True
     step_log_interval = 100
-    decoder_type = "conv" # "mlp"
     kl_weight = 1.
     kl_weight_max = 1.
     kl_anneal_factor = 0.1
@@ -44,7 +44,6 @@ class LocalConfig:
     freq_loss_weight = 1.
     st_var = (2.0 ** (1.0 / 12.0) - 1.0)
     db_limit = -120
-    db_norm = False
 
     _instance = None
 
