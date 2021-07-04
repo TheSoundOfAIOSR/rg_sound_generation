@@ -47,8 +47,9 @@ def create_encoder(conf: LocalConfig):
         tf.keras.layers.Dense(conf.lstm_dim, activation="relu")
     )(flattened)
     lstm = tf.keras.layers.Bidirectional(
-        tf.keras.layers.LSTM(conf.lstm_dim, activation="relu",
-                             return_sequences=False, dropout=conf.lstm_dropout))(td_dense)
+        tf.keras.layers.LSTM(conf.lstm_dim, activation="tanh", recurrent_activation="sigmoid",
+                             return_sequences=False, dropout=conf.lstm_dropout,
+                             recurrent_dropout=0, unroll=False, use_bias=True))(td_dense)
     z_mean = tf.keras.layers.Dense(conf.latent_dim,
                                    kernel_initializer=tf.initializers.glorot_uniform(),
                                    name="z_mean")(lstm)
@@ -89,8 +90,9 @@ def create_decoder(conf: LocalConfig):
     num_repeats = int((conf.final_conv_units // conf.hidden_dim) / 2)
     repeat = tf.keras.layers.RepeatVector(num_repeats)(hidden)
     lstm = tf.keras.layers.Bidirectional(
-        tf.keras.layers.LSTM(conf.lstm_dim, activation="relu",
-                             return_sequences=True, dropout=conf.lstm_dropout))(repeat)
+        tf.keras.layers.LSTM(conf.lstm_dim, activation="tanh", recurrent_activation="sigmoid",
+                             return_sequences=True, dropout=conf.lstm_dropout,
+                             recurrent_dropout=0, unroll=False, use_bias=True))(repeat)
     reshaped = tf.keras.layers.Reshape(conf.final_conv_shape)(lstm)
     filters = list(reversed([32] * 2 + [64] * 2))
     kernels = list(reversed([3] * 4))
