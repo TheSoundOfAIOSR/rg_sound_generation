@@ -89,8 +89,11 @@ def create_decoder(conf: LocalConfig):
             kernel_initializer=tf.initializers.glorot_uniform())(wrapper[f"up_out_{i}"])
         wrapper[f"bn_out_{i}"] = tf.keras.layers.BatchNormalization(name=f"decoder_bn_{i}")(wrapper[f"conv_out_{i}"])
         wrapper[f"act_{i}"] = tf.keras.layers.Activation("relu", name=f"decoder_act_{i}")(wrapper[f"bn_out_{i}"])
+        wrapper[f"up_conv_{i}"] = tf.keras.layers.Conv2D(
+            16, 3, padding="same", name=f"decoder_up_conv_{i}"
+        )(wrapper[f"up_out_{i}"])
         wrapper[f"up_in_{i + 1}"] = tf.keras.layers.concatenate([
-            wrapper[f"act_{i}"], wrapper[f"up_out_{i}"]
+            wrapper[f"act_{i}"], wrapper[f"up_conv_{i}"]
         ])
 
     reconstructed = tf.keras.layers.Conv2D(
