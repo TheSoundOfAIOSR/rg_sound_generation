@@ -9,7 +9,7 @@ class LocalConfig:
     model_name = "VAE"
     run_name = "Default"
     best_model_path = None
-    latent_dim = 64
+    latent_dim = 16
     hidden_dim = 256
     harmonic_frame_steps = 1001
     frame_size = 64
@@ -30,14 +30,14 @@ class LocalConfig:
     lr_factor = 0.2
     gradient_norm = 5.
     csv_log_file = "logs.csv"
-    final_conv_shape = (16, 2, 288) # update to be calculated dynamically
-    final_conv_units = 16 * 2 * 288 # update to be calculated dynamically
+    final_conv_shape = (64, 8, 192) # update to be calculated dynamically
+    final_conv_units = 64 * 8 * 192 # update to be calculated dynamically
     best_loss = 1e6
     sample_rate = 16000
     log_steps = True
     step_log_interval = 100
     decoder_type = "conv" # "mlp"
-    kl_weight = 0.
+    kl_weight = 1.
     kl_weight_max = 1.
     kl_anneal_factor = 0.1
     kl_anneal_step = 5

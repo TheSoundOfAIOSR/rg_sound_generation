@@ -19,12 +19,15 @@ def create_encoder(conf: LocalConfig):
         x = tf.keras.layers.Activation("relu", name=f"encoder_act_{index}")(x)
         return x
 
+    if conf is None:
+        conf = LocalConfig()
+
     wrapper = {}
 
     encoder_input = tf.keras.layers.Input(shape=(conf.row_dim, conf.col_dim, 2), name="encoder_input")
 
-    filters = [32] * 3 + [64] * 3
-    kernels = [3] * 6
+    filters = [32] * 2 + [64] * 2
+    kernels = [3] * 4
 
     filters_kernels = iter(zip(filters, kernels))
 
@@ -39,20 +42,21 @@ def create_encoder(conf: LocalConfig):
         wrapper[f"skip_{i + 1}"] = tf.keras.layers.concatenate([wrapper[f"block_{i + 1}"], wrapper[f"out_{i}"]])
         wrapper[f"out_{i + 1}"] = tf.keras.layers.MaxPool2D(2, name=f"encoder_pool_{i}")(wrapper[f"skip_{i + 1}"])
 
-    flattened = tf.keras.layers.Flatten()(wrapper[f"out_{len(filters)}"])
-    hidden = tf.keras.layers.Dense(conf.hidden_dim, activation="relu",
-                                   kernel_initializer=tf.initializers.glorot_uniform())(flattened)
+    flattened = tf.keras.layers.GlobalAvgPool2D()(wrapper[f"out_{len(filters)}"])
+    # flattened = tf.keras.layers.Flatten()(wrapper[f"out_{len(filters)}"])
+    # hidden = tf.keras.layers.Dense(conf.hidden_dim, activation="relu",
+    # kernel_initializer=tf.initializers.glorot_uniform())(flattened)
     z_mean = tf.keras.layers.Dense(conf.latent_dim,
                                    kernel_initializer=tf.initializers.glorot_uniform(),
-                                   name="z_mean")(hidden)
+                                   name="z_mean")(flattened)
     z_log_variance = tf.keras.layers.Dense(conf.latent_dim,
                                            kernel_initializer=tf.initializers.glorot_uniform(),
-                                           name="z_log_variance")(hidden)
+                                           name="z_log_variance")(flattened)
     z = tf.keras.layers.Lambda(sample_from_latent_space)([z_mean, z_log_variance])
     model = tf.keras.models.Model(
         encoder_input, [z, z_mean, z_log_variance], name="encoder"
     )
-    tf.keras.utils.plot_model(model, to_file="encoder.png")
+    tf.keras.utils.plot_model(model, to_file="encoder.png", show_shapes=True)
     return model
 
 
@@ -64,17 +68,28 @@ def decoder_inputs(conf: LocalConfig):
     return z_input, note_number, instrument_id, velocity
 
 
+def reshape_z(block, z_input, conf: LocalConfig):
+    target_shape = (128 * 2**block, 16 * 2**block, conf.latent_dim)
+    n_repeats = target_shape[0] * target_shape[1]
+    current_z = tf.keras.layers.RepeatVector(n_repeats)(z_input)
+    current_z = tf.keras.layers.Reshape(target_shape=target_shape)(current_z)
+    return current_z
+
+
 def create_decoder(conf: LocalConfig):
+    if conf is None:
+        conf = LocalConfig()
     z_input, note_number, instrument_id, velocity = decoder_inputs(conf)
     inputs = tf.keras.layers.concatenate([z_input, note_number, velocity, instrument_id])
-    hidden = tf.keras.layers.Dense(conf.hidden_dim, activation="relu",
-                                   kernel_initializer=tf.initializers.glorot_uniform())(inputs)
-    up_input = tf.keras.layers.Dense(conf.final_conv_units, activation="relu",
-                                     kernel_initializer=tf.initializers.glorot_uniform())(hidden)
+    # hidden = tf.keras.layers.Dense(conf.hidden_dim, activation="relu",
+    #                                kernel_initializer=tf.initializers.glorot_uniform())(inputs)
+    up_input = tf.keras.layers.Dense(192, activation="relu",
+                                     kernel_initializer=tf.initializers.glorot_uniform())(inputs)
+    up_input = tf.keras.layers.RepeatVector(64 * 8)(up_input)
     x = tf.keras.layers.Reshape(conf.final_conv_shape)(up_input)
 
-    filters = list(reversed([32] * 3 + [64] * 3))
-    kernels = list(reversed([3] * 6))
+    filters = list(reversed([32] * 2 + [64] * 2))
+    kernels = list(reversed([3] * 4))
     filters_kernels = iter(zip(filters, kernels))
     wrapper = {
         "up_in_0": x
@@ -90,10 +105,12 @@ def create_decoder(conf: LocalConfig):
         wrapper[f"bn_out_{i}"] = tf.keras.layers.BatchNormalization(name=f"decoder_bn_{i}")(wrapper[f"conv_out_{i}"])
         wrapper[f"act_{i}"] = tf.keras.layers.Activation("relu", name=f"decoder_act_{i}")(wrapper[f"bn_out_{i}"])
         wrapper[f"up_conv_{i}"] = tf.keras.layers.Conv2D(
-            16, 3, padding="same", name=f"decoder_up_conv_{i}"
+            conf.latent_dim, 3, padding="same", name=f"decoder_up_conv_{i}"
         )(wrapper[f"up_out_{i}"])
+        current_z = reshape_z(i, z_input, conf)
+        z_added = tf.keras.layers.Add()([wrapper[f"up_conv_{i}"], current_z])
         wrapper[f"up_in_{i + 1}"] = tf.keras.layers.concatenate([
-            wrapper[f"act_{i}"], wrapper[f"up_conv_{i}"]
+            wrapper[f"act_{i}"], z_added
         ])
 
     reconstructed = tf.keras.layers.Conv2D(
@@ -104,11 +121,13 @@ def create_decoder(conf: LocalConfig):
         [z_input, note_number, velocity, instrument_id],
         reconstructed, name="decoder"
     )
-    tf.keras.utils.plot_model(model, to_file="decoder.png")
+    tf.keras.utils.plot_model(model, to_file="decoder.png", show_shapes=True)
     return model
 
 
 def create_vae(conf: LocalConfig):
+    if conf is None:
+        conf = LocalConfig()
     encoder = create_encoder(conf)
     decoder = create_decoder(conf)
 
