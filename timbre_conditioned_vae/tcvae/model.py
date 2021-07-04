@@ -11,11 +11,12 @@ def sample_from_latent_space(inputs):
 
 
 def create_encoder(conf: LocalConfig):
-    def conv_block(x, f, k):
-        x = tf.keras.layers.Conv2D(f, k, padding=conf.padding,
-                                   kernel_initializer=tf.initializers.glorot_uniform())(x)
-        x = tf.keras.layers.BatchNormalization()(x)
-        x = tf.keras.layers.Activation("relu")(x)
+    def conv_block(x, f, k, index):
+        x = tf.keras.layers.Conv2D(
+            f, k, padding=conf.padding, name=f"encoder_conv_{index}",
+            kernel_initializer=tf.initializers.glorot_uniform())(x)
+        x = tf.keras.layers.BatchNormalization(name=f"encoder_bn_{index}")(x)
+        x = tf.keras.layers.Activation("relu", name=f"encoder_act_{index}")(x)
         return x
 
     wrapper = {}
@@ -29,81 +30,41 @@ def create_encoder(conf: LocalConfig):
 
     # conv block 1
     f, k = next(filters_kernels)
-    wrapper["block_1"] = conv_block(encoder_input, f, k)
-    wrapper["out_1"] = tf.keras.layers.MaxPool2D(2)(wrapper["block_1"])
+    wrapper["block_1"] = conv_block(encoder_input, f, k, 0)
+    wrapper["out_1"] = tf.keras.layers.MaxPool2D(2, name="encoder_pool_0")(wrapper["block_1"])
     # remaining conv blocks with skip connections
     for i in range(1, len(filters)):
         f, k = next(filters_kernels)
-        wrapper[f"block_{i + 1}"] = conv_block(wrapper[f"out_{i}"], f, k)
+        wrapper[f"block_{i + 1}"] = conv_block(wrapper[f"out_{i}"], f, k, i)
         wrapper[f"skip_{i + 1}"] = tf.keras.layers.concatenate([wrapper[f"block_{i + 1}"], wrapper[f"out_{i}"]])
-        wrapper[f"out_{i + 1}"] = tf.keras.layers.MaxPool2D(2)(wrapper[f"skip_{i + 1}"])
+        wrapper[f"out_{i + 1}"] = tf.keras.layers.MaxPool2D(2, name=f"encoder_pool_{i}")(wrapper[f"skip_{i + 1}"])
 
     flattened = tf.keras.layers.Flatten()(wrapper[f"out_{len(filters)}"])
     hidden = tf.keras.layers.Dense(conf.hidden_dim, activation="relu",
                                    kernel_initializer=tf.initializers.glorot_uniform())(flattened)
     z_mean = tf.keras.layers.Dense(conf.latent_dim,
-                                   kernel_initializer=tf.initializers.glorot_uniform())(hidden)
+                                   kernel_initializer=tf.initializers.glorot_uniform(),
+                                   name="z_mean")(hidden)
     z_log_variance = tf.keras.layers.Dense(conf.latent_dim,
-                                           kernel_initializer=tf.initializers.glorot_uniform())(hidden)
+                                           kernel_initializer=tf.initializers.glorot_uniform(),
+                                           name="z_log_variance")(hidden)
     z = tf.keras.layers.Lambda(sample_from_latent_space)([z_mean, z_log_variance])
     model = tf.keras.models.Model(
         encoder_input, [z, z_mean, z_log_variance], name="encoder"
     )
-    tf.keras.utils.plot_model(model, to_file="encoder.png", show_shapes=True)
+    tf.keras.utils.plot_model(model, to_file="encoder.png")
     return model
 
 
 def decoder_inputs(conf: LocalConfig):
-    z_input = tf.keras.layers.Input(shape=(conf.latent_dim,))
-    note_number = tf.keras.layers.Input(shape=(conf.num_pitches,))
-    instrument_id = tf.keras.layers.Input(shape=(conf.num_instruments,))
-    velocity = tf.keras.layers.Input(shape=(conf.num_velocities,))
+    z_input = tf.keras.layers.Input(shape=(conf.latent_dim,), name="z")
+    note_number = tf.keras.layers.Input(shape=(conf.num_pitches,), name="note_number")
+    instrument_id = tf.keras.layers.Input(shape=(conf.num_instruments,), name="instrument_id")
+    velocity = tf.keras.layers.Input(shape=(conf.num_velocities,), name="velocity")
     return z_input, note_number, instrument_id, velocity
 
 
-def create_decoder_mlp(conf: LocalConfig):
-    z_input, note_number, instrument_id, velocity = decoder_inputs(conf)
-    inputs = tf.keras.layers.concatenate([z_input, note_number, velocity, instrument_id])
-    hidden = tf.keras.layers.Dense(conf.hidden_dim, activation="relu",
-                                   kernel_initializer=tf.initializers.glorot_uniform())(inputs)
-    up_input = tf.keras.layers.Dense(conf.final_conv_units, activation="relu",
-                                     kernel_initializer=tf.initializers.glorot_uniform())(hidden)
-    x = tf.keras.layers.Reshape((128, 72))(up_input)
-
-    h_freq = tf.keras.layers.Dense(1024, activation="linear")(x)
-    h_mag = tf.keras.layers.Dense(1024, activation="linear")(x)
-
-    h_freq = tf.keras.layers.Reshape((1024, 128, 1))(h_freq)
-    h_mag = tf.keras.layers.Reshape((1024, 128, 1))(h_mag)
-
-    reconstructed = tf.keras.layers.concatenate([h_freq, h_mag])
-
-    model = tf.keras.models.Model(
-        [z_input, note_number, velocity, instrument_id],
-        reconstructed, name="decoder"
-    )
-    tf.keras.utils.plot_model(model, to_file="decoder.png", show_shapes=True)
-    return model
-
-
-def reshape_z(block, z, conf: LocalConfig):
-    target_shapes = {
-        0: (32, 4, 64),
-        1: (64, 8, 64),
-        2: (128, 16, 64),
-        3: (256, 32, 32),
-        4: (512, 64, 32),
-        5: (1024, 128, 32)
-    }
-
-    s: Tuple[int, int, int] = target_shapes[block]
-    units = int(s[0] * s[1] * s[2] / conf.latent_dim)
-
-    x = tf.keras.layers.RepeatVector(units)(z)
-    return tf.keras.layers.Reshape(target_shape=s)(x)
-
-
-def create_decoder_conv(conf: LocalConfig):
+def create_decoder(conf: LocalConfig):
     z_input, note_number, instrument_id, velocity = decoder_inputs(conf)
     inputs = tf.keras.layers.concatenate([z_input, note_number, velocity, instrument_id])
     hidden = tf.keras.layers.Dense(conf.hidden_dim, activation="relu",
@@ -112,35 +73,36 @@ def create_decoder_conv(conf: LocalConfig):
                                      kernel_initializer=tf.initializers.glorot_uniform())(hidden)
     x = tf.keras.layers.Reshape(conf.final_conv_shape)(up_input)
 
-    filters = reversed([32] * 3 + [64] * 3)
-    kernels = reversed([3] * 6)
-    block = 0
+    filters = list(reversed([32] * 3 + [64] * 3))
+    kernels = list(reversed([3] * 6))
+    filters_kernels = iter(zip(filters, kernels))
+    wrapper = {
+        "up_in_0": x
+    }
 
-    for f, k in zip(filters, kernels):
-        x = tf.keras.layers.UpSampling2D(2)(x)
-        x = tf.keras.layers.Conv2D(f, k, padding=conf.padding,
-                                   kernel_initializer=tf.initializers.glorot_uniform())(x)
-        x = tf.keras.layers.BatchNormalization()(x)
-        x = tf.keras.layers.Activation("relu")(x)
+    for i in range(0, len(filters)):
+        f, k = next(filters_kernels)
+        wrapper[f"up_out_{i}"] = tf.keras.layers.UpSampling2D(2, name=f"decoder_up_{i}")(wrapper[f"up_in_{i}"])
 
-        if conf.use_decoder_skip:
-            current_z = reshape_z(block, z_input, conf)
-            x = tf.keras.layers.Add()([x, current_z])
-            block += 1
+        wrapper[f"conv_out_{i}"] = tf.keras.layers.Conv2D(
+            f, k, padding=conf.padding, name=f"decoder_conv_{i}",
+            kernel_initializer=tf.initializers.glorot_uniform())(wrapper[f"up_out_{i}"])
+        wrapper[f"bn_out_{i}"] = tf.keras.layers.BatchNormalization(name=f"decoder_bn_{i}")(wrapper[f"conv_out_{i}"])
+        wrapper[f"act_{i}"] = tf.keras.layers.Activation("relu", name=f"decoder_act_{i}")(wrapper[f"bn_out_{i}"])
+        wrapper[f"up_in_{i + 1}"] = tf.keras.layers.concatenate([
+            wrapper[f"act_{i}"], wrapper[f"up_out_{i}"]
+        ])
 
-    reconstructed = tf.keras.layers.Conv2D(2, 3, padding=conf.padding, activation="linear",
-                                           kernel_initializer=tf.initializers.glorot_uniform())(x)
+    reconstructed = tf.keras.layers.Conv2D(
+        2, 3, padding=conf.padding, activation="linear", name="decoder_output",
+        kernel_initializer=tf.initializers.glorot_uniform())(wrapper[f"up_in_{len(filters)}"])
 
     model = tf.keras.models.Model(
         [z_input, note_number, velocity, instrument_id],
         reconstructed, name="decoder"
     )
-    tf.keras.utils.plot_model(model, to_file="decoder.png", show_shapes=True)
+    tf.keras.utils.plot_model(model, to_file="decoder.png")
     return model
-
-
-def create_decoder(conf: LocalConfig):
-    return eval(f"create_decoder_{conf.decoder_type}(conf)")
 
 
 def create_vae(conf: LocalConfig):
