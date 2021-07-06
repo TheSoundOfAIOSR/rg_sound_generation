@@ -3,7 +3,7 @@ import tensorflow as tf
 from loguru import logger
 from .dataset import get_dataset
 from .model import create_vae
-from .losses import harmonic_loss
+from .losses import total_loss
 from .localconfig import LocalConfig
 from .csv_logger import write_log
 
@@ -63,11 +63,10 @@ def train(conf: LocalConfig):
 
             with tf.GradientTape(persistent=True) as tape:
                 reconstruction, z_mean, z_log_variance = vae([h, note_number, instrument_id, velocity])
-                reconstruction_loss = harmonic_loss(h, reconstruction, mask, h_mag) / conf.batch_size
-                reconstruction_loss = reconstruction_loss * conf.reconstruction_weight
-
-                kl_loss = -0.5 * (1 + z_log_variance - tf.square(z_mean) - tf.exp(z_log_variance))
-                kl_loss = tf.reduce_mean(kl_loss) * conf.kl_weight
+                reconstruction_loss, kl_loss = total_loss(
+                    h, reconstruction, mask, h_mag,
+                    z_mean, z_log_variance, conf
+                )
 
                 loss = reconstruction_loss + kl_loss
 
@@ -101,11 +100,10 @@ def train(conf: LocalConfig):
             instrument_id = batch["instrument_id"]
 
             reconstruction, z_mean, z_log_variance = vae.predict([h, note_number, instrument_id, velocity])
-            reconstruction_loss = harmonic_loss(h, reconstruction, mask, h_mag)
-            reconstruction_loss = reconstruction_loss * conf.reconstruction_weight
-
-            kl_loss = -0.5 * (1 + z_log_variance - tf.square(z_mean) - tf.exp(z_log_variance))
-            kl_loss = tf.reduce_mean(kl_loss) * conf.kl_weight
+            reconstruction_loss, kl_loss = total_loss(
+                h, reconstruction, mask, h_mag,
+                z_mean, z_log_variance, conf
+            )
 
             loss = reconstruction_loss + kl_loss
 
