@@ -26,7 +26,7 @@ class LocalConfig:
     padding = "same"
     epochs = 100
     early_stopping = 7
-    learning_rate = 2e-5
+    learning_rate = 2e-4
     lr_plateau = 4
     lr_factor = 0.2
     gradient_norm = 5.
