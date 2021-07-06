@@ -63,12 +63,15 @@ def map_features(features):
 
     h_freq_norm = tf.squeeze(h_freq_norm)
     h_mag_norm = tf.squeeze(h_mag_norm)
+    h_mag = tf.squeeze(h_mag)
+    h_mag = h_mag / tf.reduce_sum(h_mag)
 
     mask = tf.ones_like(h_freq_norm)
     mask = pad_function(mask, conf)
 
     h_freq_norm = tf.expand_dims(pad_function(h_freq_norm, conf), axis=-1)
     h_mag_norm = tf.expand_dims(pad_function(h_mag_norm, conf), axis=-1)
+    h_mag = pad_function(h_mag, conf)
 
     h = tf.concat([h_freq_norm, h_mag_norm], axis=-1)
 
@@ -79,6 +82,7 @@ def map_features(features):
         "velocity": tf.squeeze(velocity),
         "note_number": tf.squeeze(note_number),
         "h": h,
+        "h_mag": h_mag,
         "mask": mask
     }
 

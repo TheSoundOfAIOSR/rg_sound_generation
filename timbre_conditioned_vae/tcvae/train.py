@@ -40,10 +40,9 @@ def train(conf: LocalConfig):
     train_dataset, valid_dataset, test_dataset = get_dataset(conf)
     logger.info("Datasets loaded")
 
-
     for epoch in range(0, conf.epochs):
         logger.info(f"Epoch {epoch} started")
-        if (epoch + 1) % conf.kl_anneal_step == 0:
+        if epoch >= conf.kl_anneal_start:
             conf.kl_weight += conf.kl_anneal_factor
             conf.kl_weight = min(conf.kl_weight_max, conf.kl_weight)
         logger.info(f"Current KL weight at {conf.kl_weight}")
@@ -56,6 +55,7 @@ def train(conf: LocalConfig):
 
         for step, batch in enumerate(train):
             h = batch["h"]
+            h_mag = batch["h_mag"]
             mask = batch["mask"]
             note_number = batch["note_number"]
             velocity= batch["velocity"]
@@ -63,7 +63,7 @@ def train(conf: LocalConfig):
 
             with tf.GradientTape(persistent=True) as tape:
                 reconstruction, z_mean, z_log_variance = vae([h, note_number, instrument_id, velocity])
-                reconstruction_loss = harmonic_loss(h, reconstruction, mask) / conf.batch_size
+                reconstruction_loss = harmonic_loss(h, reconstruction, mask, h_mag) / conf.batch_size
 
                 kl_loss = -0.5 * (1 + z_log_variance - tf.square(z_mean) - tf.exp(z_log_variance))
                 kl_loss = tf.reduce_mean(kl_loss) * conf.kl_weight
@@ -93,13 +93,14 @@ def train(conf: LocalConfig):
 
         for valid_step, batch in enumerate(valid):
             h = batch["h"]
+            h_mag = batch["h_mag"]
             mask = batch["mask"]
             note_number = batch["note_number"]
             velocity= batch["velocity"]
             instrument_id = batch["instrument_id"]
 
             reconstruction, z_mean, z_log_variance = vae.predict([h, note_number, instrument_id, velocity])
-            reconstruction_loss = harmonic_loss(h, reconstruction, mask)
+            reconstruction_loss = harmonic_loss(h, reconstruction, mask, h_mag)
 
             kl_loss = -0.5 * (1 + z_log_variance - tf.square(z_mean) - tf.exp(z_log_variance))
             kl_loss = tf.reduce_mean(kl_loss) * conf.kl_weight

@@ -43,13 +43,10 @@ def create_encoder(conf: LocalConfig):
         wrapper[f"out_{i + 1}"] = tf.keras.layers.MaxPool2D(2, name=f"encoder_pool_{i}")(wrapper[f"skip_{i + 1}"])
 
     flattened = tf.keras.layers.TimeDistributed(tf.keras.layers.Flatten())(wrapper[f"out_{len(filters)}"])
-    td_dense = tf.keras.layers.TimeDistributed(
-        tf.keras.layers.Dense(conf.lstm_dim, activation="relu")
-    )(flattened)
     lstm = tf.keras.layers.Bidirectional(
         tf.keras.layers.LSTM(conf.lstm_dim, activation="tanh", recurrent_activation="sigmoid",
                              return_sequences=False, dropout=conf.lstm_dropout,
-                             recurrent_dropout=0, unroll=False, use_bias=True))(td_dense)
+                             recurrent_dropout=0, unroll=False, use_bias=True))(flattened)
     z_mean = tf.keras.layers.Dense(conf.latent_dim,
                                    kernel_initializer=tf.initializers.glorot_uniform(),
                                    name="z_mean")(lstm)
