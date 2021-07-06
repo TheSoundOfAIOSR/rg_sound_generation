@@ -64,6 +64,7 @@ def train(conf: LocalConfig):
             with tf.GradientTape(persistent=True) as tape:
                 reconstruction, z_mean, z_log_variance = vae([h, note_number, instrument_id, velocity])
                 reconstruction_loss = harmonic_loss(h, reconstruction, mask, h_mag) / conf.batch_size
+                reconstruction_loss = reconstruction_loss * conf.reconstruction_weight
 
                 kl_loss = -0.5 * (1 + z_log_variance - tf.square(z_mean) - tf.exp(z_log_variance))
                 kl_loss = tf.reduce_mean(kl_loss) * conf.kl_weight
@@ -101,6 +102,7 @@ def train(conf: LocalConfig):
 
             reconstruction, z_mean, z_log_variance = vae.predict([h, note_number, instrument_id, velocity])
             reconstruction_loss = harmonic_loss(h, reconstruction, mask, h_mag)
+            reconstruction_loss = reconstruction_loss * conf.reconstruction_weight
 
             kl_loss = -0.5 * (1 + z_log_variance - tf.square(z_mean) - tf.exp(z_log_variance))
             kl_loss = tf.reduce_mean(kl_loss) * conf.kl_weight

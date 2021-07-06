@@ -41,7 +41,7 @@ class LocalConfig:
     kl_weight_max = 1.
     kl_anneal_factor = 0.1
     kl_anneal_start = 10
-    freq_loss_weight = 1.
+    reconstruction_weight = 1.
     st_var = (2.0 ** (1.0 / 12.0) - 1.0)
     db_limit = -120
 
