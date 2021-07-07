@@ -43,27 +43,40 @@ def main():
 
     residual = audio - harmonic
 
-    # m0, m1 = core.harmonicity_measure(
-    #     h_freq, h_mag, h_phase, residual, sample_rate, frame_step)
-
-    # m0, m1 = core.even_odd_measure(
-    #     h_freq, h_mag, h_phase, residual, sample_rate, frame_step)
-
-    # m0, m1 = core.sparse_rich_measure(
-    #     h_freq, h_mag, h_phase, residual, sample_rate, frame_step)
-
-    # m0, m1 = core.vibrato_straight_measure(
-    #     h_freq, h_mag, h_phase, residual, sample_rate, frame_step)
-
-    # m0, m1 = core.hard_soft_attack_measure(
-    #     h_freq, h_mag, h_phase, residual, sample_rate, frame_step)
-
-    # print(m0.numpy(), m1.numpy())
-
-    m = core.dark_measure(
+    m = core.inharmonicity_measure(
         h_freq, h_mag, h_phase, residual, sample_rate, frame_step)
 
-    print(m.numpy())
+    print("inharmonicity_measure", m.numpy())
+
+    m = core.even_odd_measure(
+        h_freq, h_mag, h_phase, residual, sample_rate, frame_step)
+
+    print("even_odd_measure", m.numpy())
+
+    m = core.sparse_rich_measure(
+        h_freq, h_mag, h_phase, residual, sample_rate, frame_step)
+
+    print("sparse_rich_measure", m.numpy())
+
+    m = core.attack_rms_measure(
+        h_freq, h_mag, h_phase, residual, sample_rate, frame_step)
+
+    print("attack_rms_measure", m.numpy())
+
+    m = core.decay_rms_measure(
+        h_freq, h_mag, h_phase, residual, sample_rate, frame_step)
+
+    print("decay_rms_measure", m.numpy())
+
+    m = core.attack_time_measure(
+        h_freq, h_mag, h_phase, residual, sample_rate, frame_step)
+
+    print("attack_time_measure", m.numpy())
+
+    m = core.decay_time_measure(
+        h_freq, h_mag, h_phase, residual, sample_rate, frame_step)
+
+    print("decay_time_measure", m.numpy())
 
 
 if __name__ == '__main__':
