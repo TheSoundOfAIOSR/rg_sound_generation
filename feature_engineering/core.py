@@ -1,4 +1,5 @@
 import tensorflow as tf
+import tensorflow_addons as tfa
 import numpy as np
 import tsms
 import matplotlib.pyplot as plt
@@ -210,161 +211,143 @@ def peak_iir_frequency_response(w, wc, bw, g_db):
     return h
 
 
-def harmonicity_measure(h_freq, h_mag, h_phase, residual,
-                        sample_rate, frame_step):
-    mag_w = h_mag / tf.math.reduce_max(h_mag)
-
+def inharmonicity_measure(h_freq, h_mag, h_phase, residual,
+                          sample_rate, frame_step):
     harmonics = h_freq.shape[-1]
-    harmonic_indices = tf.range(1, harmonics + 1, dtype=tf.float32)
-    harmonic_indices = harmonic_indices[tf.newaxis, tf.newaxis, :]
+    harmonic_numbers = tf.range(1, harmonics + 1, dtype=tf.float32)
+    harmonic_numbers = harmonic_numbers[tf.newaxis, tf.newaxis, :]
 
-    f0 = tsms.core.harmonic_analysis_to_f0(h_freq, h_mag)
-    f0 = tf.concat([f0, f0[:, -1:, :]], axis=1)
-    f = h_freq / harmonic_indices
+    f0 = tsms.core.harmonic_analysis_to_f0(h_freq, h_mag)[:, :, tf.newaxis]
+    f = h_freq / harmonic_numbers
 
+    h_mag_mean = tf.math.reduce_mean(h_mag)
     f_variance = tf.math.reduce_mean(
-        mag_w * tf.square(f - f0), axis=2) / tf.math.reduce_mean(mag_w)
+        h_mag * tf.square(f - f0), axis=2, keepdims=True) / h_mag_mean
 
-    f_variance = tf.where(f_variance > 4.0 * tf.math.reduce_mean(f_variance),
-                          0.0, f_variance)
-
+    # remove huge spikes, generally the attack part
+    f_variance = tfa.image.median_filter2d(f_variance, filter_shape=(1, 50))
     f_variance = tf.math.reduce_mean(f_variance)
 
-    harmonic = 1.0 / f_variance
-    inhamonic = f_variance
+    inharmonic = f_variance ** 2
+    inharmonic = inharmonic / (inharmonic + 1.0)
 
-    den = harmonic + inhamonic
-    harmonic = harmonic / den
-    inhamonic = inhamonic / den
-
-    return harmonic, inhamonic
+    return inharmonic
 
 
 def even_odd_measure(h_freq, h_mag, h_phase, residual,
                      sample_rate, frame_step):
-    db_limit = -80
-    mag_w = tsms.core.lin_to_db(h_mag) + A_weighting(h_freq)
-    mag_w = mag_w - tf.math.reduce_max(mag_w)
-    mag_w = (tf.maximum(mag_w, db_limit) - db_limit) / (-db_limit)
-
-    # mag_w = h_mag / tf.math.reduce_max(h_mag)
-
-    even_mean = tf.math.reduce_mean(mag_w[:, :, 1::2])
-    odd_mean = tf.math.reduce_mean(mag_w[:, :, 2::2])
+    even_mean = tf.math.reduce_mean(h_mag[:, :, 1::2])
+    odd_mean = tf.math.reduce_mean(h_mag[:, :, 2::2])
 
     den = even_mean + odd_mean
     even = even_mean / den
     odd = odd_mean / den
 
-    return even, odd
+    even_odd = 0.5*((1.0 - even) + odd)
+
+    return even_odd
 
 
 def sparse_rich_measure(h_freq, h_mag, h_phase, residual,
-                             sample_rate, frame_step):
+                        sample_rate, frame_step):
     db_limit = -60
-    mag_w = tsms.core.lin_to_db(h_mag) + A_weighting(h_freq)
-    mag_w = mag_w - tf.math.reduce_max(mag_w)
-    mag_w = (tf.maximum(mag_w, db_limit) - db_limit) / (-db_limit)
+    h_mag = tsms.core.lin_to_db(h_mag)
+    h_mag = h_mag - tf.math.reduce_max(h_mag)
+    h_mag = (tf.maximum(h_mag, db_limit) - db_limit) / (-db_limit)
 
     num_nonzero = tf.math.count_nonzero(
-        tf.math.reduce_sum(mag_w, axis=2), axis=1, dtype=tf.float32)
+        tf.math.reduce_sum(h_mag, axis=2), axis=1, dtype=tf.float32)
 
-    h_mag_mean = tf.math.reduce_sum(mag_w, axis=1) / num_nonzero
+    h_mag_mean = tf.math.reduce_sum(h_mag, axis=1) / num_nonzero
     h_mag_mean = tf.math.reduce_mean(h_mag_mean)
 
-    sparse = 1.0 - h_mag_mean
-    rich = h_mag_mean
+    sparse_rich = h_mag_mean
 
-    return sparse, rich
-
-
-def vibrato_straight_measure(h_freq, h_mag, h_phase, residual,
-                             sample_rate, frame_step):
-    mag_w = h_mag / tf.math.reduce_max(h_mag)
-
-    harmonics = h_freq.shape[-1]
-    harmonic_indices = tf.range(1, harmonics + 1, dtype=tf.float32)
-    harmonic_indices = harmonic_indices[tf.newaxis, tf.newaxis, :]
-
-    f = h_freq / harmonic_indices
-    f_mean = tf.math.reduce_mean(f, axis=1)
-
-    f_variance = tf.math.reduce_mean(
-        mag_w * tf.square(f - f_mean), axis=2) / tf.math.reduce_mean(mag_w)
-
-    f_variance = tf.where(f_variance > 4.0 * tf.math.reduce_mean(f_variance),
-                          0.0, f_variance)
-
-    f_variance = tf.math.reduce_mean(f_variance)
-
-    vibrato = f_variance
-    straight = 1.0 / f_variance
-
-    den = vibrato + straight
-    vibrato = vibrato / den
-    straight = straight / den
-
-    return vibrato, straight
+    return sparse_rich
 
 
-def tremolo_steady_measure(h_freq, h_mag, h_phase, residual,
-                             sample_rate, frame_step):
-    mag_w = h_mag / tf.math.reduce_max(h_mag)
+def attack_rms_measure(h_freq, h_mag, h_phase, residual,
+                       sample_rate, frame_step):
+    mag = tf.math.reduce_mean(h_mag, axis=2)
+    attack_size = tf.squeeze(tf.argmax(mag, axis=1, output_type=tf.int32))
 
-    harmonics = h_freq.shape[-1]
-    harmonic_indices = tf.range(1, harmonics + 1, dtype=tf.float32)
-    harmonic_indices = harmonic_indices[tf.newaxis, tf.newaxis, :]
+    mag = mag[:, :attack_size]
+    rms = tf.math.reduce_mean(tf.math.square(mag))
 
-    f = h_freq / harmonic_indices
-    f_mean = tf.math.reduce_mean(f, axis=1)
+    rms = tf.where(rms > 0.0, tf.math.sqrt(rms), 0.0)
 
-    f_variance = tf.math.reduce_mean(
-        mag_w * tf.square(f - f_mean), axis=2) / tf.math.reduce_mean(mag_w)
+    # db_limit = -120
+    # rms = 0.5 * tsms.core.lin_to_db(rms)
+    # rms = (tf.maximum(rms, db_limit) - db_limit) / (-db_limit)
 
-    f_variance = tf.where(f_variance > 4.0 * tf.math.reduce_mean(f_variance),
-                          0.0, f_variance)
-
-    f_variance = tf.math.reduce_mean(f_variance)
-
-    vibrato = f_variance
-    straight = 1.0 / f_variance
-
-    den = vibrato + straight
-    vibrato = vibrato / den
-    straight = straight / den
-
-    return vibrato, straight
+    return rms
 
 
-def hard_soft_attack_measure(h_freq, h_mag, h_phase, residual,
-                             sample_rate, frame_step):
-    d_h_freq = h_freq[:, 1:, :] - h_freq[:, :-1, :]
-    d_h_freq = tf.concat([d_h_freq, d_h_freq[:, -1:, :]], axis=1)
+def decay_rms_measure(h_freq, h_mag, h_phase, residual,
+                      sample_rate, frame_step):
+    mag = tf.math.reduce_mean(h_mag, axis=2)
 
-    d_h_mag = h_mag[:, 1:, :] - h_mag[:, :-1, :]
-    d_h_mag = tf.concat([d_h_mag, d_h_mag[:, -1:, :]], axis=1)
+    attack_size = tf.squeeze(tf.argmax(mag, axis=1, output_type=tf.int32))
 
-    # mag_w = h_mag / tf.math.reduce_max(h_mag)
+    mag = mag[:, attack_size+1:]
+    db_limit = -80
+    mag_db = tsms.core.lin_to_db(mag)
+    mag_db = tf.maximum(mag_db, db_limit)
+    decay_size = tf.squeeze(tf.argmin(mag_db, axis=1, output_type=tf.int32))
+    decay_size = tf.where(mag_db[:, decay_size] == db_limit,
+                          decay_size, tf.shape(mag_db)[1])
+    decay_size = tf.squeeze(decay_size)
 
-    db_limit = -100
-    mag_w = tsms.core.lin_to_db(h_mag) + A_weighting(h_freq)
-    mag_w = mag_w - tf.math.reduce_max(mag_w)
-    mag_w = (tf.maximum(mag_w, db_limit) - db_limit) / (-db_limit)
+    mag = mag[:, :decay_size]
+    rms = tf.math.reduce_mean(tf.math.square(mag))
 
-    mag_w_mean = tf.math.reduce_mean(mag_w)
+    rms = tf.where(rms > 0.0, tf.math.sqrt(rms), 0.0)
 
-    d_h_freq = tf.math.reduce_mean(mag_w * d_h_freq, axis=2) / mag_w_mean
-    d_h_mag = tf.math.reduce_mean(mag_w * d_h_mag, axis=2) / mag_w_mean
+    # db_limit = -120
+    # rms = 0.5 * tsms.core.lin_to_db(rms)
+    # rms = (tf.maximum(rms, db_limit) - db_limit) / (-db_limit)
 
-    # plt.figure()
-    # plt.plot(np.squeeze(d_h_freq.numpy()))
-    #
-    # plt.figure()
-    # plt.plot(np.squeeze(d_h_mag.numpy()))
-    #
-    # plt.show()
+    return rms
 
-    return 0.0, 0.0
+
+def attack_time_measure(h_freq, h_mag, h_phase, residual,
+                        sample_rate, frame_step):
+    mag = tf.math.reduce_mean(h_mag, axis=2)
+
+    sample_size = tf.shape(h_mag)[1]
+    attack_size = tf.squeeze(tf.argmax(mag, axis=1, output_type=tf.int32))
+
+    sample_size = tf.cast(sample_size, dtype=tf.float32)
+    attack_size = tf.cast(attack_size, dtype=tf.float32)
+
+    attack_time = attack_size / sample_size
+
+    return attack_time
+
+
+def decay_time_measure(h_freq, h_mag, h_phase, residual,
+                       sample_rate, frame_step):
+    mag = tf.math.reduce_mean(h_mag, axis=2)
+    mag = mag / tf.reduce_max(mag)
+
+    sample_size = tf.shape(h_mag)[1]
+    attack_size = tf.squeeze(tf.argmax(mag, axis=1))
+
+    mag = mag[:, attack_size+1:]
+    db_limit = -80
+    mag_db = tsms.core.lin_to_db(mag)
+    mag_db = tf.maximum(mag_db, db_limit)
+    decay_size = tf.squeeze(tf.argmin(mag_db, axis=1, output_type=tf.int32))
+    decay_size = tf.where(mag_db[:, decay_size] == db_limit,
+                          decay_size, tf.shape(mag_db)[1])
+    decay_size = tf.squeeze(decay_size)
+
+    sample_size = tf.cast(sample_size, dtype=tf.float32)
+    decay_size = tf.cast(decay_size, dtype=tf.float32)
+
+    decay_time = decay_size / sample_size
+
+    return decay_time
 
 
 def dark_measure(h_freq, h_mag, h_phase, residual,
