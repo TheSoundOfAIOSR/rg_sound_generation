@@ -1,4 +1,5 @@
 import tensorflow as tf
+from .localconfig import LocalConfig
 
 
 def reconstruction_loss(h, reconstruction, mask, h_mag, conf):
@@ -19,5 +20,9 @@ def kl_loss(z_mean, z_log_variance, conf):
 
 
 def total_loss(h, reconstruction, mask, h_mag,
-               z_mean, z_log_variance, conf):
-    return reconstruction_loss(h, reconstruction, mask, h_mag, conf), kl_loss(z_mean, z_log_variance, conf)
+               z_mean, z_log_variance, conf: LocalConfig):
+    _r_loss = reconstruction_loss(h, reconstruction, mask, h_mag, conf)
+    if conf.use_encoder:
+        _kl_loss = kl_loss(z_mean, z_log_variance, conf)
+        return _r_loss, _kl_loss
+    return _r_loss, tf.constant(0.)

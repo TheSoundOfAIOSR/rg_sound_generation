@@ -8,5 +8,7 @@ if __name__ == "__main__":
     conf.latent_dim = 16
     conf.kl_weight = 1.
     conf.epochs = 1
+    conf.use_encoder = False
+    conf.step_log_interval = 2
 
     train.train(conf)

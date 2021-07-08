@@ -2,7 +2,7 @@ import os
 import tensorflow as tf
 from loguru import logger
 from .dataset import get_dataset
-from .model import create_vae
+from . import model
 from .losses import total_loss
 from .localconfig import LocalConfig
 from .csv_logger import write_log
@@ -22,12 +22,12 @@ if gpus:
 
 
 def train(conf: LocalConfig):
-    vae = create_vae(conf)
+    model_ = model.create_vae(conf) if conf.use_encoder else model.create_decoder(conf)
     checkpoint_path = os.path.join(conf.checkpoints_dir, f"{conf.model_name}.h5")
 
     if os.path.isfile(checkpoint_path):
-        logger.info("Loading VAE")
-        vae.load_weights(checkpoint_path)
+        logger.info("Loading model_")
+        model_.load_weights(checkpoint_path)
     else:
         logger.info(f"No previous checkpoint found at {checkpoint_path}")
 
@@ -62,7 +62,11 @@ def train(conf: LocalConfig):
             instrument_id = batch["instrument_id"]
 
             with tf.GradientTape(persistent=True) as tape:
-                reconstruction, z_mean, z_log_variance = vae([h, note_number, instrument_id, velocity])
+                if conf.use_encoder:
+                    reconstruction, z_mean, z_log_variance = model_([h, note_number, instrument_id, velocity])
+                else:
+                    reconstruction = model_([note_number, velocity, instrument_id])
+                    z_mean, z_log_variance = None, None
                 reconstruction_loss, kl_loss = total_loss(
                     h, reconstruction, mask, h_mag,
                     z_mean, z_log_variance, conf
@@ -70,12 +74,12 @@ def train(conf: LocalConfig):
 
                 loss = reconstruction_loss + kl_loss
 
-            vae_grads = tape.gradient(loss, vae.trainable_weights)
-            vae_grads, _ = tf.clip_by_global_norm(vae_grads, conf.gradient_norm)
+            model__grads = tape.gradient(loss, model_.trainable_weights)
+            model__grads, _ = tf.clip_by_global_norm(model__grads, conf.gradient_norm)
 
             del tape
 
-            optimizer.apply_gradients(zip(vae_grads, vae.trainable_weights))
+            optimizer.apply_gradients(zip(model__grads, model_.trainable_weights))
 
             step_loss = loss.numpy().mean()
             losses.append(step_loss)
@@ -99,7 +103,11 @@ def train(conf: LocalConfig):
             velocity= batch["velocity"]
             instrument_id = batch["instrument_id"]
 
-            reconstruction, z_mean, z_log_variance = vae.predict([h, note_number, instrument_id, velocity])
+            if conf.use_encoder:
+                reconstruction, z_mean, z_log_variance = model_([h, note_number, instrument_id, velocity])
+            else:
+                reconstruction = model_([note_number, velocity, instrument_id])
+                z_mean, z_log_variance = None, None
             reconstruction_loss, kl_loss = total_loss(
                 h, reconstruction, mask, h_mag,
                 z_mean, z_log_variance, conf
@@ -126,7 +134,7 @@ def train(conf: LocalConfig):
             logger.info(f"Best loss updated to {best_loss: .4f}, saving model weights")
             model_path = os.path.join(conf.checkpoints_dir,
                                       f"{epoch}_{conf.model_name}_{best_loss:.4}.h5")
-            vae.save(model_path)
+            model_.save(model_path)
             logger.info(f"Updated model weights saved at {model_path}")
             conf.best_model_path = model_path
         else:

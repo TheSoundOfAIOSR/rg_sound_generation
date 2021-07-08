@@ -81,7 +81,11 @@ def create_decoder(conf: LocalConfig):
     if conf is None:
         conf = LocalConfig()
     z_input, note_number, instrument_id, velocity = decoder_inputs(conf)
-    inputs = tf.keras.layers.concatenate([z_input, note_number, velocity, instrument_id])
+    if conf.use_encoder:
+        inputs_list = [z_input, note_number, velocity, instrument_id]
+    else:
+        inputs_list = [note_number, velocity, instrument_id]
+    inputs = tf.keras.layers.concatenate(inputs_list)
     hidden = tf.keras.layers.Dense(conf.hidden_dim, activation="relu",
                                    kernel_initializer=tf.initializers.glorot_uniform())(inputs)
     num_repeats = int((conf.final_conv_units // conf.hidden_dim) / 2)
@@ -110,18 +114,23 @@ def create_decoder(conf: LocalConfig):
         wrapper[f"up_conv_{i}"] = tf.keras.layers.Conv2D(
             conf.latent_dim, 3, padding="same", name=f"decoder_up_conv_{i}"
         )(wrapper[f"up_out_{i}"])
-        current_z = reshape_z(i, z_input, conf)
-        z_added = tf.keras.layers.Add()([wrapper[f"up_conv_{i}"], current_z])
-        wrapper[f"up_in_{i + 1}"] = tf.keras.layers.concatenate([
-            wrapper[f"act_{i}"], z_added
-        ])
+        if conf.use_encoder:
+            current_z = reshape_z(i, z_input, conf)
+            z_added = tf.keras.layers.Add()([wrapper[f"up_conv_{i}"], current_z])
+            wrapper[f"up_in_{i + 1}"] = tf.keras.layers.concatenate([
+                wrapper[f"act_{i}"], z_added
+            ])
+        else:
+            wrapper[f"up_in_{i + 1}"] = tf.keras.layers.concatenate([
+                wrapper[f"act_{i}"], wrapper[f"up_conv_{i}"]
+            ])
 
     reconstructed = tf.keras.layers.Conv2D(
         2, 3, padding=conf.padding, activation="linear", name="decoder_output",
         kernel_initializer=tf.initializers.glorot_uniform())(wrapper[f"up_in_{len(filters)}"])
 
     model = tf.keras.models.Model(
-        [z_input, note_number, velocity, instrument_id],
+        inputs_list,
         reconstructed, name="decoder"
     )
     tf.keras.utils.plot_model(model, to_file="decoder.png", show_shapes=True)
