@@ -22,7 +22,14 @@ if gpus:
 
 
 def train(conf: LocalConfig):
-    model_ = model.create_vae(conf) if conf.use_encoder else model.create_decoder(conf)
+    if conf.use_encoder:
+        model_ = model.create_vae(conf)
+    else:
+        if conf.decoder_type == "rnn":
+            model_ = model.create_rnn_decoder(conf)
+        else:
+            model_ = model.create_decoder(conf)
+
     checkpoint_path = os.path.join(conf.checkpoints_dir, f"{conf.model_name}.h5")
 
     if os.path.isfile(checkpoint_path):

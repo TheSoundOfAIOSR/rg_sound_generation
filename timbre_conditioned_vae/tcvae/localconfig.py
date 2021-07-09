@@ -45,6 +45,7 @@ class LocalConfig:
     reconstruction_weight = 1.
     st_var = (2.0 ** (1.0 / 12.0) - 1.0)
     db_limit = -120
+    decoder_type = "cnn"
 
     _instance = None
 

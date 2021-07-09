@@ -157,3 +157,26 @@ def create_vae(conf: LocalConfig):
         name="VAE"
     )
     return model
+
+
+def create_rnn_decoder(conf: LocalConfig):
+    if conf is None:
+        conf = LocalConfig()
+    z_input, note_number, instrument_id, velocity = decoder_inputs(conf)
+
+    inputs_list = [note_number, velocity, instrument_id]
+    inputs = tf.keras.layers.concatenate(inputs_list)
+    hidden = tf.keras.layers.Dense(256, activation="relu",
+                                   kernel_initializer=tf.initializers.glorot_uniform())(inputs)
+    num_repeats = 512
+    repeat = tf.keras.layers.RepeatVector(num_repeats)(hidden)
+    lstm = tf.keras.layers.Bidirectional(
+        tf.keras.layers.LSTM(256, activation="tanh", recurrent_activation="sigmoid",
+                             return_sequences=True, dropout=conf.lstm_dropout,
+                             recurrent_dropout=0, unroll=False, use_bias=True))(repeat)
+    output = tf.keras.layers.Reshape((1024, 128, 2))(lstm)
+    model = tf.keras.models.Model(
+        inputs_list,
+        output, name="decoder"
+    )
+    return model
