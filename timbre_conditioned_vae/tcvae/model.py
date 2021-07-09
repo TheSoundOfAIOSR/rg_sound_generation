@@ -168,13 +168,21 @@ def create_rnn_decoder(conf: LocalConfig):
     inputs = tf.keras.layers.concatenate(inputs_list)
     hidden = tf.keras.layers.Dense(256, activation="relu",
                                    kernel_initializer=tf.initializers.glorot_uniform())(inputs)
-    num_repeats = 512
+    num_repeats = 1024
     repeat = tf.keras.layers.RepeatVector(num_repeats)(hidden)
-    lstm = tf.keras.layers.Bidirectional(
-        tf.keras.layers.LSTM(256, activation="tanh", recurrent_activation="sigmoid",
+    lstm_1 = tf.keras.layers.Bidirectional(
+        tf.keras.layers.LSTM(64, activation="tanh", recurrent_activation="sigmoid",
                              return_sequences=True, dropout=conf.lstm_dropout,
                              recurrent_dropout=0, unroll=False, use_bias=True))(repeat)
-    output = tf.keras.layers.Reshape((1024, 128, 2))(lstm)
+    lstm_2 = tf.keras.layers.Bidirectional(
+        tf.keras.layers.LSTM(64, activation="tanh", recurrent_activation="sigmoid",
+                             return_sequences=True, dropout=conf.lstm_dropout,
+                             recurrent_dropout=0, unroll=False, use_bias=True))(repeat)
+
+    output_1 = tf.keras.layers.Lambda(lambda x: tf.expand_dims(x, axis=-1))(lstm_1)
+    output_2 = tf.keras.layers.Lambda(lambda x: tf.expand_dims(x, axis=-1))(lstm_2)
+
+    output = tf.keras.layers.concatenate([output_1, output_2])
     model = tf.keras.models.Model(
         inputs_list,
         output, name="decoder"
