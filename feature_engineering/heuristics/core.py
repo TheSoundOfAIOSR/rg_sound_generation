@@ -1,8 +1,8 @@
 import tensorflow as tf
 import tensorflow_addons as tfa
 import numpy as np
-import tsms
-import matplotlib.pyplot as plt
+from . import tsms
+from . import utils
 
 
 def exp_envelope(t, alpha):
@@ -211,6 +211,7 @@ def peak_iir_frequency_response(w, wc, bw, g_db):
     return h
 
 
+@utils.how_long
 def inharmonicity_measure(h_freq, h_mag, h_phase, residual,
                           sample_rate, frame_step):
     harmonics = h_freq.shape[-1]
@@ -225,7 +226,7 @@ def inharmonicity_measure(h_freq, h_mag, h_phase, residual,
         h_mag * tf.square(f - f0), axis=2, keepdims=True) / h_mag_mean
 
     # remove huge spikes, generally the attack part
-    f_variance = tfa.image.median_filter2d(f_variance, filter_shape=(1, 50))
+    # f_variance = tfa.image.median_filter2d(f_variance, filter_shape=(1, 50))
     f_variance = tf.math.reduce_mean(f_variance)
 
     inharmonic = f_variance ** 2
@@ -234,6 +235,7 @@ def inharmonicity_measure(h_freq, h_mag, h_phase, residual,
     return inharmonic
 
 
+@utils.how_long
 def even_odd_measure(h_freq, h_mag, h_phase, residual,
                      sample_rate, frame_step):
     even_mean = tf.math.reduce_mean(h_mag[:, :, 1::2])
@@ -248,6 +250,7 @@ def even_odd_measure(h_freq, h_mag, h_phase, residual,
     return even_odd
 
 
+@utils.how_long
 def sparse_rich_measure(h_freq, h_mag, h_phase, residual,
                         sample_rate, frame_step):
     db_limit = -60
@@ -266,6 +269,7 @@ def sparse_rich_measure(h_freq, h_mag, h_phase, residual,
     return sparse_rich
 
 
+@utils.how_long
 def attack_rms_measure(h_freq, h_mag, h_phase, residual,
                        sample_rate, frame_step):
     mag = tf.math.reduce_mean(h_mag, axis=2)
@@ -283,6 +287,7 @@ def attack_rms_measure(h_freq, h_mag, h_phase, residual,
     return rms
 
 
+@utils.how_long
 def decay_rms_measure(h_freq, h_mag, h_phase, residual,
                       sample_rate, frame_step):
     mag = tf.math.reduce_mean(h_mag, axis=2)
@@ -310,6 +315,7 @@ def decay_rms_measure(h_freq, h_mag, h_phase, residual,
     return rms
 
 
+@utils.how_long
 def attack_time_measure(h_freq, h_mag, h_phase, residual,
                         sample_rate, frame_step):
     mag = tf.math.reduce_mean(h_mag, axis=2)
@@ -325,6 +331,7 @@ def attack_time_measure(h_freq, h_mag, h_phase, residual,
     return attack_time
 
 
+@utils.how_long
 def decay_time_measure(h_freq, h_mag, h_phase, residual,
                        sample_rate, frame_step):
     mag = tf.math.reduce_mean(h_mag, axis=2)
@@ -350,8 +357,10 @@ def decay_time_measure(h_freq, h_mag, h_phase, residual,
     return decay_time
 
 
-def dark_measure(h_freq, h_mag, h_phase, residual,
-                 sample_rate, frame_step):
+@utils.how_long
+def frequency_band_measure(h_freq, h_mag, h_phase, residual,
+                           sample_rate, frame_step,
+                           f_min, f_max):
     # remove components above nyquist frequency
     mask = tf.where(
         tf.greater_equal(h_freq, sample_rate / 2.0),
@@ -359,10 +368,6 @@ def dark_measure(h_freq, h_mag, h_phase, residual,
 
     h_freq = h_freq * mask
     w = 2.0 * np.pi * h_freq / sample_rate
-
-    # dark frequency range. TODO: use real values
-    f_min = 200.0
-    f_max = 400.0
 
     w_min = 2.0 * np.pi * f_min / sample_rate
     w_max = 2.0 * np.pi * f_max / sample_rate
@@ -381,7 +386,6 @@ def dark_measure(h_freq, h_mag, h_phase, residual,
     num = tf.math.reduce_mean(h_mag * h * mask)
     den = tf.math.reduce_mean(h_mag * mask)
 
-    dark = num / den
+    ratio = num / den
 
-    return dark
-
+    return ratio

@@ -1,20 +1,24 @@
+import os
+os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+
 import tensorflow as tf
 import numpy as np
 import glob
 import soundfile as sf
 import matplotlib.pyplot as plt
-import tsms
-import core
+from time import time
+from heuristics import core, tsms, utils
 
 
+@utils.how_long
 def main():
     # file_list = glob.glob("samples/*.wav")
     # index = 1
     # audio_file = file_list[index]
     # note_number = int(audio_file[-11:-8])
 
-    audio_file = "samples/synth_audio.wav"
-    note_number = 50
+    audio_file = os.path.join(os.getcwd(), "samples/guitar_electronic_003-060-050_harmonic.wav")
+    note_number = 60
 
     audio, sample_rate = sf.read(audio_file)
 
@@ -45,7 +49,6 @@ def main():
 
     m = core.inharmonicity_measure(
         h_freq, h_mag, h_phase, residual, sample_rate, frame_step)
-
     print("inharmonicity_measure", m.numpy())
 
     m = core.even_odd_measure(
@@ -77,6 +80,13 @@ def main():
         h_freq, h_mag, h_phase, residual, sample_rate, frame_step)
 
     print("decay_time_measure", m.numpy())
+
+    m = core.frequency_band_measure(
+        h_freq, h_mag, h_phase, residual, sample_rate, frame_step,
+        f_min=200, f_max=4000
+    )
+
+    print("frequency_band_measure in range 200 - 4000", m.numpy())
 
 
 if __name__ == '__main__':

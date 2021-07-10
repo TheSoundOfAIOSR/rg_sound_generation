@@ -2,8 +2,8 @@ import tensorflow as tf
 import numpy as np
 import soundfile as sf
 import matplotlib.pyplot as plt
-import tsms
-import core
+from .. import tsms
+from . import core
 
 # pip install git+
 # https://github.com/fabiodimarco/tf-spectral-modeling-synthesis.git
