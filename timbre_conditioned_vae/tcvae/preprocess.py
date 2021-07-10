@@ -29,12 +29,12 @@ def get_measures(h_freq, h_mag, harmonics, conf: LocalConfig):
             h_freq_orig, h_mag_orig, None, None, None, None)
         decay_time = heuristics.core.decay_time_measure(
             h_freq_orig, h_mag_orig, None, None, None, None)
-        f_m = heuristics.core.frequency_band_measure(
-            h_freq_orig, h_mag_orig, None, None, conf.sample_rate, None,
-            f_min=200, f_max=4000 # ToDo: iterate over all the frequency bands
-        )
+        # f_m = heuristics.core.frequency_band_measure(
+        #     h_freq_orig, h_mag_orig, None, None, conf.sample_rate, None,
+        #     f_min=200, f_max=4000 # ToDo: iterate over all the frequency bands
+        # )
         result = [[inharmonic, even_odd, sparse_rich,
-                   attack_rms, decay_rms, attack_time, decay_time, f_m]]
+                   attack_rms, decay_rms, attack_time, decay_time]]
         result = tf.convert_to_tensor(result)
 
         if results is None:

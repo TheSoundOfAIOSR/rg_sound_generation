@@ -18,6 +18,7 @@ class LocalConfig:
     frame_size = 64
     batch_size = 2
     num_instruments = 74
+    num_measures = 7
     starting_midi_pitch = 40
     num_pitches = 49
     num_velocities = 5
