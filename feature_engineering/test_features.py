@@ -1,5 +1,5 @@
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+os.environ["CUDA_VISIBLE_DEVICES"] = "-1" # ToDo: Remove when using Colab
 
 import tensorflow as tf
 import numpy as np
@@ -11,12 +11,42 @@ from heuristics import core, tsms, utils
 
 
 @utils.how_long
-def main():
+def from_core(h_freq, h_mag, h_phase=None, residual=None, sample_rate=None, frame_step=None):
     # file_list = glob.glob("samples/*.wav")
     # index = 1
     # audio_file = file_list[index]
     # note_number = int(audio_file[-11:-8])
 
+    inharmonic = core.inharmonicity_measure(
+        h_freq, h_mag, h_phase, residual, sample_rate, frame_step)
+
+    even_odd = core.even_odd_measure(
+        h_freq, h_mag, h_phase, residual, sample_rate, frame_step)
+
+    sparse_rich = core.sparse_rich_measure(
+        h_freq, h_mag, h_phase, residual, sample_rate, frame_step)
+
+    attack_rms = core.attack_rms_measure(
+        h_freq, h_mag, h_phase, residual, sample_rate, frame_step)
+
+    decay_rms = core.decay_rms_measure(
+        h_freq, h_mag, h_phase, residual, sample_rate, frame_step)
+
+    attack_time = core.attack_time_measure(
+        h_freq, h_mag, h_phase, residual, sample_rate, frame_step)
+
+    decay_time = core.decay_time_measure(
+        h_freq, h_mag, h_phase, residual, sample_rate, frame_step)
+
+    f_m = core.frequency_band_measure(
+        h_freq, h_mag, h_phase, residual, sample_rate, frame_step,
+        f_min=200, f_max=4000
+    )
+    return (inharmonic, even_odd, sparse_rich, attack_rms,
+     decay_rms, attack_time, decay_time), f_m
+
+
+if __name__ == '__main__':
     audio_file = os.path.join(os.getcwd(), "samples/guitar_electronic_003-060-050_harmonic.wav")
     note_number = 60
 
@@ -47,47 +77,13 @@ def main():
 
     residual = audio - harmonic
 
-    m = core.inharmonicity_measure(
-        h_freq, h_mag, h_phase, residual, sample_rate, frame_step)
-    print("inharmonicity_measure", m.numpy())
+    (inharmonic_c, even_odd_c, sparse_rich_c, attack_rms_c,
+     decay_rms_c, attack_time_c, decay_time_c), f_m_c = from_core(h_freq, h_mag, sample_rate=sample_rate)
 
-    m = core.even_odd_measure(
-        h_freq, h_mag, h_phase, residual, sample_rate, frame_step)
-
-    print("even_odd_measure", m.numpy())
-
-    m = core.sparse_rich_measure(
-        h_freq, h_mag, h_phase, residual, sample_rate, frame_step)
-
-    print("sparse_rich_measure", m.numpy())
-
-    m = core.attack_rms_measure(
-        h_freq, h_mag, h_phase, residual, sample_rate, frame_step)
-
-    print("attack_rms_measure", m.numpy())
-
-    m = core.decay_rms_measure(
-        h_freq, h_mag, h_phase, residual, sample_rate, frame_step)
-
-    print("decay_rms_measure", m.numpy())
-
-    m = core.attack_time_measure(
-        h_freq, h_mag, h_phase, residual, sample_rate, frame_step)
-
-    print("attack_time_measure", m.numpy())
-
-    m = core.decay_time_measure(
-        h_freq, h_mag, h_phase, residual, sample_rate, frame_step)
-
-    print("decay_time_measure", m.numpy())
-
-    m = core.frequency_band_measure(
-        h_freq, h_mag, h_phase, residual, sample_rate, frame_step,
-        f_min=200, f_max=4000
-    )
-
-    print("frequency_band_measure in range 200 - 4000", m.numpy())
-
-
-if __name__ == '__main__':
-    main()
+    print("Inharmonic", inharmonic_c)
+    print("Even Odd", even_odd_c)
+    print("Sparse Rich", sparse_rich_c)
+    print("Attack RMS", attack_rms_c)
+    print("Decay RM", decay_rms_c)
+    print("Attack Time", attack_time_c)
+    print("Decay Time", decay_time_c)

@@ -211,7 +211,6 @@ def peak_iir_frequency_response(w, wc, bw, g_db):
     return h
 
 
-@utils.how_long
 def inharmonicity_measure(h_freq, h_mag, h_phase, residual,
                           sample_rate, frame_step):
     harmonics = h_freq.shape[-1]
@@ -235,7 +234,6 @@ def inharmonicity_measure(h_freq, h_mag, h_phase, residual,
     return inharmonic
 
 
-@utils.how_long
 def even_odd_measure(h_freq, h_mag, h_phase, residual,
                      sample_rate, frame_step):
     even_mean = tf.math.reduce_mean(h_mag[:, :, 1::2])
@@ -250,7 +248,6 @@ def even_odd_measure(h_freq, h_mag, h_phase, residual,
     return even_odd
 
 
-@utils.how_long
 def sparse_rich_measure(h_freq, h_mag, h_phase, residual,
                         sample_rate, frame_step):
     db_limit = -60
@@ -269,7 +266,6 @@ def sparse_rich_measure(h_freq, h_mag, h_phase, residual,
     return sparse_rich
 
 
-@utils.how_long
 def attack_rms_measure(h_freq, h_mag, h_phase, residual,
                        sample_rate, frame_step):
     mag = tf.math.reduce_mean(h_mag, axis=2)
@@ -287,7 +283,6 @@ def attack_rms_measure(h_freq, h_mag, h_phase, residual,
     return rms
 
 
-@utils.how_long
 def decay_rms_measure(h_freq, h_mag, h_phase, residual,
                       sample_rate, frame_step):
     mag = tf.math.reduce_mean(h_mag, axis=2)
@@ -315,7 +310,6 @@ def decay_rms_measure(h_freq, h_mag, h_phase, residual,
     return rms
 
 
-@utils.how_long
 def attack_time_measure(h_freq, h_mag, h_phase, residual,
                         sample_rate, frame_step):
     mag = tf.math.reduce_mean(h_mag, axis=2)
@@ -331,7 +325,6 @@ def attack_time_measure(h_freq, h_mag, h_phase, residual,
     return attack_time
 
 
-@utils.how_long
 def decay_time_measure(h_freq, h_mag, h_phase, residual,
                        sample_rate, frame_step):
     mag = tf.math.reduce_mean(h_mag, axis=2)
@@ -357,7 +350,6 @@ def decay_time_measure(h_freq, h_mag, h_phase, residual,
     return decay_time
 
 
-@utils.how_long
 def frequency_band_measure(h_freq, h_mag, h_phase, residual,
                            sample_rate, frame_step,
                            f_min, f_max):
