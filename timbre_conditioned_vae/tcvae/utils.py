@@ -19,7 +19,7 @@ def normalize_h_freq(h_freq, h_mag, note_number):
 
     h_freq_norm = (h_freq - h_freq_mean) / (h_freq_note * st_var)
 
-    return h_freq_norm
+    return h_freq_norm, harmonics
 
 
 def denormalize_h_freq(h_freq_norm, note_number):
