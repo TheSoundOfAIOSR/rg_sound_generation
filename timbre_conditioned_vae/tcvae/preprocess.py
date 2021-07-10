@@ -4,7 +4,12 @@ from . import heuristics
 
 
 def get_measures(h_freq, h_mag, harmonics, conf: LocalConfig):
-    results = tf.zeros(shape=(conf.batch_size, 8))
+    results = None
+
+    # ToDo: Add the frequency bands to use
+    # frequency_bands = [
+    #     (20, 200)
+    # ]
 
     for i in range(0, conf.batch_size):
         h_freq_orig = tf.expand_dims(h_freq[i, :, :harmonics[i], 0], axis=0)
@@ -26,8 +31,14 @@ def get_measures(h_freq, h_mag, harmonics, conf: LocalConfig):
             h_freq_orig, h_mag_orig, None, None, None, None)
         f_m = heuristics.core.frequency_band_measure(
             h_freq_orig, h_mag_orig, None, None, conf.sample_rate, None,
-            f_min=200, f_max=4000
+            f_min=200, f_max=4000 # ToDo: iterate over all the frequency bands
         )
-        results[i, :] = tf.concat([inharmonic, even_odd, sparse_rich,
-                                   attack_rms, decay_rms, attack_time, decay_time, f_m])
+        result = [[inharmonic, even_odd, sparse_rich,
+                   attack_rms, decay_rms, attack_time, decay_time, f_m]]
+        result = tf.convert_to_tensor(result)
+
+        if results is None:
+            results = result
+        else:
+            results = tf.concat([results, result], axis=0)
     return results
