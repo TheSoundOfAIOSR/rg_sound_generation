@@ -129,7 +129,7 @@ def train(conf: LocalConfig):
             all_measures = get_all_measures(batch, conf)
             reconstruction_loss, kl_loss = take_step(_model, conf, h, h_mag, mask,
                                                      note_number, velocity, all_measures)
-
+            loss = reconstruction_loss + kl_loss
             step_loss = loss.numpy().mean()
             val_losses.append(step_loss)
 
