@@ -81,10 +81,12 @@ def create_decoder(conf: LocalConfig):
     if conf is None:
         conf = LocalConfig()
     z_input, note_number, instrument_id, velocity = decoder_inputs(conf)
+    heuristic_measures = tf.keras.layers.Input(shape=(conf.num_measures,), name="measures")
+
     if conf.use_encoder:
         inputs_list = [z_input, note_number, velocity, instrument_id]
     else:
-        inputs_list = [note_number, velocity, instrument_id]
+        inputs_list = [note_number, velocity, heuristic_measures]
     inputs = tf.keras.layers.concatenate(inputs_list)
     hidden = tf.keras.layers.Dense(conf.hidden_dim, activation="relu",
                                    kernel_initializer=tf.initializers.glorot_uniform())(inputs)

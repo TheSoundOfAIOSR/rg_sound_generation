@@ -9,7 +9,7 @@ if __name__ == "__main__":
     conf.kl_weight = 1.
     conf.epochs = 1
     conf.use_encoder = False
-    conf.decoder_type = "rnn"
+    conf.decoder_type = "cnn"
     conf.step_log_interval = 2
 
     train.train(conf)

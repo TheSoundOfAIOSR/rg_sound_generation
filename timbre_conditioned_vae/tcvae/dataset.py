@@ -102,6 +102,6 @@ def get_dataset(conf: LocalConfig):
 
     train_dataset = create_dataset(train_path, map_func=map_features, batch_size=conf.batch_size)
     valid_dataset = create_dataset(valid_path, map_func=map_features, batch_size=conf.batch_size)
-    test_dataset = create_dataset(test_path, map_func=map_features, batch_size=1)
+    test_dataset = create_dataset(test_path, map_func=map_features, batch_size=conf.batch_size)
 
     return train_dataset, valid_dataset, test_dataset
