@@ -62,7 +62,6 @@ def train(conf: LocalConfig):
 
         for step, batch in enumerate(train):
             h = batch["h"]
-            h_mag = batch["h_mag"]
             mask = batch["mask"]
             note_number = batch["note_number"]
             velocity= batch["velocity"]
@@ -75,7 +74,7 @@ def train(conf: LocalConfig):
                     reconstruction = model_([note_number, velocity, instrument_id])
                     z_mean, z_log_variance = None, None
                 reconstruction_loss, kl_loss = total_loss(
-                    h, reconstruction, mask, h_mag,
+                    h, reconstruction, mask,
                     z_mean, z_log_variance, conf
                 )
 

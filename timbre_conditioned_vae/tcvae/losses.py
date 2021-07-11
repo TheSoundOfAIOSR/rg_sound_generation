@@ -2,15 +2,46 @@ import tensorflow as tf
 from .localconfig import LocalConfig
 
 
-def reconstruction_loss(h, reconstruction, mask, h_mag, conf):
+def reconstruction_loss(h, reconstruction, mask, conf):
+    f_true, m_true = tf.unstack(h, axis=-1)
     f_pred, m_pred = tf.unstack(reconstruction, axis=-1)
-    f_gt, m_gt = tf.unstack(h, axis=-1)
 
-    weighted_mask = h_mag * mask
+    max_harmonics = conf.data_handler.max_harmonics
 
-    m_loss = tf.reduce_sum(tf.square(m_pred - m_gt) * weighted_mask)
-    f_loss = tf.reduce_sum(tf.square(f_pred - f_gt) * weighted_mask)
-    return (m_loss + f_loss) * conf.reconstruction_weight / conf.batch_size
+    f0_shifts_true = f_true[:, :, 0:1]
+    f0_shifts_pred = f_pred[:, :, 0:1]
+
+    mag_env_true = m_true[:, :, 0:1]
+    mag_env_pred = m_true[:, :, 0:1]
+
+    h_freq_shifts_true = f_true[:, :, 1:max_harmonics + 1]
+    h_freq_shifts_pred = f_pred[:, :, 1:max_harmonics + 1]
+
+    h_mag_distribution_true = m_true[:, :, 1:max_harmonics + 1]
+    h_mag_distribution_pred = m_true[:, :, 1:max_harmonics + 1]
+
+    mask = mask[:, :, 0:max_harmonics]
+
+    f0_loss, mag_env_loss, h_freq_shifts_loss, h_mag_loss = \
+        conf.data_handler.loss(
+            f0_shifts_true, f0_shifts_pred,
+            mag_env_true, mag_env_pred,
+            h_freq_shifts_true, h_freq_shifts_pred,
+            h_mag_distribution_true, h_mag_distribution_pred,
+            mask)
+
+    f0_weight = 1.0,
+    mag_env_weight = 1.0,
+    h_freq_shifts_weight = 0.1,
+    h_mag_weight = 0.1
+
+    loss = \
+        f0_loss * f0_weight + \
+        mag_env_loss * mag_env_weight + \
+        h_freq_shifts_loss * h_freq_shifts_weight + \
+        h_mag_loss * h_mag_weight
+
+    return loss * conf.reconstruction_weight
 
 
 def kl_loss(z_mean, z_log_variance, conf):
@@ -19,9 +50,9 @@ def kl_loss(z_mean, z_log_variance, conf):
     return loss
 
 
-def total_loss(h, reconstruction, mask, h_mag,
+def total_loss(h, reconstruction, mask,
                z_mean, z_log_variance, conf: LocalConfig):
-    _r_loss = reconstruction_loss(h, reconstruction, mask, h_mag, conf)
+    _r_loss = reconstruction_loss(h, reconstruction, mask, conf)
     if conf.use_encoder:
         _kl_loss = kl_loss(z_mean, z_log_variance, conf)
         return _r_loss, _kl_loss

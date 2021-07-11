@@ -1,6 +1,7 @@
 import os
 import json
 from typing import Dict
+from .utils import DataHandler
 
 
 class LocalConfig:
@@ -46,6 +47,7 @@ class LocalConfig:
     st_var = (2.0 ** (1.0 / 12.0) - 1.0)
     db_limit = -120
     decoder_type = "cnn"
+    data_handler = DataHandler()
 
     _instance = None
 

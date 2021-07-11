@@ -2,7 +2,6 @@ import os
 import tensorflow as tf
 from .tfrecord_provider import CompleteTFRecordProvider
 from .localconfig import LocalConfig
-from .utils import normalize_h_mag, normalize_h_freq
 
 
 def create_dataset(
@@ -58,22 +57,23 @@ def map_features(features):
     h_freq = tf.expand_dims(h_freq, axis=0)
     h_mag = tf.expand_dims(h_mag, axis=0)
 
-    h_freq_norm = normalize_h_freq(h_freq, h_mag, note_number)
-    h_mag_norm = normalize_h_mag(h_mag, conf.db_limit)
+    f0_shifts, mag_env, h_freq_shifts, h_mag_distribution, mask = \
+        conf.data_handler.normalize(h_freq, h_mag, note_number)
 
-    h_freq_norm = tf.squeeze(h_freq_norm)
-    h_mag_norm = tf.squeeze(h_mag_norm)
-    h_mag = tf.squeeze(h_mag)
-    h_mag = h_mag / tf.reduce_sum(h_mag)
+    f0_shifts = tf.squeeze(f0_shifts, axis=0)
+    mag_env = tf.squeeze(mag_env, axis=0)
+    h_freq_shifts = tf.squeeze(h_freq_shifts, axis=0)
+    h_mag_distribution = tf.squeeze(h_mag_distribution, axis=0)
+    mask = tf.squeeze(mask, axis=0)
 
-    mask = tf.ones_like(h_freq_norm)
+    freq = tf.concat([f0_shifts, h_freq_shifts], axis=-1)
+    mag = tf.concat([mag_env, h_mag_distribution], axis=-1)
+
+    freq = tf.expand_dims(pad_function(freq, conf), axis=-1)
+    mag = tf.expand_dims(pad_function(mag, conf), axis=-1)
     mask = pad_function(mask, conf)
 
-    h_freq_norm = tf.expand_dims(pad_function(h_freq_norm, conf), axis=-1)
-    h_mag_norm = tf.expand_dims(pad_function(h_mag_norm, conf), axis=-1)
-    h_mag = pad_function(h_mag, conf)
-
-    h = tf.concat([h_freq_norm, h_mag_norm], axis=-1)
+    h = tf.concat([freq, mag], axis=-1)
 
     note_number = tf.one_hot(note_number - conf.starting_midi_pitch, depth=conf.num_pitches)
 
@@ -82,7 +82,6 @@ def map_features(features):
         "velocity": tf.squeeze(velocity),
         "note_number": tf.squeeze(note_number),
         "h": h,
-        "h_mag": h_mag,
         "mask": mask
     }
 
