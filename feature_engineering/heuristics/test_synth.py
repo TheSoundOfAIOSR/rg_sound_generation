@@ -2,7 +2,7 @@ import tensorflow as tf
 import numpy as np
 import soundfile as sf
 import matplotlib.pyplot as plt
-from .. import tsms
+import tsms
 from . import core
 
 # pip install git+

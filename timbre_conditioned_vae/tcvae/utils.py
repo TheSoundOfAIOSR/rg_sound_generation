@@ -1,5 +1,5 @@
 import tensorflow as tf
-from . import tsms
+import tsms
 
 
 def normalize_h_freq(h_freq, h_mag, note_number):

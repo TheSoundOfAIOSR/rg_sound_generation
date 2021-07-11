@@ -7,7 +7,8 @@ import glob
 import soundfile as sf
 import matplotlib.pyplot as plt
 from time import time
-from heuristics import core, tsms, utils
+import tsms
+from heuristics import core, utils
 
 
 @utils.how_long
