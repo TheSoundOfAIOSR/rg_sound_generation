@@ -47,8 +47,9 @@ class DataHandler:
         self._lin_limit = tsms.core.db_to_lin(db_limit)
         self._max_pool_length = max_pool_length
 
-        self.max_harmonics = tsms.core.get_number_harmonics(
-            min_f0, sample_rate)
+        # self.max_harmonics = tsms.core.get_number_harmonics(
+        #     min_f0, sample_rate)
+        self.max_harmonics = 110
 
     @tf.function
     def normalize(self, h_freq, h_mag, note_number, name=None):
