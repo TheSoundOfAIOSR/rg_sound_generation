@@ -30,18 +30,13 @@ def reconstruction_loss(h, reconstruction, mask, conf):
             h_mag_distribution_true, h_mag_distribution_pred,
             mask)
 
-    f0_weight = 1.0,
-    mag_env_weight = 1.0,
-    h_freq_shifts_weight = 0.1,
-    h_mag_weight = 0.1
+    f0_weight = 1.
+    mag_env_weight = 1.
+    h_freq_shifts_weight = 1.
+    h_mag_weight = 1.
 
-    loss = \
-        f0_loss * f0_weight + \
-        mag_env_loss * mag_env_weight + \
-        h_freq_shifts_loss * h_freq_shifts_weight + \
-        h_mag_loss * h_mag_weight
-
-    return loss * conf.reconstruction_weight
+    return (f0_loss * f0_weight, mag_env_loss * mag_env_weight,
+            h_freq_shifts_loss * h_freq_shifts_weight, h_mag_loss * h_mag_weight)
 
 
 def kl_loss(z_mean, z_log_variance, conf):

@@ -5,7 +5,6 @@ from .dataset import get_dataset
 from . import model
 from .losses import reconstruction_loss
 from .localconfig import LocalConfig
-from .csv_logger import write_log
 from .preprocess import get_measures
 
 
@@ -25,15 +24,28 @@ def get_all_measures(batch, conf):
     return get_measures(h_freq_orig, h_mag_orig, harmonics, conf)
 
 
-def write_step(name, step, conf, step_loss):
+def write_step(name, epoch, step, conf, loss,
+               f0_loss, mag_env_loss, h_freq_shifts_loss, h_mag_loss):
+    write_string = f"{epoch},{step},{loss},{f0_loss},{mag_env_loss},{h_freq_shifts_loss},{h_mag_loss}\n"
+    out_string = f"{name}, Epoch {epoch}, Step: {step}, Loss: {loss} " \
+                 f"F0: {f0_loss}, Mag Env: {mag_env_loss} " \
+                 f"H Freq Shifts: {h_freq_shifts_loss}, H Mag: {h_mag_loss}"
+
+    with open(f"{name}_{conf.csv_log_file}", "a") as f:
+        f.write(write_string)
     if step % conf.step_log_interval == 0 and conf.log_steps:
-        logger.info(f"{name} Step: {step:5d}, Loss: {step_loss}")
+        logger.info(out_string)
 
 
 def train(conf: LocalConfig):
 
     logger.info(f"Using Physical Devices:")
     print(tf.config.list_physical_devices())
+
+    if os.path.isfile(f"train_{conf.csv_log_file}"):
+        os.remove(f"train_{conf.csv_log_file}")
+    if os.path.isfile(f"valid_{conf.csv_log_file}"):
+        os.remove(f"train_{conf.csv_log_file}")
 
     if conf.decoder_type == "rnn":
         _model = model.create_rnn_decoder(conf)
@@ -59,10 +71,6 @@ def train(conf: LocalConfig):
 
     for epoch in range(0, conf.epochs):
         logger.info(f"Epoch {epoch} started")
-        # if epoch >= conf.kl_anneal_start:
-        #     conf.kl_weight += conf.kl_anneal_factor
-        #     conf.kl_weight = min(conf.kl_weight_max, conf.kl_weight)
-        # logger.info(f"Current KL weight at {conf.kl_weight}")
 
         losses = []
         val_losses = []
@@ -74,43 +82,43 @@ def train(conf: LocalConfig):
             h, mask, note_number, velocity, instrument_id = get_inputs(batch)
             all_measures = get_all_measures(batch, conf)
 
-            with tf.GradientTape(persistent=True) as tape:
+            with tf.GradientTape() as tape:
                 reconstruction = _model([note_number, velocity, all_measures])
-                loss = tf.squeeze(reconstruction_loss(h, reconstruction, mask, conf))
+                f0_loss, mag_env_loss, h_freq_shifts_loss, h_mag_loss = \
+                    reconstruction_loss(h, reconstruction, mask, conf)
+                loss = f0_loss + mag_env_loss + h_freq_shifts_loss + h_mag_loss
 
-            step_loss = loss.numpy().mean()
+            step_loss = tf.squeeze(loss).numpy().mean()
             losses.append(step_loss)
 
-            write_step("Training", step, conf, step_loss)
+            write_step("train", epoch, step, conf, step_loss, f0_loss,
+                       mag_env_loss, h_freq_shifts_loss, h_mag_loss)
 
             _model_grads = tape.gradient(loss, _model.trainable_weights)
-            # _model_grads, _ = tf.clip_by_global_norm(_model_grads, conf.gradient_norm)
-
-            del tape
-
             optimizer.apply_gradients(zip(_model_grads, _model.trainable_weights))
 
         train_loss = sum(losses) / len(losses)
 
         logger.info(f"Epoch: {epoch} ended")
         logger.info(f"Training loss: {train_loss:.4f}")
-        logger.info("Starting validation..")
+        logger.info("Starting validation")
 
         for valid_step, batch in enumerate(valid_set):
             h, mask, note_number, velocity, instrument_id = get_inputs(batch)
             all_measures = get_all_measures(batch, conf)
             reconstruction = _model([note_number, velocity, all_measures])
-            loss = tf.squeeze(reconstruction_loss(h, reconstruction, mask, conf))
+            f0_loss, mag_env_loss, h_freq_shifts_loss, h_mag_loss = \
+                reconstruction_loss(h, reconstruction, mask, conf)
+            loss = f0_loss + mag_env_loss + h_freq_shifts_loss + h_mag_loss
 
-            step_loss = loss.numpy().mean()
+            step_loss = tf.squeeze(loss).numpy().mean()
             val_losses.append(step_loss)
 
-            write_step("Training", valid_step, conf, step_loss)
+            write_step("valid", epoch, valid_step, conf, step_loss, f0_loss,
+                       mag_env_loss, h_freq_shifts_loss, h_mag_loss)
 
         valid_loss = sum(val_losses) / len(val_losses)
         logger.info(f"Validation Loss: {valid_loss:.4f}")
-
-        write_log(conf, epoch, losses, val_losses)
 
         if valid_loss < best_loss:
             last_good_epoch = epoch
@@ -125,14 +133,14 @@ def train(conf: LocalConfig):
             logger.info("Validation loss did not improve")
 
         if epoch - last_good_epoch >= conf.early_stopping:
-            logger.info(f"No improvement for {conf.early_stopping} epochs. Stopping early..")
+            logger.info(f"No improvement for {conf.early_stopping} epochs. Stopping early")
             break
 
         if epoch - last_good_epoch >= conf.lr_plateau:
             logger.info(f"No improvement for {conf.lr_plateau} epochs. Reducing learning rate")
             conf.learning_rate *= conf.lr_factor
             logger.info(f"New learning rate is {conf.learning_rate}")
-            conf.lr_plateau += 3 # Wait 3 epochs before reducing lr again
+            conf.lr_plateau += 2 # Wait 2 epochs before reducing lr again
 
     if conf.best_model_path is not None:
         logger.info(f"Best model: {conf.best_model_path}")
