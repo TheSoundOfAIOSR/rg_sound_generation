@@ -40,6 +40,7 @@ def pad_function(sample, conf: LocalConfig):
 def map_features(features):
     conf = LocalConfig()
 
+    name = features["sample_name"]
     note_number = features["note_number"]
     instrument_id = tf.one_hot(features["instrument_id"], depth=conf.num_instruments)
     velocity = tf.cast(features["velocity"], dtype=tf.float32) / 25. - 1.
@@ -56,11 +57,11 @@ def map_features(features):
 
     num_harmonics = tf.shape(tf.squeeze(h_freq))[-1]
 
-    # h_freq = tf.expand_dims(h_freq, axis=0)
-    # h_mag = tf.expand_dims(h_mag, axis=0)
+    h_freq = tf.expand_dims(h_freq, axis=0)
+    h_mag = tf.expand_dims(h_mag, axis=0)
 
     f0_shifts, mag_env, h_freq_shifts, h_mag_distribution, mask = \
-        conf.data_handler.normalize(h_freq, h_mag, note_number)
+        conf.data_handler.normalize(h_freq, h_mag, note_number, name)
 
     h_mag_orig = tf.expand_dims(pad_function(tf.squeeze(h_mag), conf), axis=-1)
     h_freq_orig = tf.expand_dims(pad_function(tf.squeeze(h_freq), conf), axis=-1)

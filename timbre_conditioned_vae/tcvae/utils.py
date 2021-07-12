@@ -51,7 +51,7 @@ class DataHandler:
             min_f0, sample_rate)
 
     @tf.function
-    def normalize(self, h_freq, h_mag, note_number):
+    def normalize(self, h_freq, h_mag, note_number, name=None):
         note_number = tf.cast(note_number, dtype=tf.float32)
         f0 = tsms.core.harmonic_analysis_to_f0(h_freq, h_mag)[:, :, tf.newaxis]
         f0_note = tsms.core.midi_to_hz(note_number)
@@ -75,6 +75,9 @@ class DataHandler:
         if self.max_harmonics - tf.squeeze(harmonics) < 0:
             tf.print("Wrong padding dims")
             tf.print(harmonics)
+            tf.print(batches)
+            tf.print(frames)
+            tf.print(name)
 
         h_freq_shifts = tf.pad(
             h_freq_shifts,

@@ -1,8 +1,7 @@
 import tensorflow as tf
 import tensorflow_addons as tfa
 import numpy as np
-import tsms
-from . import utils
+from .. import tsms
 
 
 def exp_envelope(t, alpha):
@@ -166,14 +165,12 @@ def A_weighting(frequencies, min_db=-80.0):
 
 def peak_iir_frequency_response(w, wc, bw, g_db):
     """Compute peak iir filter frequency response
-
      Args:
         w: angular frequencies on which the frequency response is computed,
            range [0, pi].
         wc: center angular frequency, range [0, pi].
         bw: bandwidth, range [0, pi].
         g_db: dB gain at center frequency.
-
                 b0 + b1*z^-1 + b2*z^-2
         H(z) = ------------------------
                 a0 + a1*z^-1 + a2*z^-2
