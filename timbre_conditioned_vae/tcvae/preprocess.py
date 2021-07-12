@@ -25,19 +25,27 @@ def get_measures(h_freq, h_mag, harmonics, conf: LocalConfig):
         decay_time = heuristics.core.decay_time_measure(
             h_freq_orig, h_mag_orig, None, None, None, None)
 
-        bands = []
-        for band_name, band_range in conf.freq_bands.items():
-            b = heuristics.core.frequency_band_measure(
-                    h_freq_orig, h_mag_orig, None, None, conf.sample_rate, None,
-                    f_min=band_range[0], f_max=band_range[1]
-                )
-            bands.append(b)
-        result = [[inharmonic, even_odd, sparse_rich,
-                   attack_rms, decay_rms, attack_time, decay_time] + bands]
+        bass = heuristics.core.frequency_band_measure(
+                h_freq_orig, h_mag_orig, None, None, conf.sample_rate, None,
+                f_min=conf.freq_bands["bass"][0], f_max=conf.freq_bands["bass"][1]
+            )
+        mid = heuristics.core.frequency_band_measure(
+                h_freq_orig, h_mag_orig, None, None, conf.sample_rate, None,
+                f_min=conf.freq_bands["mid"][0], f_max=conf.freq_bands["mid"][1]
+            )
+        high_mid = heuristics.core.frequency_band_measure(
+                h_freq_orig, h_mag_orig, None, None, conf.sample_rate, None,
+                f_min=conf.freq_bands["high_mid"][0], f_max=conf.freq_bands["high_mid"][1]
+            )
+        high = heuristics.core.frequency_band_measure(
+                h_freq_orig, h_mag_orig, None, None, conf.sample_rate, None,
+                f_min=conf.freq_bands["high"][0], f_max=conf.freq_bands["high"][1]
+            )
 
-        assert len(result[0]) == conf.num_measures, f"Number of heuristic " \
-                                                    f"measures is wrong ({conf.num_measures})"
-        result = tf.convert_to_tensor(result)
+        result = [inharmonic, even_odd, sparse_rich,
+                  attack_rms, decay_rms, attack_time, decay_time,
+                  bass, mid, high_mid, high]
+        result = tf.convert_to_tensor([result])
 
         if results is None:
             results = result

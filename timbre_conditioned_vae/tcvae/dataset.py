@@ -34,7 +34,7 @@ def create_dataset(
 def pad_function(sample, conf: LocalConfig):
     return tf.pad(sample,
                   tf.convert_to_tensor([[0, conf.row_dim - conf.harmonic_frame_steps],
-                                        [0, conf.col_dim - tf.shape(sample)[1]]]))
+                                        [0, conf.col_dim - tf.shape(tf.squeeze(sample))[-1]]]))
 
 
 def map_features(features):
@@ -54,10 +54,10 @@ def map_features(features):
     h_freq = tf.io.parse_tensor(h_freq, out_type=tf.float32)
     h_mag = tf.io.parse_tensor(h_mag, out_type=tf.float32)
 
-    harmonics = tf.shape(h_freq)[-1]
+    num_harmonics = tf.shape(tf.squeeze(h_freq))[-1]
 
-    h_freq = tf.expand_dims(h_freq, axis=0)
-    h_mag = tf.expand_dims(h_mag, axis=0)
+    # h_freq = tf.expand_dims(h_freq, axis=0)
+    # h_mag = tf.expand_dims(h_mag, axis=0)
 
     f0_shifts, mag_env, h_freq_shifts, h_mag_distribution, mask = \
         conf.data_handler.normalize(h_freq, h_mag, note_number)
@@ -90,7 +90,7 @@ def map_features(features):
         "mask": mask,
         "h_mag_orig": h_mag_orig,
         "h_freq_orig": h_freq_orig,
-        "harmonics": harmonics
+        "harmonics": num_harmonics
     }
 
 

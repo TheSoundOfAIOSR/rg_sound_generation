@@ -9,19 +9,6 @@ from .csv_logger import write_log
 from .preprocess import get_measures
 
 
-gpus = tf.config.experimental.list_physical_devices('GPU')
-if gpus:
-    try:
-        # Currently, memory growth needs to be the same across GPUs
-        for gpu in gpus:
-            tf.config.experimental.set_memory_growth(gpu, True)
-        logical_gpus = tf.config.experimental.list_logical_devices('GPU')
-        logger.info(str(len(gpus)), "Physical GPUs,", str(len(logical_gpus)), "Logical GPUs")
-    except RuntimeError as e:
-        # Memory growth must be set before GPUs have been initialized
-        logger.error(e)
-
-
 def get_inputs(batch):
     h = batch["h"]
     mask = batch["mask"]
@@ -44,13 +31,14 @@ def write_step(name, step, conf, step_loss):
 
 
 def train(conf: LocalConfig):
-    if conf.use_encoder:
-        _model = model.create_vae(conf)
+
+    logger.info(f"Using Physical Devices:")
+    print(tf.config.list_physical_devices())
+
+    if conf.decoder_type == "rnn":
+        _model = model.create_rnn_decoder(conf)
     else:
-        if conf.decoder_type == "rnn":
-            _model = model.create_rnn_decoder(conf)
-        else:
-            _model = model.create_decoder(conf)
+        _model = model.create_decoder(conf)
 
     checkpoint_path = os.path.join(conf.checkpoints_dir, f"{conf.model_name}.h5")
 
@@ -71,18 +59,18 @@ def train(conf: LocalConfig):
 
     for epoch in range(0, conf.epochs):
         logger.info(f"Epoch {epoch} started")
-        if epoch >= conf.kl_anneal_start:
-            conf.kl_weight += conf.kl_anneal_factor
-            conf.kl_weight = min(conf.kl_weight_max, conf.kl_weight)
-        logger.info(f"Current KL weight at {conf.kl_weight}")
+        # if epoch >= conf.kl_anneal_start:
+        #     conf.kl_weight += conf.kl_anneal_factor
+        #     conf.kl_weight = min(conf.kl_weight_max, conf.kl_weight)
+        # logger.info(f"Current KL weight at {conf.kl_weight}")
 
         losses = []
         val_losses = []
 
-        train = iter(train_dataset)
-        valid = iter(valid_dataset)
+        train_set = iter(train_dataset)
+        valid_set = iter(valid_dataset)
 
-        for step, batch in enumerate(train):
+        for step, batch in enumerate(train_set):
             h, mask, note_number, velocity, instrument_id = get_inputs(batch)
             all_measures = get_all_measures(batch, conf)
 
@@ -108,7 +96,7 @@ def train(conf: LocalConfig):
         logger.info(f"Training loss: {train_loss:.4f}")
         logger.info("Starting validation..")
 
-        for valid_step, batch in enumerate(valid):
+        for valid_step, batch in enumerate(valid_set):
             h, mask, note_number, velocity, instrument_id = get_inputs(batch)
             all_measures = get_all_measures(batch, conf)
             reconstruction = _model([note_number, velocity, all_measures])
