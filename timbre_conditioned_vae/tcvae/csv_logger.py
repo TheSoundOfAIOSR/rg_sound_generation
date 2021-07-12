@@ -19,7 +19,9 @@ def write_log(conf: LocalConfig, epoch: int, train_losses: List[float], val_loss
     print(f"Logs written for epoch {epoch}")
 
 
-def show_logs(set_name: str, conf: LocalConfig, all_steps: bool = False):
+def show_logs(set_name: str, conf: LocalConfig = None, all_steps: bool = False):
+    if conf is None:
+        conf = LocalConfig()
     with open(f"{set_name}_{conf.csv_log_file}", "r") as f:
         rows = f.read().splitlines()
         epochs = []

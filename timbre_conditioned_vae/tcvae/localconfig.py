@@ -10,7 +10,7 @@ class LocalConfig:
     model_name = "VAE"
     run_name = "Default"
     best_model_path = None
-    use_encoder = True
+    use_encoder = False
     latent_dim = 16
     hidden_dim = 256
     lstm_dim = 256

@@ -73,13 +73,6 @@ class DataHandler:
         h_freq_shifts = (h_freq / harmonic_numbers - f0) / max_f0
         h_mag_distribution = h_mag / mag_env
 
-        if self.max_harmonics - tf.squeeze(harmonics) < 0:
-            tf.print("Wrong padding dims")
-            tf.print(harmonics)
-            tf.print(batches)
-            tf.print(frames)
-            tf.print(name)
-
         h_freq_shifts = tf.pad(
             h_freq_shifts,
             paddings=((0, 0), (0, 0), (0, self.max_harmonics - harmonics)))

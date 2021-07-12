@@ -12,13 +12,13 @@ def reconstruction_loss(h, reconstruction, mask, conf):
     f0_shifts_pred = f_pred[:, :, 0:1]
 
     mag_env_true = m_true[:, :, 0:1]
-    mag_env_pred = m_true[:, :, 0:1]
+    mag_env_pred = m_pred[:, :, 0:1]
 
     h_freq_shifts_true = f_true[:, :, 1:max_harmonics + 1]
     h_freq_shifts_pred = f_pred[:, :, 1:max_harmonics + 1]
 
     h_mag_distribution_true = m_true[:, :, 1:max_harmonics + 1]
-    h_mag_distribution_pred = m_true[:, :, 1:max_harmonics + 1]
+    h_mag_distribution_pred = m_pred[:, :, 1:max_harmonics + 1]
 
     mask = mask[:, :, 0:max_harmonics]
 
