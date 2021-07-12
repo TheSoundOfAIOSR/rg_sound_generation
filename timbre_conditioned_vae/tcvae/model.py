@@ -1,4 +1,3 @@
-from typing import Tuple
 import tensorflow as tf
 from .localconfig import LocalConfig
 
@@ -81,10 +80,12 @@ def create_decoder(conf: LocalConfig):
     if conf is None:
         conf = LocalConfig()
     z_input, note_number, instrument_id, velocity = decoder_inputs(conf)
+    heuristic_measures = tf.keras.layers.Input(shape=(conf.num_measures,), name="measures")
+
     if conf.use_encoder:
         inputs_list = [z_input, note_number, velocity, instrument_id]
     else:
-        inputs_list = [note_number, velocity, instrument_id]
+        inputs_list = [note_number, velocity, heuristic_measures]
     inputs = tf.keras.layers.concatenate(inputs_list)
     hidden = tf.keras.layers.Dense(conf.hidden_dim, activation="relu",
                                    kernel_initializer=tf.initializers.glorot_uniform())(inputs)
@@ -162,9 +163,11 @@ def create_vae(conf: LocalConfig):
 def create_rnn_decoder(conf: LocalConfig):
     if conf is None:
         conf = LocalConfig()
-    z_input, note_number, instrument_id, velocity = decoder_inputs(conf)
+    note_number = tf.keras.layers.Input(shape=(conf.num_pitches,), name="note_number")
+    velocity = tf.keras.layers.Input(shape=(conf.num_velocities,), name="velocity")
+    heuristic_measures = tf.keras.layers.Input(shape=(conf.num_measures,), name="measures")
 
-    inputs_list = [note_number, velocity, instrument_id]
+    inputs_list = [note_number, velocity, heuristic_measures]
     inputs = tf.keras.layers.concatenate(inputs_list)
     hidden = tf.keras.layers.Dense(256, activation="relu",
                                    kernel_initializer=tf.initializers.glorot_uniform())(inputs)

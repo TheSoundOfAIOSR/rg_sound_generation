@@ -19,6 +19,7 @@ class LocalConfig:
     frame_size = 64
     batch_size = 2
     num_instruments = 74
+    num_measures = 7 + 4
     starting_midi_pitch = 40
     num_pitches = 49
     num_velocities = 5
@@ -30,11 +31,11 @@ class LocalConfig:
     early_stopping = 7
     learning_rate = 2e-4
     lr_plateau = 4
-    lr_factor = 0.2
+    lr_factor = 0.1
     gradient_norm = 5.
     csv_log_file = "logs.csv"
-    final_conv_shape = (64, 8, 192) # update to be calculated dynamically
-    final_conv_units = 64 * 8 * 192 # update to be calculated dynamically
+    final_conv_shape = (64, 8, 192) # ToDo: to be calculated dynamically
+    final_conv_units = 64 * 8 * 192 # ToDo: to be calculated dynamically
     best_loss = 1e6
     sample_rate = 16000
     log_steps = True
@@ -47,6 +48,12 @@ class LocalConfig:
     st_var = (2.0 ** (1.0 / 12.0) - 1.0)
     db_limit = -120
     decoder_type = "cnn"
+    freq_bands = {
+        "bass": [60, 270],
+        "mid": [270, 2000],
+        "high_mid": [2000, 6000],
+        "high": [6000, 20000]
+    }
     data_handler = DataHandler()
 
     _instance = None

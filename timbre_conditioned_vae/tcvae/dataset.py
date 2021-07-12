@@ -54,11 +54,16 @@ def map_features(features):
     h_freq = tf.io.parse_tensor(h_freq, out_type=tf.float32)
     h_mag = tf.io.parse_tensor(h_mag, out_type=tf.float32)
 
+    harmonics = tf.shape(h_freq)[-1]
+
     h_freq = tf.expand_dims(h_freq, axis=0)
     h_mag = tf.expand_dims(h_mag, axis=0)
 
     f0_shifts, mag_env, h_freq_shifts, h_mag_distribution, mask = \
         conf.data_handler.normalize(h_freq, h_mag, note_number)
+
+    h_mag_orig = tf.expand_dims(pad_function(tf.squeeze(h_mag), conf), axis=-1)
+    h_freq_orig = tf.expand_dims(pad_function(tf.squeeze(h_freq), conf), axis=-1)
 
     f0_shifts = tf.squeeze(f0_shifts, axis=0)
     mag_env = tf.squeeze(mag_env, axis=0)
@@ -82,7 +87,10 @@ def map_features(features):
         "velocity": tf.squeeze(velocity),
         "note_number": tf.squeeze(note_number),
         "h": h,
-        "mask": mask
+        "mask": mask,
+        "h_mag_orig": h_mag_orig,
+        "h_freq_orig": h_freq_orig,
+        "harmonics": harmonics
     }
 
 
@@ -95,6 +103,6 @@ def get_dataset(conf: LocalConfig):
 
     train_dataset = create_dataset(train_path, map_func=map_features, batch_size=conf.batch_size)
     valid_dataset = create_dataset(valid_path, map_func=map_features, batch_size=conf.batch_size)
-    test_dataset = create_dataset(test_path, map_func=map_features, batch_size=1)
+    test_dataset = create_dataset(test_path, map_func=map_features, batch_size=conf.batch_size)
 
     return train_dataset, valid_dataset, test_dataset

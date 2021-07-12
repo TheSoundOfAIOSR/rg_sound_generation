@@ -1,6 +1,0 @@
-Django
-psycopg2-binary
-python-dotenv
-requests
-gunicorn
-whitenoise
