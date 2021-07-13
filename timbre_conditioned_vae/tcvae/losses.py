@@ -2,7 +2,7 @@ import tensorflow as tf
 from .localconfig import LocalConfig
 
 
-def reconstruction_loss(h, reconstruction, mask, conf):
+def deconstruct_tensors(h, reconstruction, mask, conf):
     f_true, m_true = tf.unstack(h, axis=-1)
     f_pred, m_pred = tf.unstack(reconstruction, axis=-1)
 
@@ -21,6 +21,15 @@ def reconstruction_loss(h, reconstruction, mask, conf):
     h_mag_distribution_pred = m_pred[:, :, 1:max_harmonics + 1]
 
     mask = mask[:, :, 0:max_harmonics]
+    return (f0_shifts_true, f0_shifts_pred, mag_env_true, mag_env_pred,
+            h_freq_shifts_true, h_freq_shifts_pred, h_mag_distribution_true,
+            h_mag_distribution_pred, mask)
+
+
+def reconstruction_loss(h, reconstruction, mask, conf):
+    (f0_shifts_true, f0_shifts_pred, mag_env_true, mag_env_pred,
+     h_freq_shifts_true, h_freq_shifts_pred, h_mag_distribution_true,
+     h_mag_distribution_pred, mask) = deconstruct_tensors(h, reconstruction, mask, conf)
 
     f0_loss, mag_env_loss, h_freq_shifts_loss, h_mag_loss = \
         conf.data_handler.loss(

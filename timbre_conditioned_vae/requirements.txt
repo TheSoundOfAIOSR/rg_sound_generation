@@ -1,3 +1,2 @@
 tensorflow
 git+https://github.com/fabiodimarco/tf-spectral-modeling-synthesis.git@b81438676b90e34ecf45a33d8c439dcc3a16549d
-loguru

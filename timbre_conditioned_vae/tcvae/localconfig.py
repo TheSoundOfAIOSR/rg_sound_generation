@@ -1,7 +1,7 @@
 import os
 import json
 from typing import Dict
-from .utils import DataHandler
+from .data_handler import DataHandler
 
 
 class LocalConfig:

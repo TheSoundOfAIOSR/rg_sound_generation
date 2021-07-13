@@ -114,11 +114,22 @@ class DataHandler:
         h_mag_distribution *= mask
 
         f0 = f0_note + f0_shifts * max_f0
+        print(tf.shape(f0))
+        print(tf.shape(h_freq_shifts))
+        print(tf.shape(max_f0))
+        print(tf.shape(harmonic_numbers))
         h_freq = harmonic_numbers * (f0 + h_freq_shifts * max_f0)
         h_mag = h_mag_distribution * mag_env
-
         return h_freq, h_mag
 
+    def reshape_freq_mag(self, h_freq, h_mag):
+        # One example at a time
+        f0_estimate = tsms.core.harmonic_analysis_to_f0(h_freq, h_mag)
+        min_f0 = tf.math.reduce_min(f0_estimate)
+        harmonics = tsms.core.get_number_harmonics(min_f0, self._sample_rate)
+        return h_freq[..., :harmonics], h_mag[..., :harmonics]
+
+    @tf.function
     def loss(self,
              f0_shifts_true, f0_shifts_pred,
              mag_env_true, mag_env_pred,
