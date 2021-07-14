@@ -2,6 +2,12 @@ import tensorflow as tf
 from .localconfig import LocalConfig
 from . import heuristics
 
+heuristic_names = [
+    "inharmonicity", "even_odd", "sparse_rich", "attack_rms",
+    "decay_rms", "attack_time", "decay_time", "bass", "mid",
+    "high_mid", "high"
+]
+
 
 def get_measures(h_freq, h_mag, harmonics, conf: LocalConfig):
     results = None

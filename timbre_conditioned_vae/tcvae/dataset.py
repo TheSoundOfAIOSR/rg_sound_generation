@@ -91,7 +91,8 @@ def map_features(features):
         "mask": mask,
         "h_mag_orig": h_mag_orig,
         "h_freq_orig": h_freq_orig,
-        "harmonics": num_harmonics
+        "harmonics": num_harmonics,
+        "sample_name": name
     }
 
 
