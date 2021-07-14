@@ -60,7 +60,7 @@ def map_features(features):
     h_freq = tf.expand_dims(h_freq, axis=0)
     h_mag = tf.expand_dims(h_mag, axis=0)
 
-    f0_shifts, mag_env, h_freq_shifts, h_mag_distribution, mask = \
+    f0_shifts, mag_env, h_freq_shifts, h_mag_dist, mask = \
         conf.data_handler.normalize(h_freq, h_mag, note_number, name)
 
     h_mag_orig = tf.expand_dims(pad_function(tf.squeeze(h_mag), conf), axis=-1)
@@ -69,11 +69,11 @@ def map_features(features):
     f0_shifts = tf.squeeze(f0_shifts, axis=0)
     mag_env = tf.squeeze(mag_env, axis=0)
     h_freq_shifts = tf.squeeze(h_freq_shifts, axis=0)
-    h_mag_distribution = tf.squeeze(h_mag_distribution, axis=0)
+    h_mag_dist = tf.squeeze(h_mag_dist, axis=0)
     mask = tf.squeeze(mask, axis=0)
 
     freq = tf.concat([f0_shifts, h_freq_shifts], axis=-1)
-    mag = tf.concat([mag_env, h_mag_distribution], axis=-1)
+    mag = tf.concat([mag_env, h_mag_dist], axis=-1)
 
     freq = tf.expand_dims(pad_function(freq, conf), axis=-1)
     mag = tf.expand_dims(pad_function(mag, conf), axis=-1)
