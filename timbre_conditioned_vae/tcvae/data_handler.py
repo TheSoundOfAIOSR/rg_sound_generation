@@ -52,6 +52,24 @@ class DataHandler:
         self._max_pool_length = max_pool_length
         self.max_harmonics = max_harmonics
 
+    @property
+    def f0_weight_type(self):
+        return self._f0_weight_type
+
+    @f0_weight_type.setter
+    def f0_weight_type(self, value: str):
+        assert value in ['mag_max_pool', 'mag', 'none']
+        self._f0_weight_type = value
+
+    @property
+    def mag_loss_type(self):
+        return self._mag_loss_type
+
+    @mag_loss_type.setter
+    def mag_loss_type(self, value: str):
+        assert value in ['l2_db' 'l1_db', 'rms_db', 'mse']
+        self._mag_loss_type = value
+
     @tf.function
     def normalize(self, h_freq, h_mag, note_number, name=None):
         note_number = tf.cast(note_number, dtype=tf.float32)

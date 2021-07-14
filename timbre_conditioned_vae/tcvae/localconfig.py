@@ -55,6 +55,10 @@ class LocalConfig:
         "high": [6000, 20000]
     }
     data_handler = DataHandler()
+    data_handler_properties = [
+        "f0_weight_type",
+        "mag_loss_type"
+    ]
 
     _instance = None
 
@@ -64,7 +68,12 @@ class LocalConfig:
         return cls._instance
 
     def set_config(self, params: Dict):
-        vars(self).update(params)
+        params_conf = dict((k, v) for k, v in params.items()
+                           if k not in self.data_handler_properties)
+        vars(self).update(params_conf)
+        for p in self.data_handler_properties:
+            if p in params:
+                exec(f"self.data_handler.{p} = params['{p}']")
 
     def load_config_from_file(self, file_path: str):
         assert os.path.isfile(file_path)
@@ -74,7 +83,10 @@ class LocalConfig:
         self.set_config(params)
 
     def save_config(self):
-        target_path = os.path.join(self.checkpoints_dir, f"{self.run_name}_{self.model_name}.json")
-
+        target_path = os.path.join(self.checkpoints_dir,
+                                   f"{self.run_name}_{self.model_name}.json")
+        to_save = vars(self)
+        for p in self.data_handler_properties:
+            to_save[p] = eval(f"self.data_handler.{p}")
         with open(target_path, "w") as f:
-            json.dump(vars(self), f)
+            json.dump(to_save, f)
