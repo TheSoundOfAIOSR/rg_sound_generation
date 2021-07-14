@@ -40,7 +40,7 @@ class LocalConfig:
     sample_rate = 16000
     log_steps = True
     step_log_interval = 100
-    kl_weight = 0.
+    kl_weight = 1.
     kl_weight_max = 1.
     kl_anneal_factor = 0.1
     kl_anneal_start = 10

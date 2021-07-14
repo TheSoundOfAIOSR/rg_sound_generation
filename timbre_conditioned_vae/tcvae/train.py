@@ -2,7 +2,7 @@ import os
 import tensorflow as tf
 from .dataset import get_dataset
 from . import model
-from .losses import reconstruction_loss
+from .losses import reconstruction_loss, kl_loss
 from .localconfig import LocalConfig
 from .compute_measures import get_measures
 
@@ -24,11 +24,14 @@ def get_all_measures(batch, conf):
 
 
 def write_step(name, epoch, step, conf, loss,
-               f0_loss, mag_env_loss, h_freq_shifts_loss, h_mag_loss):
-    write_string = f"{epoch},{step},{loss},{f0_loss},{mag_env_loss},{h_freq_shifts_loss},{h_mag_loss}\n"
+               f0_loss, mag_env_loss, h_freq_shifts_loss,
+               h_mag_loss, _kl_loss):
+    write_string = f"{epoch},{step},{loss},{f0_loss},{mag_env_loss}," \
+                   f"{h_freq_shifts_loss},{h_mag_loss},{_kl_loss}\n"
     out_string = f"{name}, Epoch {epoch:3d}, Step: {step:4d}, Loss: {loss:.4f} " \
                  f"F0: {f0_loss:.4f}, Mag Env: {mag_env_loss:.4f} " \
-                 f"H Freq Shifts: {h_freq_shifts_loss:.4f}, H Mag: {h_mag_loss:.4f}"
+                 f"H Freq Shifts: {h_freq_shifts_loss:.4f}, H Mag: {h_mag_loss:.4f}, " \
+                 f"KL Loss: {_kl_loss}"
 
     csv_file_path = os.path.join(conf.checkpoints_dir,
                                  f"{conf.model_name}_{name}_{conf.csv_log_file}")
@@ -47,10 +50,7 @@ def train(conf: LocalConfig):
     print(f"Using Physical Devices:")
     print(tf.config.list_physical_devices())
 
-    if conf.decoder_type == "rnn":
-        _model = model.create_rnn_decoder(conf)
-    else:
-        _model = model.create_decoder(conf)
+    _model = model.get_model_from_config(conf)
 
     checkpoint_path = os.path.join(conf.checkpoints_dir, f"{conf.model_name}.h5")
 
@@ -83,16 +83,23 @@ def train(conf: LocalConfig):
             all_measures = get_all_measures(batch, conf)
 
             with tf.GradientTape() as tape:
-                reconstruction = _model([note_number, velocity, all_measures])
+                if conf.use_encoder:
+                    reconstruction, z_mean, z_log_var = _model([h, note_number, velocity, all_measures])
+                else:
+                    reconstruction = _model([note_number, velocity, all_measures])
                 f0_loss, mag_env_loss, h_freq_shifts_loss, h_mag_loss = \
                     reconstruction_loss(h, reconstruction, mask, conf)
-                loss = f0_loss + mag_env_loss + h_freq_shifts_loss + h_mag_loss
+                if conf.use_encoder:
+                    _kl_loss = kl_loss(z_mean, z_log_var, conf)
+                else:
+                    _kl_loss = 0.
+                loss = f0_loss + mag_env_loss + h_freq_shifts_loss + h_mag_loss + _kl_loss
 
             step_loss = tf.squeeze(loss).numpy().mean()
             losses.append(step_loss)
 
             write_step("train", epoch, step, conf, step_loss, f0_loss,
-                       mag_env_loss, h_freq_shifts_loss, h_mag_loss)
+                       mag_env_loss, h_freq_shifts_loss, h_mag_loss, _kl_loss)
 
             _model_grads = tape.gradient(loss, _model.trainable_weights)
             optimizer.apply_gradients(zip(_model_grads, _model.trainable_weights))
@@ -106,16 +113,24 @@ def train(conf: LocalConfig):
         for valid_step, batch in enumerate(valid_set):
             h, mask, note_number, velocity, _ = get_inputs(batch)
             all_measures = get_all_measures(batch, conf)
-            reconstruction = _model([note_number, velocity, all_measures])
+
+            if conf.use_encoder:
+                reconstruction, z_mean, z_log_var = _model([h, note_number, velocity, all_measures])
+            else:
+                reconstruction = _model([note_number, velocity, all_measures])
             f0_loss, mag_env_loss, h_freq_shifts_loss, h_mag_loss = \
                 reconstruction_loss(h, reconstruction, mask, conf)
-            loss = f0_loss + mag_env_loss + h_freq_shifts_loss + h_mag_loss
+            if conf.use_encoder:
+                _kl_loss = kl_loss(z_mean, z_log_var, conf)
+            else:
+                _kl_loss = 0.
+            loss = f0_loss + mag_env_loss + h_freq_shifts_loss + h_mag_loss + _kl_loss
 
             step_loss = tf.squeeze(loss).numpy().mean()
             val_losses.append(step_loss)
 
             write_step("valid", epoch, valid_step, conf, step_loss, f0_loss,
-                       mag_env_loss, h_freq_shifts_loss, h_mag_loss)
+                       mag_env_loss, h_freq_shifts_loss, h_mag_loss, _kl_loss)
 
         valid_loss = sum(val_losses) / len(val_losses)
         print(f"Validation Loss: {valid_loss:.4f}")

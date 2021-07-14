@@ -63,9 +63,9 @@ def create_encoder(conf: LocalConfig):
 def decoder_inputs(conf: LocalConfig):
     z_input = tf.keras.layers.Input(shape=(conf.latent_dim,), name="z")
     note_number = tf.keras.layers.Input(shape=(conf.num_pitches,), name="note_number")
-    instrument_id = tf.keras.layers.Input(shape=(conf.num_instruments,), name="instrument_id")
+    # instrument_id = tf.keras.layers.Input(shape=(conf.num_instruments,), name="instrument_id")
     velocity = tf.keras.layers.Input(shape=(conf.num_velocities,), name="velocity")
-    return z_input, note_number, instrument_id, velocity
+    return z_input, note_number, velocity
 
 
 def reshape_z(block, z_input, conf: LocalConfig):
@@ -79,11 +79,11 @@ def reshape_z(block, z_input, conf: LocalConfig):
 def create_decoder(conf: LocalConfig):
     if conf is None:
         conf = LocalConfig()
-    z_input, note_number, instrument_id, velocity = decoder_inputs(conf)
+    z_input, note_number, velocity = decoder_inputs(conf)
     heuristic_measures = tf.keras.layers.Input(shape=(conf.num_measures,), name="measures")
 
     if conf.use_encoder:
-        inputs_list = [z_input, note_number, velocity, instrument_id]
+        inputs_list = [z_input, note_number, velocity, heuristic_measures]
     else:
         inputs_list = [note_number, velocity, heuristic_measures]
     inputs = tf.keras.layers.concatenate(inputs_list)
@@ -138,28 +138,6 @@ def create_decoder(conf: LocalConfig):
     return model
 
 
-def create_vae(conf: LocalConfig):
-    if conf is None:
-        conf = LocalConfig()
-    encoder = create_encoder(conf)
-    decoder = create_decoder(conf)
-
-    encoder_input = tf.keras.layers.Input(shape=(conf.row_dim, conf.col_dim, 2))
-    note_number = tf.keras.layers.Input(shape=(conf.num_pitches,))
-    instrument_id = tf.keras.layers.Input(shape=(conf.num_instruments,))
-    velocity = tf.keras.layers.Input(shape=(conf.num_velocities,))
-
-    z, z_mean, z_log_variance = encoder(encoder_input)
-    reconstruction = decoder([z, note_number, velocity, instrument_id])
-
-    model = tf.keras.models.Model(
-        [encoder_input, note_number, instrument_id, velocity],
-        [reconstruction, z_mean, z_log_variance],
-        name="VAE"
-    )
-    return model
-
-
 def create_rnn_decoder(conf: LocalConfig):
     if conf is None:
         conf = LocalConfig()
@@ -191,3 +169,39 @@ def create_rnn_decoder(conf: LocalConfig):
         output, name="decoder"
     )
     return model
+
+
+def create_vae(conf: LocalConfig):
+    if conf is None:
+        conf = LocalConfig()
+    encoder = create_encoder(conf)
+    if conf.decoder_type == "rnn":
+        decoder = create_rnn_decoder(conf)
+    else:
+        decoder = create_decoder(conf)
+
+    encoder_input = tf.keras.layers.Input(shape=(conf.row_dim, conf.col_dim, 2))
+    note_number = tf.keras.layers.Input(shape=(conf.num_pitches,))
+    # instrument_id = tf.keras.layers.Input(shape=(conf.num_instruments,))
+    heuristic_measures = tf.keras.layers.Input(shape=(conf.num_measures,), name="measures")
+    velocity = tf.keras.layers.Input(shape=(conf.num_velocities,))
+
+    z, z_mean, z_log_variance = encoder(encoder_input)
+    reconstruction = decoder([z, note_number, velocity, heuristic_measures])
+
+    model = tf.keras.models.Model(
+        [encoder_input, note_number, velocity, heuristic_measures],
+        [reconstruction, z_mean, z_log_variance],
+        name="VAE"
+    )
+    return model
+
+
+def get_model_from_config(conf):
+    if conf.use_encoder:
+        print("Creating VAE")
+        return create_vae(conf)
+    print("Creating Decoder")
+    if conf.decoder_type == "rnn":
+        return create_rnn_decoder(conf)
+    return create_decoder(conf)
