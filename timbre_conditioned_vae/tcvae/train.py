@@ -41,11 +41,6 @@ def train(conf: LocalConfig):
     print(f"Using Physical Devices:")
     print(tf.config.list_physical_devices())
 
-    if os.path.isfile(f"train_{conf.csv_log_file}"):
-        os.remove(f"train_{conf.csv_log_file}")
-    if os.path.isfile(f"valid_{conf.csv_log_file}"):
-        os.remove(f"train_{conf.csv_log_file}")
-
     if conf.decoder_type == "rnn":
         _model = model.create_rnn_decoder(conf)
     else:
