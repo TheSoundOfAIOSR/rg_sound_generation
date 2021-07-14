@@ -25,9 +25,9 @@ class DataHandler:
                  f0_weight_type='mag_max_pool',  # 'mag_max_pool', 'mag', 'none'
                  h_freq_shifts_weight_type='mag_max_pool',
                  mag_loss_type='l2_db',  # ' l2_db' 'l1_db', 'rms_db', 'mse'
-                 f0_weight=10.0,
+                 f0_weight=1.0,
                  mag_env_weight=1.0,
-                 h_freq_shifts_weight=10.0,
+                 h_freq_shifts_weight=1.0,
                  h_mag_dist_weight=1.0,
                  mag_scale_fn=exp_sigmoid,
                  max_harmonics=110,
@@ -69,6 +69,38 @@ class DataHandler:
     def mag_loss_type(self, value: str):
         assert value in ['l2_db' 'l1_db', 'rms_db', 'mse']
         self._mag_loss_type = value
+
+    @property
+    def f0_weight(self):
+        return self._f0_weight
+
+    @f0_weight.setter
+    def f0_weight(self, value: float):
+        self._f0_weight = value
+
+    @property
+    def mag_env_weight(self):
+        return self._mag_env_weight
+
+    @mag_env_weight.setter
+    def mag_env_weight(self, value: float):
+        self._mag_env_weight = value
+
+    @property
+    def h_freq_shifts_weight(self):
+        return self._h_freq_shifts_weight
+
+    @h_freq_shifts_weight.setter
+    def h_freq_shifts_weight(self, value: float):
+        self._h_freq_shifts_weight = value
+
+    @property
+    def h_mag_dist_weight(self):
+        return self._h_mag_dist_weight
+
+    @h_mag_dist_weight.setter
+    def h_mag_dist_weight(self, value: float):
+        self._h_mag_dist_weight = value
 
     @tf.function
     def normalize(self, h_freq, h_mag, note_number, name=None):

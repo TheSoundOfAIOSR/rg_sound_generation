@@ -30,7 +30,13 @@ def write_step(name, epoch, step, conf, loss,
                  f"F0: {f0_loss:.4f}, Mag Env: {mag_env_loss:.4f} " \
                  f"H Freq Shifts: {h_freq_shifts_loss:.4f}, H Mag: {h_mag_loss:.4f}"
 
-    with open(f"{name}_{conf.csv_log_file}", "a") as f:
+    csv_file_path = os.path.join(conf.checkpoints_dir,
+                                 f"{conf.model_name}_{name}_{conf.csv_log_file}")
+    if epoch == 0 and step == 0:
+        mode = "w"
+    else:
+        mode = "a"
+    with open(csv_file_path, mode) as f:
         f.write(write_string)
     if step % conf.step_log_interval == 0 and conf.log_steps:
         print(out_string)
