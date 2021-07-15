@@ -46,15 +46,19 @@ def create_encoder(conf: LocalConfig):
         tf.keras.layers.LSTM(conf.lstm_dim, activation="tanh", recurrent_activation="sigmoid",
                              return_sequences=False, dropout=conf.lstm_dropout,
                              recurrent_dropout=0, unroll=False, use_bias=True))(flattened)
-    z_mean = tf.keras.layers.Dense(conf.latent_dim,
-                                   kernel_initializer=tf.initializers.glorot_uniform(),
-                                   name="z_mean")(lstm)
-    z_log_variance = tf.keras.layers.Dense(conf.latent_dim,
-                                           kernel_initializer=tf.initializers.glorot_uniform(),
-                                           name="z_log_variance")(lstm)
-    z = tf.keras.layers.Lambda(sample_from_latent_space)([z_mean, z_log_variance])
+    if conf.is_variational:
+        z_mean = tf.keras.layers.Dense(conf.latent_dim,
+                                       kernel_initializer=tf.initializers.glorot_uniform(),
+                                       name="z_mean")(lstm)
+        z_log_variance = tf.keras.layers.Dense(conf.latent_dim,
+                                               kernel_initializer=tf.initializers.glorot_uniform(),
+                                               name="z_log_variance")(lstm)
+        z = tf.keras.layers.Lambda(sample_from_latent_space)([z_mean, z_log_variance])
+        outputs = [z, z_mean, z_log_variance]
+    else:
+        outputs = tf.keras.layers.Dense(conf.latent_dim, activation="relu")(lstm)
     model = tf.keras.models.Model(
-        encoder_input, [z, z_mean, z_log_variance], name="encoder"
+        encoder_input, outputs, name="encoder"
     )
     tf.keras.utils.plot_model(model, to_file="encoder.png", show_shapes=True)
     return model
@@ -186,13 +190,19 @@ def create_vae(conf: LocalConfig):
     heuristic_measures = tf.keras.layers.Input(shape=(conf.num_measures,), name="measures")
     velocity = tf.keras.layers.Input(shape=(conf.num_velocities,))
 
-    z, z_mean, z_log_variance = encoder(encoder_input)
-    reconstruction = decoder([z, note_number, velocity, heuristic_measures])
+    if conf.is_variational:
+        z, z_mean, z_log_variance = encoder(encoder_input)
+        reconstruction = decoder([z, note_number, velocity, heuristic_measures])
+        outputs = [reconstruction, z_mean, z_log_variance]
+    else:
+        z = encoder(encoder_input)
+        reconstruction = decoder([z, note_number, velocity, heuristic_measures])
+        outputs = reconstruction
 
     model = tf.keras.models.Model(
         [encoder_input, note_number, velocity, heuristic_measures],
-        [reconstruction, z_mean, z_log_variance],
-        name="VAE"
+        outputs,
+        name="auto_encoder"
     )
     return model
 

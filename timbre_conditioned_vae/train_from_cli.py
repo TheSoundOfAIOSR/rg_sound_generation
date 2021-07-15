@@ -7,6 +7,7 @@ if __name__ == "__main__":
     conf = localconfig.LocalConfig()
 
     conf.use_encoder = True
+    conf.is_variational = False
     conf.decoder_type = "cnn"
     conf.batch_size = 8
     conf.learning_rate = 2e-3

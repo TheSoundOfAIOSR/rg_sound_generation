@@ -84,12 +84,15 @@ def train(conf: LocalConfig):
 
             with tf.GradientTape() as tape:
                 if conf.use_encoder:
-                    reconstruction, z_mean, z_log_var = _model([h, note_number, velocity, all_measures])
+                    if conf.is_variational:
+                        reconstruction, z_mean, z_log_var = _model([h, note_number, velocity, all_measures])
+                    else:
+                        reconstruction = _model([h, note_number, velocity, all_measures])
                 else:
                     reconstruction = _model([note_number, velocity, all_measures])
                 f0_loss, mag_env_loss, h_freq_shifts_loss, h_mag_loss = \
                     reconstruction_loss(h, reconstruction, mask, conf)
-                if conf.use_encoder:
+                if conf.use_encoder and conf.is_variational:
                     _kl_loss = kl_loss(z_mean, z_log_var, conf)
                 else:
                     _kl_loss = 0.
@@ -115,12 +118,15 @@ def train(conf: LocalConfig):
             all_measures = get_all_measures(batch, conf)
 
             if conf.use_encoder:
-                reconstruction, z_mean, z_log_var = _model([h, note_number, velocity, all_measures])
+                if conf.is_variational:
+                    reconstruction, z_mean, z_log_var = _model([h, note_number, velocity, all_measures])
+                else:
+                    reconstruction = _model([h, note_number, velocity, all_measures])
             else:
                 reconstruction = _model([note_number, velocity, all_measures])
             f0_loss, mag_env_loss, h_freq_shifts_loss, h_mag_loss = \
                 reconstruction_loss(h, reconstruction, mask, conf)
-            if conf.use_encoder:
+            if conf.use_encoder and conf.is_variational:
                 _kl_loss = kl_loss(z_mean, z_log_var, conf)
             else:
                 _kl_loss = 0.
