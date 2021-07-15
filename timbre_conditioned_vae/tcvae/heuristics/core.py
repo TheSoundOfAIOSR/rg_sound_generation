@@ -95,8 +95,8 @@ def generate_h_mag(h_freq, sample_rate, frame_step,
                    even_odd_balance=0.5,
                    decay_samples=800,
                    release_samples=200):
-    frames = h_freq.shape[1]
-    harmonics = h_freq.shape[2]
+    frames = tf.shape(h_freq)[1]
+    harmonics = tf.shape(h_freq)[2]
 
     attack_alpha = list(np.linspace(0.0, 0.0, harmonics, dtype=np.float))
     decay_alpha = list(np.linspace(start_alpha, stop_alpha, harmonics,
@@ -210,7 +210,7 @@ def peak_iir_frequency_response(w, wc, bw, g_db):
 
 def inharmonicity_measure(h_freq, h_mag, h_phase, residual,
                           sample_rate, frame_step):
-    harmonics = h_freq.shape[-1]
+    harmonics = tf.shape(h_freq)[-1]
     harmonic_numbers = tf.range(1, harmonics + 1, dtype=tf.float32)
     harmonic_numbers = harmonic_numbers[tf.newaxis, tf.newaxis, :]
 

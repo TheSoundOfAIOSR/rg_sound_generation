@@ -23,6 +23,50 @@ def get_all_measures(batch, conf):
     return get_measures(h_freq_orig, h_mag_orig, harmonics, conf)
 
 
+def _batch(batch, conf):
+    h, mask, note_number, velocity, _ = get_inputs(batch)
+    all_measures = get_all_measures(batch, conf)
+    return h, mask, note_number, velocity, all_measures
+
+
+def _step(_model, h, mask, note_number, velocity, all_measures, conf):
+    if conf.use_encoder:
+        if conf.is_variational:
+            reconstruction, z_mean, z_log_var = _model([h, note_number, velocity, all_measures])
+        else:
+            reconstruction = _model([h, note_number, velocity, all_measures])
+    else:
+        reconstruction = _model([note_number, velocity, all_measures])
+    f0_loss, mag_env_loss, h_freq_shifts_loss, h_mag_loss = \
+        reconstruction_loss(h, reconstruction, mask, conf)
+    if conf.use_encoder and conf.is_variational:
+        _kl_loss = kl_loss(z_mean, z_log_var, conf)
+    else:
+        _kl_loss = 0.
+    loss = f0_loss + mag_env_loss + h_freq_shifts_loss + h_mag_loss + _kl_loss
+    return loss, f0_loss, mag_env_loss, h_freq_shifts_loss, h_mag_loss, _kl_loss
+
+
+@tf.function
+def validation_step(_model, batch, conf):
+    h, mask, note_number, velocity, all_measures = _batch(batch, conf)
+    loss, f0_loss, mag_env_loss, h_freq_shifts_loss, h_mag_loss, _kl_loss = \
+        _step(_model, h, mask, note_number, velocity, all_measures, conf)
+    return loss, f0_loss, mag_env_loss, h_freq_shifts_loss, h_mag_loss, _kl_loss
+
+
+@tf.function
+def training_step(_model, optimizer, batch, conf):
+    h, mask, note_number, velocity, all_measures = _batch(batch, conf)
+
+    with tf.GradientTape() as tape:
+        loss, f0_loss, mag_env_loss, h_freq_shifts_loss, h_mag_loss, _kl_loss = \
+            _step(_model, h, mask, note_number, velocity, all_measures, conf)
+    _model_grads = tape.gradient(loss, _model.trainable_weights)
+    optimizer.apply_gradients(zip(_model_grads, _model.trainable_weights))
+    return loss, f0_loss, mag_env_loss, h_freq_shifts_loss, h_mag_loss, _kl_loss
+
+
 def write_step(name, epoch, step, conf, loss,
                f0_loss, mag_env_loss, h_freq_shifts_loss,
                h_mag_loss, _kl_loss):
@@ -35,10 +79,7 @@ def write_step(name, epoch, step, conf, loss,
 
     csv_file_path = os.path.join(conf.checkpoints_dir,
                                  f"{conf.model_name}_{name}_{conf.csv_log_file}")
-    if epoch == 0 and step == 0:
-        mode = "w"
-    else:
-        mode = "a"
+    mode = "w" if epoch == 0 and step == 0 else "a"
     with open(csv_file_path, mode) as f:
         f.write(write_string)
     if step % conf.step_log_interval == 0 and conf.log_steps:
@@ -51,7 +92,6 @@ def train(conf: LocalConfig):
     print(tf.config.list_physical_devices())
 
     _model = model.get_model_from_config(conf)
-
     checkpoint_path = os.path.join(conf.checkpoints_dir, f"{conf.model_name}.h5")
 
     if os.path.isfile(checkpoint_path):
@@ -79,33 +119,14 @@ def train(conf: LocalConfig):
         valid_set = iter(valid_dataset)
 
         for step, batch in enumerate(train_set):
-            h, mask, note_number, velocity, _ = get_inputs(batch)
-            all_measures = get_all_measures(batch, conf)
-
-            with tf.GradientTape() as tape:
-                if conf.use_encoder:
-                    if conf.is_variational:
-                        reconstruction, z_mean, z_log_var = _model([h, note_number, velocity, all_measures])
-                    else:
-                        reconstruction = _model([h, note_number, velocity, all_measures])
-                else:
-                    reconstruction = _model([note_number, velocity, all_measures])
-                f0_loss, mag_env_loss, h_freq_shifts_loss, h_mag_loss = \
-                    reconstruction_loss(h, reconstruction, mask, conf)
-                if conf.use_encoder and conf.is_variational:
-                    _kl_loss = kl_loss(z_mean, z_log_var, conf)
-                else:
-                    _kl_loss = 0.
-                loss = f0_loss + mag_env_loss + h_freq_shifts_loss + h_mag_loss + _kl_loss
+            loss, f0_loss, mag_env_loss, h_freq_shifts_loss, h_mag_loss, _kl_loss = \
+                training_step(_model, optimizer, batch, conf)
 
             step_loss = tf.squeeze(loss).numpy().mean()
             losses.append(step_loss)
 
             write_step("train", epoch, step, conf, step_loss, f0_loss,
                        mag_env_loss, h_freq_shifts_loss, h_mag_loss, _kl_loss)
-
-            _model_grads = tape.gradient(loss, _model.trainable_weights)
-            optimizer.apply_gradients(zip(_model_grads, _model.trainable_weights))
 
         train_loss = sum(losses) / len(losses)
 
@@ -114,23 +135,8 @@ def train(conf: LocalConfig):
         print("Starting validation")
 
         for valid_step, batch in enumerate(valid_set):
-            h, mask, note_number, velocity, _ = get_inputs(batch)
-            all_measures = get_all_measures(batch, conf)
-
-            if conf.use_encoder:
-                if conf.is_variational:
-                    reconstruction, z_mean, z_log_var = _model([h, note_number, velocity, all_measures])
-                else:
-                    reconstruction = _model([h, note_number, velocity, all_measures])
-            else:
-                reconstruction = _model([note_number, velocity, all_measures])
-            f0_loss, mag_env_loss, h_freq_shifts_loss, h_mag_loss = \
-                reconstruction_loss(h, reconstruction, mask, conf)
-            if conf.use_encoder and conf.is_variational:
-                _kl_loss = kl_loss(z_mean, z_log_var, conf)
-            else:
-                _kl_loss = 0.
-            loss = f0_loss + mag_env_loss + h_freq_shifts_loss + h_mag_loss + _kl_loss
+            loss, f0_loss, mag_env_loss, h_freq_shifts_loss, h_mag_loss, _kl_loss = \
+                validation_step(_model, batch, conf)
 
             step_loss = tf.squeeze(loss).numpy().mean()
             val_losses.append(step_loss)

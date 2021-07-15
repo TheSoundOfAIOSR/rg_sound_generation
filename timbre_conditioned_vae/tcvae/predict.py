@@ -9,9 +9,9 @@ from .localconfig import LocalConfig
 
 
 def load_model(conf: LocalConfig, checkpoint_path: str):
-    decoder = model.create_rnn_decoder(conf) if conf.decoder_type == "rnn" else model.create_decoder(conf)
-    decoder.load_weights(checkpoint_path)
-    return decoder
+    _model = model.get_model_from_config(conf)
+    _model.load_weights(checkpoint_path)
+    return _model
 
 
 def reconstruct_audio(freq, mag, conf):
@@ -32,7 +32,6 @@ def update_latent_input(note_number_orig, velocity_orig, heuristic_measures, **k
             target_val = float(kwargs.get(name))
             print(f"Changing value for {name} from {heuristic_measures[0, i]} to {target_val}")
             heuristic_measures[0, i] = target_val
-
     if "note_number" in kwargs:
         target_val = kwargs.get("note_number")
         print(f"Changing note number from {note_number_orig} to {target_val}")
@@ -46,7 +45,7 @@ def update_latent_input(note_number_orig, velocity_orig, heuristic_measures, **k
     return np.array(note_number_orig), np.array(velocity_orig), heuristic_measures
 
 
-def get_intermediate_values(decoder, batch, conf: LocalConfig, **kwargs):
+def get_intermediate_values(_model, batch, conf: LocalConfig, **kwargs):
     h, mask, note_number, velocity, _ = get_inputs(batch)
     note_number_orig = tf.argmax(note_number, axis=-1) + conf.starting_midi_pitch
     heuristic_measures = get_all_measures(batch, conf)
@@ -55,16 +54,20 @@ def get_intermediate_values(decoder, batch, conf: LocalConfig, **kwargs):
         note_number_orig.numpy(), velocity.numpy(),
         heuristic_measures.numpy(), **kwargs
     )
-
-    reconstruction = decoder.predict([note_number, velocity, heuristic_measures])
-
+    if conf.use_encoder:
+        if conf.is_variational:
+            reconstruction, z_mean, z_log_var = _model.predict([h, note_number, velocity, heuristic_measures])
+        else:
+            reconstruction = _model.predict([h, note_number, velocity, heuristic_measures])
+    else:
+        reconstruction = _model.predict([note_number, velocity, heuristic_measures])
     return deconstruct_tensors(h, reconstruction, mask, conf), note_number_orig
 
 
-def get_freq_and_mag_batch(decoder, batch, conf: LocalConfig, **kwargs):
+def get_freq_and_mag_batch(_model, batch, conf: LocalConfig, **kwargs):
     (f0_shifts_true, f0_shifts_pred, mag_env_true, mag_env_pred,
      h_freq_shifts_true, h_freq_shifts_pred, h_mag_dist_true,
-     h_mag_dist_pred, mask), note_number_orig = get_intermediate_values(decoder, batch, conf, **kwargs)
+     h_mag_dist_pred, mask), note_number_orig = get_intermediate_values(_model, batch, conf, **kwargs)
 
     h_freq_true, h_mag_true = conf.data_handler.denormalize(
         f0_shifts_true, mag_env_true,
