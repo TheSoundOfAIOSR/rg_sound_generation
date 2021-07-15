@@ -92,13 +92,13 @@ def train(conf: LocalConfig):
     print(tf.config.list_physical_devices())
 
     _model = model.get_model_from_config(conf)
-    checkpoint_path = os.path.join(conf.checkpoints_dir, f"{conf.model_name}.h5")
 
-    if os.path.isfile(checkpoint_path):
+    if conf.pretrained_model_path is not None:
+        assert os.path.isfile(conf.pretrained_model_path), "No pretrained model found"
         print("Loading model")
-        _model.load_weights(checkpoint_path)
+        _model.load_weights(conf.pretrained_model_path)
     else:
-        print(f"No previous checkpoint found at {checkpoint_path}")
+        print("No pretrained model provided")
 
     optimizer = tf.keras.optimizers.Adam(learning_rate=conf.learning_rate)
 

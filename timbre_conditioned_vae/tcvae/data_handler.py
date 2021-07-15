@@ -67,7 +67,7 @@ class DataHandler:
 
     @mag_loss_type.setter
     def mag_loss_type(self, value: str):
-        assert value in ['l2_db' 'l1_db', 'rms_db', 'mse']
+        assert value in ['l2_db', 'l1_db', 'rms_db', 'mse']
         self._mag_loss_type = value
 
     @property

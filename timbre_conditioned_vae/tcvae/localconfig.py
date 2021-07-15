@@ -7,6 +7,7 @@ from .data_handler import DataHandler
 class LocalConfig:
     dataset_dir = os.path.join(os.getcwd(), "complete_dataset")
     checkpoints_dir = os.path.join(os.getcwd(), "checkpoints")
+    pretrained_model_path = None
     model_name = "VAE"
     run_name = "Default"
     best_model_path = None
