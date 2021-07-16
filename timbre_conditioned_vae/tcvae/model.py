@@ -107,6 +107,8 @@ def create_decoder(conf: LocalConfig):
         "up_in_0": reshaped
     }
 
+    up_conv_channels = conf.latent_dim if conf.add_z_to_decoder_blocks else conf.skip_channels
+
     for i in range(0, len(filters)):
         f, k = next(filters_kernels)
         wrapper[f"up_out_{i}"] = tf.keras.layers.UpSampling2D(2, name=f"decoder_up_{i}")(wrapper[f"up_in_{i}"])
@@ -117,9 +119,9 @@ def create_decoder(conf: LocalConfig):
         wrapper[f"bn_out_{i}"] = tf.keras.layers.BatchNormalization(name=f"decoder_bn_{i}")(wrapper[f"conv_out_{i}"])
         wrapper[f"act_{i}"] = tf.keras.layers.Activation("relu", name=f"decoder_act_{i}")(wrapper[f"bn_out_{i}"])
         wrapper[f"up_conv_{i}"] = tf.keras.layers.Conv2D(
-            conf.latent_dim, 3, padding="same", name=f"decoder_up_conv_{i}"
+            up_conv_channels, 3, padding="same", name=f"decoder_up_conv_{i}"
         )(wrapper[f"up_out_{i}"])
-        if conf.use_encoder:
+        if conf.use_encoder and conf.add_z_to_decoder_blocks:
             current_z = reshape_z(i, z_input, conf)
             z_added = tf.keras.layers.Add()([wrapper[f"up_conv_{i}"], current_z])
             wrapper[f"up_in_{i + 1}"] = tf.keras.layers.concatenate([

@@ -14,6 +14,8 @@ class LocalConfig:
     use_encoder = False
     latent_dim = 16
     hidden_dim = 256
+    add_z_to_decoder_blocks = True
+    skip_channels = 32
     lstm_dim = 256
     lstm_dropout = 0.4
     harmonic_frame_steps = 1001
