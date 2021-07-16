@@ -102,6 +102,14 @@ class DataHandler:
     def h_mag_dist_weight(self, value: float):
         self._h_mag_dist_weight = value
 
+    @property
+    def mag_scale_fn(self):
+        return self._mag_scale_fn
+
+    @mag_scale_fn.setter
+    def mag_scale_fn(self, fn=None):
+        self._mag_scale_fn = fn
+
     @tf.function
     def normalize(self, h_freq, h_mag, note_number, name=None):
         note_number = tf.cast(note_number, dtype=tf.float32)
