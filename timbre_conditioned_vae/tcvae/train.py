@@ -104,6 +104,7 @@ def train(conf: LocalConfig):
 
     best_loss = conf.best_loss
     last_good_epoch = 0
+    lr_changed_at = 0
 
     print("Loading datasets..")
     train_dataset, valid_dataset, test_dataset = get_dataset(conf)
@@ -164,10 +165,11 @@ def train(conf: LocalConfig):
             break
 
         if epoch - last_good_epoch >= conf.lr_plateau:
-            print(f"No improvement for {conf.lr_plateau} epochs. Reducing learning rate")
-            conf.learning_rate *= conf.lr_factor
-            print(f"New learning rate is {conf.learning_rate}")
-            conf.lr_plateau += 2 # Wait 2 epochs before reducing lr again
+            if epoch - lr_changed_at >= conf.lr_plateau:
+                print(f"No improvement for {conf.lr_plateau} epochs. Reducing learning rate")
+                conf.learning_rate *= conf.lr_factor
+                print(f"New learning rate is {conf.learning_rate}")
+                lr_changed_at = epoch
 
     if conf.best_model_path is not None:
         print(f"Best model: {conf.best_model_path}")

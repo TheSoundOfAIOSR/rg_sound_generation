@@ -30,11 +30,11 @@ class LocalConfig:
     row_dim = 1024
     col_dim = 128
     padding = "same"
-    epochs = 100
+    epochs = 500
     early_stopping = 7
     learning_rate = 2e-4
-    lr_plateau = 4
-    lr_factor = 0.1
+    lr_plateau = 2
+    lr_factor = 0.5
     gradient_norm = 5.
     csv_log_file = "logs.csv"
     final_conv_shape = (64, 8, 192) # ToDo: to be calculated dynamically
