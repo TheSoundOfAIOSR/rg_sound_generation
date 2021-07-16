@@ -29,7 +29,7 @@ def _batch(batch, conf):
     return h, mask, note_number, velocity, all_measures
 
 
-def _step(_model, h, mask, note_number, velocity, all_measures, conf):
+def _step(_model, h, mask, note_number, velocity, all_measures, conf, epoch):
     if conf.use_encoder:
         if conf.is_variational:
             reconstruction, z_mean, z_log_var = _model([h, note_number, velocity, all_measures])
@@ -41,6 +41,12 @@ def _step(_model, h, mask, note_number, velocity, all_measures, conf):
         reconstruction_loss(h, reconstruction, mask, conf)
     if conf.use_encoder and conf.is_variational:
         _kl_loss = kl_loss(z_mean, z_log_var, conf)
+        if conf.use_kl_anneal:
+            if epoch >= conf.kl_anneal_start:
+                conf.kl_weight += conf.kl_anneal_factor
+                conf.kl_weight = min(conf.kl_weight, conf.kl_weight_max)
+            _kl_loss *= conf.kl_weight
+            print(f"KL Weight is {conf.kl_weight:.4f} at epoch {epoch}")
     else:
         _kl_loss = 0.
     loss = f0_loss + mag_env_loss + h_freq_shifts_loss + h_mag_loss + _kl_loss
@@ -48,20 +54,20 @@ def _step(_model, h, mask, note_number, velocity, all_measures, conf):
 
 
 @tf.function
-def validation_step(_model, batch, conf):
+def validation_step(_model, batch, conf, epoch):
     h, mask, note_number, velocity, all_measures = _batch(batch, conf)
     loss, f0_loss, mag_env_loss, h_freq_shifts_loss, h_mag_loss, _kl_loss = \
-        _step(_model, h, mask, note_number, velocity, all_measures, conf)
+        _step(_model, h, mask, note_number, velocity, all_measures, conf, epoch)
     return loss, f0_loss, mag_env_loss, h_freq_shifts_loss, h_mag_loss, _kl_loss
 
 
 @tf.function
-def training_step(_model, optimizer, batch, conf):
+def training_step(_model, optimizer, batch, conf, epoch):
     h, mask, note_number, velocity, all_measures = _batch(batch, conf)
 
     with tf.GradientTape() as tape:
         loss, f0_loss, mag_env_loss, h_freq_shifts_loss, h_mag_loss, _kl_loss = \
-            _step(_model, h, mask, note_number, velocity, all_measures, conf)
+            _step(_model, h, mask, note_number, velocity, all_measures, conf, epoch)
     _model_grads = tape.gradient(loss, _model.trainable_weights)
     optimizer.apply_gradients(zip(_model_grads, _model.trainable_weights))
     return loss, f0_loss, mag_env_loss, h_freq_shifts_loss, h_mag_loss, _kl_loss
@@ -121,7 +127,7 @@ def train(conf: LocalConfig):
 
         for step, batch in enumerate(train_set):
             loss, f0_loss, mag_env_loss, h_freq_shifts_loss, h_mag_loss, _kl_loss = \
-                training_step(_model, optimizer, batch, conf)
+                training_step(_model, optimizer, batch, conf, epoch)
 
             step_loss = tf.squeeze(loss).numpy().mean()
             losses.append(step_loss)
@@ -137,7 +143,7 @@ def train(conf: LocalConfig):
 
         for valid_step, batch in enumerate(valid_set):
             loss, f0_loss, mag_env_loss, h_freq_shifts_loss, h_mag_loss, _kl_loss = \
-                validation_step(_model, batch, conf)
+                validation_step(_model, batch, conf, epoch)
 
             step_loss = tf.squeeze(loss).numpy().mean()
             val_losses.append(step_loss)
@@ -164,12 +170,11 @@ def train(conf: LocalConfig):
             print(f"No improvement for {conf.early_stopping} epochs. Stopping early")
             break
 
-        if epoch - last_good_epoch >= conf.lr_plateau:
-            if epoch - lr_changed_at >= conf.lr_plateau:
-                print(f"No improvement for {conf.lr_plateau} epochs. Reducing learning rate")
-                conf.learning_rate *= conf.lr_factor
-                print(f"New learning rate is {conf.learning_rate}")
-                lr_changed_at = epoch
+        if epoch - last_good_epoch >= conf.lr_plateau and epoch - lr_changed_at >= conf.lr_plateau:
+            print("Reducing learning rate")
+            conf.learning_rate *= conf.lr_factor
+            print(f"New learning rate is {conf.learning_rate}")
+            lr_changed_at = epoch
 
     if conf.best_model_path is not None:
         print(f"Best model: {conf.best_model_path}")

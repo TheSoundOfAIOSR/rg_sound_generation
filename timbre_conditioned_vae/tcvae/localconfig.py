@@ -44,10 +44,11 @@ class LocalConfig:
     log_steps = True
     step_log_interval = 100
     is_variational = True
+    use_kl_anneal = False
     kl_weight = 1.
     kl_weight_max = 1.
-    kl_anneal_factor = 0.1
-    kl_anneal_start = 10
+    kl_anneal_factor = 0.05
+    kl_anneal_start = 20
     reconstruction_weight = 1.
     st_var = (2.0 ** (1.0 / 12.0) - 1.0)
     db_limit = -120
@@ -65,7 +66,8 @@ class LocalConfig:
         "f0_weight",
         "mag_env_weight",
         "h_freq_shifts_weight",
-        "h_mag_dist_weight"
+        "h_mag_dist_weight",
+        "mag_scale_fn"
     ]
 
     _instance = None
