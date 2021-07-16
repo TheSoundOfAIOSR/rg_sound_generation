@@ -1,5 +1,5 @@
 import tensorflow as tf
-# import tensorflow_addons as tfa
+import tensorflow_addons as tfa
 import numpy as np
 import tsms
 
@@ -222,7 +222,7 @@ def inharmonicity_measure(h_freq, h_mag, h_phase, residual,
         h_mag * tf.square(f - f0), axis=2, keepdims=True) / h_mag_mean
 
     # remove huge spikes, generally the attack part
-    # f_variance = tfa.image.median_filter2d(f_variance, filter_shape=(1, 50))
+    f_variance = tfa.image.median_filter2d(f_variance, filter_shape=(1, 50))
     f_variance = tf.math.reduce_mean(f_variance)
 
     inharmonic = f_variance ** 2

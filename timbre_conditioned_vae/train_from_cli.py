@@ -9,7 +9,7 @@ if __name__ == "__main__":
     conf.use_encoder = True
     conf.is_variational = False
     conf.decoder_type = "cnn"
-    conf.batch_size = 8
+    conf.batch_size = 4
     conf.learning_rate = 2e-3
     conf.model_name = "test"
     conf.step_log_interval = 1
