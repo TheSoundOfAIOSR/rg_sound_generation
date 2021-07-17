@@ -66,8 +66,7 @@ class LocalConfig:
         "f0_weight",
         "mag_env_weight",
         "h_freq_shifts_weight",
-        "h_mag_dist_weight",
-        "mag_scale_fn"
+        "h_mag_dist_weight"
     ]
 
     _instance = None
