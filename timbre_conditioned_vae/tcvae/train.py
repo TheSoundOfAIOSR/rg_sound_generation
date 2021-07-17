@@ -34,7 +34,7 @@ def _batch(batch, conf):
     return h, mask, note_number, velocity, all_measures
 
 
-def _step(_model, h, mask, note_number, velocity, all_measures, conf, epoch):
+def _step(_model, h, mask, note_number, velocity, all_measures, conf):
     if conf.use_encoder:
         if conf.is_variational:
             reconstruction, z_mean, z_log_var = _model([h, note_number, velocity, all_measures])
@@ -46,12 +46,6 @@ def _step(_model, h, mask, note_number, velocity, all_measures, conf, epoch):
         reconstruction_loss(h, reconstruction, mask, conf)
     if conf.use_encoder and conf.is_variational:
         _kl_loss = kl_loss(z_mean, z_log_var, conf)
-        if conf.use_kl_anneal:
-            if epoch >= conf.kl_anneal_start:
-                conf.kl_weight += conf.kl_anneal_factor
-                conf.kl_weight = min(conf.kl_weight, conf.kl_weight_max)
-            _kl_loss *= conf.kl_weight
-            print(f"KL Weight is {conf.kl_weight:.4f} at epoch {epoch}")
     else:
         _kl_loss = 0.
     loss = f0_loss + mag_env_loss + h_freq_shifts_loss + h_mag_loss + _kl_loss
@@ -59,20 +53,20 @@ def _step(_model, h, mask, note_number, velocity, all_measures, conf, epoch):
 
 
 @tf.function
-def validation_step(_model, batch, conf, epoch):
+def validation_step(_model, batch, conf):
     h, mask, note_number, velocity, all_measures = _batch(batch, conf)
     loss, f0_loss, mag_env_loss, h_freq_shifts_loss, h_mag_loss, _kl_loss = \
-        _step(_model, h, mask, note_number, velocity, all_measures, conf, epoch)
+        _step(_model, h, mask, note_number, velocity, all_measures, conf)
     return loss, f0_loss, mag_env_loss, h_freq_shifts_loss, h_mag_loss, _kl_loss
 
 
 @tf.function
-def training_step(_model, optimizer, batch, conf, epoch):
+def training_step(_model, optimizer, batch, conf):
     h, mask, note_number, velocity, all_measures = _batch(batch, conf)
 
     with tf.GradientTape() as tape:
         loss, f0_loss, mag_env_loss, h_freq_shifts_loss, h_mag_loss, _kl_loss = \
-            _step(_model, h, mask, note_number, velocity, all_measures, conf, epoch)
+            _step(_model, h, mask, note_number, velocity, all_measures, conf)
     _model_grads = tape.gradient(loss, _model.trainable_weights)
     optimizer.apply_gradients(zip(_model_grads, _model.trainable_weights))
     return loss, f0_loss, mag_env_loss, h_freq_shifts_loss, h_mag_loss, _kl_loss
@@ -145,7 +139,7 @@ def train(conf: LocalConfig):
 
         for step, batch in enumerate(train_set):
             loss, f0_loss, mag_env_loss, h_freq_shifts_loss, h_mag_loss, _kl_loss = \
-                training_step(_model, optimizer, batch, conf, epoch)
+                training_step(_model, optimizer, batch, conf)
 
             losses["loss"].append(loss)
             losses["f0_loss"].append(f0_loss)
@@ -173,7 +167,7 @@ def train(conf: LocalConfig):
 
         for valid_step, batch in enumerate(valid_set):
             loss, f0_loss, mag_env_loss, h_freq_shifts_loss, h_mag_loss, _kl_loss = \
-                validation_step(_model, batch, conf, epoch)
+                validation_step(_model, batch, conf)
 
             val_losses["loss"].append(loss)
             val_losses["f0_loss"].append(f0_loss)
