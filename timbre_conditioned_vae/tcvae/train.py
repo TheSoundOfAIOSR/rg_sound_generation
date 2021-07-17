@@ -157,9 +157,10 @@ def train(conf: LocalConfig):
             write_step("train", epoch, step, conf, loss, f0_loss,
                        mag_env_loss, h_freq_shifts_loss, h_mag_loss, _kl_loss)
 
-            if step >= conf.num_train_steps:
-                print("Training steps completed")
-                break
+            if conf.num_train_steps is not None:
+                if step >= conf.num_train_steps:
+                    print("Training steps completed")
+                    break
 
         print(f"Epoch: {epoch} ended")
         print(f"Training losses: Loss: {np.mean(losses['loss']):.4f} "
@@ -184,9 +185,10 @@ def train(conf: LocalConfig):
             write_step("valid", epoch, valid_step, conf, loss, f0_loss,
                        mag_env_loss, h_freq_shifts_loss, h_mag_loss, _kl_loss)
 
-            if valid_step >= conf.num_valid_steps:
-                print("Validation steps completed")
-                break
+            if conf.num_valid_steps is not None:
+                if valid_step >= conf.num_valid_steps:
+                    print("Validation steps completed")
+                    break
 
         print(f"Validation losses: Loss: {np.mean(val_losses['loss']):.4f} "
               f"F0: {np.mean(val_losses['f0_loss']):.4f} "
