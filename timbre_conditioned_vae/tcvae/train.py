@@ -1,10 +1,15 @@
 import os
+import warnings
 import tensorflow as tf
+import numpy as np
 from .dataset import get_dataset
 from . import model
 from .losses import reconstruction_loss, kl_loss
 from .localconfig import LocalConfig
 from .compute_measures import get_measures
+
+
+warnings.simplefilter("ignore")
 
 
 def get_inputs(batch):
@@ -93,6 +98,18 @@ def write_step(name, epoch, step, conf, loss,
 
 
 def train(conf: LocalConfig):
+    print("Using configuration:")
+    print("="*50)
+    for key, value in vars(conf).items():
+        print(f"{key} = {value}")
+    print("=" * 50)
+    for dh_prop in conf.data_handler_properties:
+        print(f"data_handler.{dh_prop} =", eval(f"conf.data_handler.{dh_prop}"))
+    print("=" * 50)
+    confirm = input("Does config look ok? Y to proceed: ")
+    if confirm.lower() != "y":
+        print("Stopping")
+        return
 
     print(f"Using Physical Devices:")
     print(tf.config.list_physical_devices())
@@ -111,6 +128,7 @@ def train(conf: LocalConfig):
     best_loss = conf.best_loss
     last_good_epoch = 0
     lr_changed_at = 0
+    loss_names = ["loss", "f0_loss", "mag_env_loss", "h_freq_shifts_loss", "h_mag_loss", "kl_loss"]
 
     print("Loading datasets..")
     train_dataset, valid_dataset, test_dataset = get_dataset(conf)
@@ -119,8 +137,8 @@ def train(conf: LocalConfig):
     for epoch in range(0, conf.epochs):
         print(f"Epoch {epoch} started")
 
-        losses = []
-        val_losses = []
+        losses = dict((n, []) for n in loss_names)
+        val_losses = dict((n, []) for n in loss_names)
 
         train_set = iter(train_dataset)
         valid_set = iter(valid_dataset)
@@ -129,30 +147,55 @@ def train(conf: LocalConfig):
             loss, f0_loss, mag_env_loss, h_freq_shifts_loss, h_mag_loss, _kl_loss = \
                 training_step(_model, optimizer, batch, conf, epoch)
 
-            step_loss = tf.squeeze(loss).numpy().mean()
-            losses.append(step_loss)
+            losses["loss"].append(loss)
+            losses["f0_loss"].append(f0_loss)
+            losses["mag_env_loss"].append(mag_env_loss)
+            losses["h_freq_shifts_loss"].append(h_freq_shifts_loss)
+            losses["h_mag_loss"].append(h_mag_loss)
+            losses["kl_loss"].append(_kl_loss)
 
-            write_step("train", epoch, step, conf, step_loss, f0_loss,
+            write_step("train", epoch, step, conf, loss, f0_loss,
                        mag_env_loss, h_freq_shifts_loss, h_mag_loss, _kl_loss)
 
-        train_loss = sum(losses) / len(losses)
+            if step >= conf.num_train_steps:
+                print("Training steps completed")
+                break
 
         print(f"Epoch: {epoch} ended")
-        print(f"Training loss: {train_loss:.4f}")
+        print(f"Training losses: Loss: {np.mean(losses['loss']):.4f} "
+              f"F0: {np.mean(losses['f0_loss']):.4f} "
+              f"Mag Env: {np.mean(losses['mag_env_loss']):.4f} "
+              f"H Freq Shifts: {np.mean(losses['h_freq_shifts_loss']):.4f} "
+              f"H Mag: {np.mean(losses['h_mag_loss']):.4f} "
+              f"KL: {np.mean(losses['kl_loss'])} ")
         print("Starting validation")
 
         for valid_step, batch in enumerate(valid_set):
             loss, f0_loss, mag_env_loss, h_freq_shifts_loss, h_mag_loss, _kl_loss = \
                 validation_step(_model, batch, conf, epoch)
 
-            step_loss = tf.squeeze(loss).numpy().mean()
-            val_losses.append(step_loss)
+            val_losses["loss"].append(loss)
+            val_losses["f0_loss"].append(f0_loss)
+            val_losses["mag_env_loss"].append(mag_env_loss)
+            val_losses["h_freq_shifts_loss"].append(h_freq_shifts_loss)
+            val_losses["h_mag_loss"].append(h_mag_loss)
+            val_losses["kl_loss"].append(_kl_loss)
 
-            write_step("valid", epoch, valid_step, conf, step_loss, f0_loss,
+            write_step("valid", epoch, valid_step, conf, loss, f0_loss,
                        mag_env_loss, h_freq_shifts_loss, h_mag_loss, _kl_loss)
 
-        valid_loss = sum(val_losses) / len(val_losses)
-        print(f"Validation Loss: {valid_loss:.4f}")
+            if valid_step >= conf.num_valid_steps:
+                print("Validation steps completed")
+                break
+
+        print(f"Validation losses: Loss: {np.mean(val_losses['loss']):.4f} "
+              f"F0: {np.mean(val_losses['f0_loss']):.4f} "
+              f"Mag Env: {np.mean(val_losses['mag_env_loss']):.4f} "
+              f"H Freq Shifts: {np.mean(val_losses['h_freq_shifts_loss']):.4f} "
+              f"H Mag: {np.mean(val_losses['h_mag_loss']):.4f} "
+              f"KL: {np.mean(val_losses['kl_loss'])} ")
+
+        valid_loss = np.mean(val_losses['loss'])
 
         if valid_loss < best_loss:
             last_good_epoch = epoch

@@ -34,9 +34,11 @@ class LocalConfig:
     col_dim = 128
     padding = "same"
     epochs = 500
+    num_train_steps = None
+    num_valid_steps = None
     early_stopping = 7
     learning_rate = 2e-4
-    lr_plateau = 2
+    lr_plateau = 4
     lr_factor = 0.5
     gradient_norm = 5.
     csv_log_file = "logs.csv"
@@ -69,7 +71,8 @@ class LocalConfig:
         "f0_weight",
         "mag_env_weight",
         "h_freq_shifts_weight",
-        "h_mag_dist_weight"
+        "h_mag_dist_weight",
+        "mag_scale_fn"
     ]
 
     _instance = None

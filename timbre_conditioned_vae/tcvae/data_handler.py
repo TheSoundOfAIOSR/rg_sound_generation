@@ -104,11 +104,18 @@ class DataHandler:
 
     @property
     def mag_scale_fn(self):
-        return self._mag_scale_fn
+        if self._mag_scale_fn is None:
+            return "none"
+        else:
+            return "exp_sigmoid"
 
     @mag_scale_fn.setter
-    def mag_scale_fn(self, fn=None):
-        self._mag_scale_fn = fn
+    def mag_scale_fn(self, value: str):
+        assert value in ["none", "exp_sigmoid"]
+        if value == "none":
+            self._mag_scale_fn = None
+        else:
+            self._mag_scale_fn = exp_sigmoid
 
     @tf.function
     def normalize(self, h_freq, h_mag, note_number, name=None):
