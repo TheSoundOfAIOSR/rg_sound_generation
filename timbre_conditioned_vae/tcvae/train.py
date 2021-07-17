@@ -221,6 +221,9 @@ def train(conf: LocalConfig):
             print(f"New learning rate is {conf.learning_rate}")
             lr_changed_at = epoch
 
+        del losses
+        del val_losses
+
     if conf.best_model_path is not None:
         print(f"Best model: {conf.best_model_path}")
     print("Training finished")
