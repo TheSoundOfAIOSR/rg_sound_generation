@@ -64,6 +64,66 @@ def create_encoder(conf: LocalConfig):
     return model
 
 
+def create_strides_encoder(conf: LocalConfig):
+    def conv_block(x, f, k):
+        x = tf.keras.layers.Conv2D(
+            f, k, padding=conf.padding, strides=conf.strides)(x)
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.Activation("elu")(x)
+        return x
+
+    if conf is None:
+        conf = LocalConfig()
+
+    encoder_input = tf.keras.layers.Input(shape=(conf.row_dim, conf.col_dim, 2), name="encoder_input")
+
+    filters = [32] * 2 + [64] * 2
+    kernels = [3] * 4
+    max_blocks = len(filters)
+
+    filters_kernels = iter(zip(filters, kernels))
+
+    wrapper = {}
+    wrapper["block_0_input"] = encoder_input
+
+    for i, (f, k) in enumerate(filters_kernels):
+        wrapper[f"block_{i}_output"] = conv_block(wrapper[f"block_{i}_input"], f, k)
+        if i == 0:
+            wrapper[f"block_{i + 1}_input"] = wrapper[f"block_{i}_output"]
+        else:
+            wrapper[f"block_{i + 1}_input"] = tf.keras.layers.concatenate(
+                [wrapper[f"block_{i}_output"], wrapper[f"block_{i}_skip"]]
+            )
+        if i < max_blocks:
+            wrapper[f"block_{i + 1}_skip"] = conv_block(wrapper[f"block_{i}_output"], conf.skip_channels, 3)
+
+    if conf.use_lstm_in_encoder:
+        flattened = tf.keras.layers.TimeDistributed(tf.keras.layers.Flatten())(wrapper[f"block_{max_blocks}_input"])
+        hidden = tf.keras.layers.Bidirectional(
+            tf.keras.layers.LSTM(conf.lstm_dim, activation="tanh", recurrent_activation="sigmoid",
+                                 return_sequences=False, dropout=conf.lstm_dropout,
+                                 recurrent_dropout=0, unroll=False, use_bias=True))(flattened)
+    else:
+        hidden = tf.keras.layers.Flatten()(wrapper[f"block_{max_blocks}_input"])
+
+    if conf.is_variational:
+        z_mean = tf.keras.layers.Dense(conf.latent_dim,
+                                       kernel_initializer=tf.initializers.glorot_uniform(),
+                                       name="z_mean")(hidden)
+        z_log_variance = tf.keras.layers.Dense(conf.latent_dim,
+                                               kernel_initializer=tf.initializers.glorot_uniform(),
+                                               name="z_log_variance")(hidden)
+        z = tf.keras.layers.Lambda(sample_from_latent_space)([z_mean, z_log_variance])
+        outputs = [z, z_mean, z_log_variance]
+    else:
+        outputs = tf.keras.layers.Dense(conf.latent_dim, activation="elu")(hidden)
+    model = tf.keras.models.Model(
+        encoder_input, outputs, name="encoder"
+    )
+    tf.keras.utils.plot_model(model, to_file="encoder.png", show_shapes=True)
+    return model
+
+
 def decoder_inputs(conf: LocalConfig):
     z_input = tf.keras.layers.Input(shape=(conf.latent_dim,), name="z")
     note_number = tf.keras.layers.Input(shape=(conf.num_pitches,), name="note_number")
@@ -180,7 +240,10 @@ def create_rnn_decoder(conf: LocalConfig):
 def create_vae(conf: LocalConfig):
     if conf is None:
         conf = LocalConfig()
-    encoder = create_encoder(conf)
+    if conf.use_max_pool:
+        encoder = create_encoder(conf)
+    else:
+        encoder = create_strides_encoder(conf)
     if conf.decoder_type == "rnn":
         decoder = create_rnn_decoder(conf)
     else:
@@ -211,7 +274,7 @@ def create_vae(conf: LocalConfig):
 
 def get_model_from_config(conf):
     if conf.use_encoder:
-        print("Creating VAE")
+        print("Creating Auto Encoder")
         return create_vae(conf)
     print("Creating Decoder")
     if conf.decoder_type == "rnn":

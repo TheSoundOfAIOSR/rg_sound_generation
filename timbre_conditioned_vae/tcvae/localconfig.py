@@ -13,6 +13,9 @@ class LocalConfig:
     best_model_path = None
     use_encoder = False
     latent_dim = 16
+    use_max_pool = True
+    strides = 2
+    use_lstm_in_encoder = True
     hidden_dim = 256
     add_z_to_decoder_blocks = True
     skip_channels = 32
