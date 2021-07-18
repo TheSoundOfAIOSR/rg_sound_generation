@@ -125,9 +125,12 @@ def create_strides_encoder(conf: LocalConfig):
 
 
 def create_1d_encoder(conf: LocalConfig):
-    def conv1d_model(inputs):
+    def conv1d_model(inputs, name):
         filters = [256, 32, 32, 32, 64, 128]
-        kernels = [128, 16, 16, 16, 16, 16]
+        if name == "mag":
+            kernels = [128, 16, 16, 16, 16, 16]
+        else:
+            kernels = [7, 3, 3, 3, 3, 3]
         strides = [8, 2, 2, 2, 2, 2]
 
         x = inputs
@@ -147,8 +150,8 @@ def create_1d_encoder(conf: LocalConfig):
     freq = tf.keras.layers.Lambda(lambda x: x[..., 0])(encoder_input)
     mag = tf.keras.layers.Lambda(lambda x: x[..., 1])(encoder_input)
 
-    freq_flattened = conv1d_model(freq)
-    mag_flattened = conv1d_model(mag)
+    freq_flattened = conv1d_model(freq, "freq")
+    mag_flattened = conv1d_model(mag, "mag")
 
     hidden = tf.keras.layers.concatenate([freq_flattened, mag_flattened])
 

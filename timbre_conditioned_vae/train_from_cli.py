@@ -7,7 +7,8 @@ if __name__ == "__main__":
     conf = localconfig.LocalConfig()
     # conf.load_config_from_file("checkpoints/Default_test.json")
     conf.use_encoder = True
-    conf.is_variational = True
+    conf.use_max_pool = False
+    conf.is_variational = False
     conf.encoder_type = "1d"
     conf.decoder_type = "cnn"
     conf.batch_size = 4
