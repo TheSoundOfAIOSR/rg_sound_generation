@@ -9,15 +9,21 @@ if __name__ == "__main__":
     conf.use_encoder = True
     conf.use_max_pool = False
     conf.is_variational = False
+    conf.add_z_to_decoder_blocks = False
     conf.encoder_type = "1d"
     conf.decoder_type = "cnn"
-    conf.batch_size = 4
-    conf.learning_rate = 2e-3
+    conf.latent_dim = 1024
+    # Training
+    conf.batch_size = 2
+    conf.learning_rate = 2e-4
+    conf.lr_factor = 0.5
+    conf.lr_plateau = 4
     conf.model_name = "test"
-    conf.step_log_interval = 1
-    conf.data_handler.f0_weight_type = "mag_max_pool"
-    conf.data_handler.mag_loss_type = "mse"
-    conf.data_handler.mag_scale_fn = "none"
+    conf.early_stopping = 10
+    # Data Handler
+    conf.data_handler.mag_loss_type = "l2_db"
+    conf.data_handler.mag_scale_fn = "exp_sigmoid"
+
     conf.num_train_steps = 5
     conf.num_valid_steps = 3
     conf.epochs = 2

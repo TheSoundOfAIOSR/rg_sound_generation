@@ -194,9 +194,9 @@ def create_decoder(conf: LocalConfig):
     else:
         inputs_list = [note_number, velocity, heuristic_measures]
 
-    if conf.hidden_dim < conf.latent_dim:
-        conf.hidden_dim = max(conf.hidden_dim, conf.latent_dim)
-        print("Decoder hidden dimension updated to", conf.hidden_dim)
+    # if conf.hidden_dim < conf.latent_dim:
+    #     conf.hidden_dim = max(conf.hidden_dim, conf.latent_dim)
+    #     print("Decoder hidden dimension updated to", conf.hidden_dim)
 
     inputs = tf.keras.layers.concatenate(inputs_list)
 
