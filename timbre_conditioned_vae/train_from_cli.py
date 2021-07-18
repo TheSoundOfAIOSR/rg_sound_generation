@@ -7,7 +7,8 @@ if __name__ == "__main__":
     conf = localconfig.LocalConfig()
     # conf.load_config_from_file("checkpoints/Default_test.json")
     conf.use_encoder = True
-    conf.is_variational = False
+    conf.is_variational = True
+    conf.encoder_type = "1d"
     conf.decoder_type = "cnn"
     conf.batch_size = 4
     conf.learning_rate = 2e-3
@@ -20,6 +21,6 @@ if __name__ == "__main__":
     conf.num_valid_steps = 3
     conf.epochs = 2
 
-    conf.save_config()
+    # conf.save_config()
 
     train.train(conf)

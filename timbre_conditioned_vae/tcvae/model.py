@@ -124,6 +124,47 @@ def create_strides_encoder(conf: LocalConfig):
     return model
 
 
+def create_1d_encoder(conf: LocalConfig):
+    def conv1d_model(inputs):
+        filters = [256, 32, 32, 32, 64, 128]
+        kernels = [128, 16, 16, 16, 16, 16]
+        strides = [8, 2, 2, 2, 2, 2]
+
+        x = inputs
+
+        for f, k, s in zip(filters, kernels, strides):
+            x = tf.keras.layers.Conv1D(f, k, strides=s, padding=conf.padding)(x)
+            x = tf.keras.layers.BatchNormalization()(x)
+            x = tf.keras.layers.Activation("elu")(x)
+
+        x = tf.keras.layers.Flatten()(x)
+        return x
+
+    if conf is None:
+        conf = LocalConfig()
+
+    encoder_input = tf.keras.layers.Input(shape=(conf.row_dim, conf.col_dim, 2), name="encoder_input")
+    freq = tf.keras.layers.Lambda(lambda x: x[..., 0])(encoder_input)
+    mag = tf.keras.layers.Lambda(lambda x: x[..., 1])(encoder_input)
+
+    freq_flattened = conv1d_model(freq)
+    mag_flattened = conv1d_model(mag)
+
+    hidden = tf.keras.layers.concatenate([freq_flattened, mag_flattened])
+
+    if conf.is_variational:
+        z_mean = tf.keras.layers.Dense(conf.latent_dim, name="z_mean")(hidden)
+        z_log_variance = tf.keras.layers.Dense(conf.latent_dim, name="z_log_variance")(hidden)
+        z = tf.keras.layers.Lambda(sample_from_latent_space)([z_mean, z_log_variance])
+        outputs = [z, z_mean, z_log_variance]
+    else:
+        outputs = tf.keras.layers.Dense(conf.latent_dim, activation="elu")(hidden)
+
+    model = tf.keras.models.Model(encoder_input, outputs)
+    tf.keras.utils.plot_model(model, to_file="encoder.png", show_shapes=True)
+    return model
+
+
 def decoder_inputs(conf: LocalConfig):
     z_input = tf.keras.layers.Input(shape=(conf.latent_dim,), name="z")
     note_number = tf.keras.layers.Input(shape=(conf.num_pitches,), name="note_number")
@@ -243,7 +284,10 @@ def create_vae(conf: LocalConfig):
     if conf.use_max_pool:
         encoder = create_encoder(conf)
     else:
-        encoder = create_strides_encoder(conf)
+        if conf.encoder_type == "2d":
+            encoder = create_strides_encoder(conf)
+        else:
+            encoder = create_1d_encoder(conf)
     if conf.decoder_type == "rnn":
         decoder = create_rnn_decoder(conf)
     else:

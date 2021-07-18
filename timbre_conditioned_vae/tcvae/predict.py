@@ -27,6 +27,9 @@ def reconstruct_audio(freq, mag, conf):
 
 
 def update_latent_input(note_number_orig, velocity_orig, heuristic_measures, **kwargs):
+    for key in kwargs.keys():
+        # ToDo Let Z be changed as well
+        assert key in heuristic_names + ["velocity", "note_number"]
     for i, name in enumerate(heuristic_names):
         if name in kwargs:
             target_val = float(kwargs.get(name))
