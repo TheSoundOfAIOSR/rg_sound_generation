@@ -135,6 +135,7 @@ def create_1d_encoder(conf: LocalConfig):
         else:
             kernels = [7, 3, 3, 3, 3, 3]
         strides = [8, 2, 2, 2, 2, 2]
+        # ToDo: Find better values for kernels for both freq
 
         x = inputs
 
@@ -196,9 +197,12 @@ def create_decoder(conf: LocalConfig):
     heuristic_measures = tf.keras.layers.Input(shape=(conf.num_measures,), name="measures")
 
     if conf.use_encoder:
-        inputs_list = [z_input, note_number, velocity, heuristic_measures]
+        inputs_list = [z_input, note_number, velocity]
     else:
-        inputs_list = [note_number, velocity, heuristic_measures]
+        inputs_list = [note_number, velocity]
+
+    if conf.use_heuristics:
+        inputs_list += [heuristic_measures]
 
     if conf.hidden_dim < conf.latent_dim and conf.check_decoder_hidden_dim:
         conf.hidden_dim = max(conf.hidden_dim, conf.latent_dim)
@@ -280,13 +284,17 @@ def create_rnn_decoder(conf: LocalConfig):
     note_number = tf.keras.layers.Input(shape=(conf.num_pitches,), name="note_number")
     velocity = tf.keras.layers.Input(shape=(conf.num_velocities,), name="velocity")
     heuristic_measures = tf.keras.layers.Input(shape=(conf.num_measures,), name="measures")
+    inputs_list = [note_number, velocity]
 
-    inputs_list = [note_number, velocity, heuristic_measures]
+    if conf.use_heuristics:
+        inputs_list += [heuristic_measures]
+
     inputs = tf.keras.layers.concatenate(inputs_list)
     hidden = tf.keras.layers.Dense(256, activation="relu",
                                    kernel_initializer=tf.initializers.glorot_uniform())(inputs)
     num_repeats = 1024
     repeat = tf.keras.layers.RepeatVector(num_repeats)(hidden)
+    # Note: When using LSTM, only this specific configuration works with CUDA
     lstm_1 = tf.keras.layers.Bidirectional(
         tf.keras.layers.LSTM(64, activation="tanh", recurrent_activation="sigmoid",
                              return_sequences=True, dropout=conf.lstm_dropout,
@@ -332,15 +340,25 @@ def create_vae(conf: LocalConfig):
 
     if conf.is_variational:
         z, z_mean, z_log_variance = encoder(encoder_input)
-        reconstruction = decoder([z, note_number, velocity, heuristic_measures])
+        inputs = [z, note_number, velocity]
+        if conf.use_heuristics:
+            inputs += [heuristic_measures]
+        reconstruction = decoder(inputs)
         outputs = [reconstruction, z_mean, z_log_variance]
     else:
         z = encoder(encoder_input)
-        reconstruction = decoder([z, note_number, velocity, heuristic_measures])
+        inputs = [z, note_number, velocity]
+        if conf.use_heuristics:
+            inputs += [heuristic_measures]
+        reconstruction = decoder(inputs)
         outputs = reconstruction
 
+    model_input = [encoder_input, note_number, velocity]
+    if conf.use_heuristics:
+        model_input += [heuristic_measures]
+
     model = tf.keras.models.Model(
-        [encoder_input, note_number, velocity, heuristic_measures],
+        model_input,
         outputs,
         name="auto_encoder"
     )

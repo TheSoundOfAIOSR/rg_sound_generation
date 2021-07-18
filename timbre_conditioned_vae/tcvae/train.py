@@ -28,20 +28,24 @@ def get_all_measures(batch, conf):
     return get_measures(h_freq_orig, h_mag_orig, harmonics, conf)
 
 
-def _batch(batch, conf):
-    h, mask, note_number, velocity, _ = get_inputs(batch)
-    all_measures = get_all_measures(batch, conf)
-    return h, mask, note_number, velocity, all_measures
+# def _batch(batch, conf):
+#     h, mask, note_number, velocity, _ = get_inputs(batch)
+#     if conf.use_heuristics:
+#         all_measures = get_all_measures(batch, conf)
+#         return h, mask, note_number, velocity, all_measures
+#     return h, mask, note_number, velocity
 
 
 def _step(_model, h, mask, note_number, velocity, all_measures, conf):
+    model_input = [note_number, velocity]
+    if conf.use_heuristics:
+        model_input += [all_measures]
     if conf.use_encoder:
-        if conf.is_variational:
-            reconstruction, z_mean, z_log_var = _model([h, note_number, velocity, all_measures])
-        else:
-            reconstruction = _model([h, note_number, velocity, all_measures])
+        model_input = [h] + model_input
+    if conf.use_encoder and conf.is_variational:
+        reconstruction, z_mean, z_log_var = _model(model_input)
     else:
-        reconstruction = _model([note_number, velocity, all_measures])
+        reconstruction = _model(model_input)
     f0_loss, mag_env_loss, h_freq_shifts_loss, h_mag_loss = \
         reconstruction_loss(h, reconstruction, mask, conf)
     if conf.use_encoder and conf.is_variational:
@@ -55,7 +59,11 @@ def _step(_model, h, mask, note_number, velocity, all_measures, conf):
 
 @tf.function
 def validation_step(_model, batch, conf):
-    h, mask, note_number, velocity, all_measures = _batch(batch, conf)
+    h, mask, note_number, velocity, _ = get_inputs(batch)
+    if conf.use_heuristics:
+        all_measures = get_all_measures(batch, conf)
+    else:
+        all_measures = tf.zeros(shape=(1,))
     loss, f0_loss, mag_env_loss, h_freq_shifts_loss, h_mag_loss, _kl_loss = \
         _step(_model, h, mask, note_number, velocity, all_measures, conf)
     return loss, f0_loss, mag_env_loss, h_freq_shifts_loss, h_mag_loss, _kl_loss
@@ -63,8 +71,11 @@ def validation_step(_model, batch, conf):
 
 @tf.function
 def training_step(_model, optimizer, batch, conf):
-    h, mask, note_number, velocity, all_measures = _batch(batch, conf)
-
+    h, mask, note_number, velocity, _ = get_inputs(batch)
+    if conf.use_heuristics:
+        all_measures = get_all_measures(batch, conf)
+    else:
+        all_measures = tf.zeros(shape=(1,))
     with tf.GradientTape() as tape:
         loss, f0_loss, mag_env_loss, h_freq_shifts_loss, h_mag_loss, _kl_loss = \
             _step(_model, h, mask, note_number, velocity, all_measures, conf)

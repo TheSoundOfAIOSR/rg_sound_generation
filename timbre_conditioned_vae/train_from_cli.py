@@ -8,11 +8,13 @@ if __name__ == "__main__":
     # conf.load_config_from_file("checkpoints/Default_test.json")
     conf.use_encoder = True
     conf.use_max_pool = False
-    conf.is_variational = False
+    conf.is_variational = True
+    conf.use_heuristics = False
     conf.add_z_to_decoder_blocks = False
-    conf.encoder_type = "1d"
+    conf.deep_decoder = True
+    conf.encoder_type = "2d"
     conf.decoder_type = "cnn"
-    conf.latent_dim = 1024
+    conf.latent_dim = 64
     # Training
     conf.batch_size = 2
     conf.learning_rate = 2e-4
@@ -28,7 +30,7 @@ if __name__ == "__main__":
 
     conf.num_train_steps = 5
     conf.num_valid_steps = 3
-    conf.epochs = 0
+    conf.epochs = 2
 
     # conf.save_config()
 
