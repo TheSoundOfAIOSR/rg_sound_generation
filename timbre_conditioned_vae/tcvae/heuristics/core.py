@@ -33,13 +33,15 @@ def dahdr_envelope(attack_alpha=0.0, decay_alpha=0.0, release_alpha=0.0,
     e0 = t0 * 0.0
     e1 = exp_envelope(t1, attack_alpha)
     e2 = t2 * 0.0 + 1.0
-    e3 = exp_envelope(t3, decay_alpha)
-    e4 = exp_envelope(t4, release_alpha)
+    e3 = exp_envelope(t3, decay_alpha)[1:]
+    e4 = exp_envelope(t4, release_alpha)[1:]
 
     e1 = 1.0 - e1
-    e3 = e3[:decay_samples-release_samples]
     if decay_samples - release_samples > 0:
+        e3 = e3[:decay_samples - release_samples]
         e4 = e4 * e3[-1]
+    else:
+        e3 = tf.ones(shape=(0,))
 
     return tf.concat([e0, e1, e2, e3, e4], axis=0)
 
