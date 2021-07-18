@@ -6,93 +6,82 @@ from .dataset import get_dataset
 from . import model
 from .losses import reconstruction_loss, kl_loss
 from .localconfig import LocalConfig
-from .compute_measures import get_measures
 
 
 warnings.simplefilter("ignore")
 
 
-def get_inputs(batch):
-    h = batch["h"]
-    mask = batch["mask"]
+def _batch(batch):
     note_number = batch["note_number"]
     velocity = batch["velocity"]
-    instrument_id = batch["instrument_id"]
-    return h, mask, note_number, velocity, instrument_id
+    h = batch["h"]
+    mask = batch["mask"]
+    measures = batch["measures"]
+    return note_number, velocity, h, mask, measures
 
 
-def get_all_measures(batch, conf):
-    h_freq_orig = batch["h_freq_orig"]
-    h_mag_orig = batch["h_mag_orig"]
-    harmonics = batch["harmonics"]
-    return get_measures(h_freq_orig, h_mag_orig, harmonics, conf)
-
-
-# def _batch(batch, conf):
-#     h, mask, note_number, velocity, _ = get_inputs(batch)
-#     if conf.use_heuristics:
-#         all_measures = get_all_measures(batch, conf)
-#         return h, mask, note_number, velocity, all_measures
-#     return h, mask, note_number, velocity
-
-
-def _step(_model, h, mask, note_number, velocity, all_measures, conf):
+def _step(_model, h, mask, note_number, velocity, measures, conf):
     model_input = [note_number, velocity]
     if conf.use_heuristics:
-        model_input += [all_measures]
+        model_input += [measures]
     if conf.use_encoder:
         model_input = [h] + model_input
     if conf.use_encoder and conf.is_variational:
         reconstruction, z_mean, z_log_var = _model(model_input)
     else:
         reconstruction = _model(model_input)
-    f0_loss, mag_env_loss, h_freq_shifts_loss, h_mag_loss = \
+    f0_loss, mag_env_loss, h_freq_shifts_loss, h_mag_loss, h_phase_diff_loss = \
         reconstruction_loss(h, reconstruction, mask, conf)
     if conf.use_encoder and conf.is_variational:
         # Note this is weighted kl loss as kl_loss function applies the weight
         _kl_loss = kl_loss(z_mean, z_log_var, conf)
     else:
         _kl_loss = 0.
-    loss = f0_loss + mag_env_loss + h_freq_shifts_loss + h_mag_loss + _kl_loss
-    return loss, f0_loss, mag_env_loss, h_freq_shifts_loss, h_mag_loss, _kl_loss
+
+    loss = \
+        f0_loss + \
+        mag_env_loss + \
+        h_freq_shifts_loss + \
+        h_mag_loss + \
+        h_phase_diff_loss + \
+        _kl_loss
+
+    return loss, f0_loss, mag_env_loss, h_freq_shifts_loss, \
+           h_mag_loss, h_phase_diff_loss, _kl_loss
 
 
 @tf.function
 def validation_step(_model, batch, conf):
-    h, mask, note_number, velocity, _ = get_inputs(batch)
-    if conf.use_heuristics:
-        all_measures = get_all_measures(batch, conf)
-    else:
-        all_measures = tf.zeros(shape=(1,))
-    loss, f0_loss, mag_env_loss, h_freq_shifts_loss, h_mag_loss, _kl_loss = \
-        _step(_model, h, mask, note_number, velocity, all_measures, conf)
-    return loss, f0_loss, mag_env_loss, h_freq_shifts_loss, h_mag_loss, _kl_loss
+    note_number, velocity, h, mask, measures = _batch(batch)
+
+    losses = _step(_model, h, mask, note_number, velocity, measures, conf)
+
+    return losses
 
 
 @tf.function
 def training_step(_model, optimizer, batch, conf):
-    h, mask, note_number, velocity, _ = get_inputs(batch)
-    if conf.use_heuristics:
-        all_measures = get_all_measures(batch, conf)
-    else:
-        all_measures = tf.zeros(shape=(1,))
+    note_number, velocity, h, mask, measures = _batch(batch)
+
     with tf.GradientTape() as tape:
-        loss, f0_loss, mag_env_loss, h_freq_shifts_loss, h_mag_loss, _kl_loss = \
-            _step(_model, h, mask, note_number, velocity, all_measures, conf)
+        loss, *losses = \
+            _step(_model, h, mask, note_number, velocity, measures, conf)
+
     _model_grads = tape.gradient(loss, _model.trainable_weights)
     optimizer.apply_gradients(zip(_model_grads, _model.trainable_weights))
-    return loss, f0_loss, mag_env_loss, h_freq_shifts_loss, h_mag_loss, _kl_loss
+    return loss, *losses
 
 
 def write_step(name, epoch, step, conf, loss,
                f0_loss, mag_env_loss, h_freq_shifts_loss,
-               h_mag_loss, _kl_loss):
+               h_mag_loss, h_phase_diff_loss, _kl_loss):
     write_string = f"{epoch},{step},{loss},{f0_loss},{mag_env_loss}," \
-                   f"{h_freq_shifts_loss},{h_mag_loss},{_kl_loss}\n"
+                   f"{h_freq_shifts_loss},{h_mag_loss}," \
+                   f"{h_phase_diff_loss},{_kl_loss}\n"
     out_string = f"{name}, Epoch {epoch:3d}, Step: {step:4d}, Loss: {loss:.4f} " \
                  f"F0: {f0_loss:.4f}, Mag Env: {mag_env_loss:.4f} " \
                  f"H Freq Shifts: {h_freq_shifts_loss:.4f}, H Mag: {h_mag_loss:.4f}, " \
-                 f"KL Loss: {_kl_loss}"
+                 f"H Phase Diff: {h_phase_diff_loss:.4f}, KL Loss: {_kl_loss}"
 
     csv_file_path = os.path.join(conf.checkpoints_dir,
                                  f"{conf.model_name}_{name}_{conf.csv_log_file}")
@@ -143,7 +132,7 @@ def train(conf: LocalConfig):
     best_loss = conf.best_loss
     last_good_epoch = 0
     lr_changed_at = 0
-    loss_names = ["loss", "f0_loss", "mag_env_loss", "h_freq_shifts_loss", "h_mag_loss", "kl_loss"]
+    loss_names = ["loss", "f0_loss", "mag_env_loss", "h_freq_shifts_loss", "h_mag_loss", "h_phase_diff_loss", "kl_loss"]
 
     print("Loading datasets..")
     train_dataset, valid_dataset, test_dataset = get_dataset(conf)
@@ -162,7 +151,8 @@ def train(conf: LocalConfig):
             set_kl_weight(epoch, conf)
 
         for step, batch in enumerate(train_set):
-            loss, f0_loss, mag_env_loss, h_freq_shifts_loss, h_mag_loss, _kl_loss = \
+            loss, f0_loss, mag_env_loss, h_freq_shifts_loss, \
+            h_mag_loss, h_phase_diff_loss, _kl_loss = \
                 training_step(_model, optimizer, batch, conf)
 
             losses["loss"].append(loss)
@@ -170,10 +160,12 @@ def train(conf: LocalConfig):
             losses["mag_env_loss"].append(mag_env_loss)
             losses["h_freq_shifts_loss"].append(h_freq_shifts_loss)
             losses["h_mag_loss"].append(h_mag_loss)
+            losses["h_phase_diff_loss"].append(h_phase_diff_loss)
             losses["kl_loss"].append(_kl_loss)
 
             write_step("train", epoch, step, conf, loss, f0_loss,
-                       mag_env_loss, h_freq_shifts_loss, h_mag_loss, _kl_loss)
+                       mag_env_loss, h_freq_shifts_loss, h_mag_loss,
+                       h_phase_diff_loss, _kl_loss)
 
             if conf.num_train_steps is not None:
                 if step >= conf.num_train_steps:
@@ -190,7 +182,8 @@ def train(conf: LocalConfig):
         print("Starting validation")
 
         for valid_step, batch in enumerate(valid_set):
-            loss, f0_loss, mag_env_loss, h_freq_shifts_loss, h_mag_loss, _kl_loss = \
+            loss, f0_loss, mag_env_loss, h_freq_shifts_loss, \
+            h_mag_loss, h_phase_diff_loss, _kl_loss = \
                 validation_step(_model, batch, conf)
 
             val_losses["loss"].append(loss)
@@ -198,10 +191,12 @@ def train(conf: LocalConfig):
             val_losses["mag_env_loss"].append(mag_env_loss)
             val_losses["h_freq_shifts_loss"].append(h_freq_shifts_loss)
             val_losses["h_mag_loss"].append(h_mag_loss)
+            val_losses["h_phase_diff_loss"].append(h_phase_diff_loss)
             val_losses["kl_loss"].append(_kl_loss)
 
             write_step("valid", epoch, valid_step, conf, loss, f0_loss,
-                       mag_env_loss, h_freq_shifts_loss, h_mag_loss, _kl_loss)
+                       mag_env_loss, h_freq_shifts_loss, h_mag_loss,
+                       h_phase_diff_loss, _kl_loss)
 
             if conf.num_valid_steps is not None:
                 if valid_step >= conf.num_valid_steps:

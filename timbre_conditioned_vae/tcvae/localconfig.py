@@ -72,7 +72,7 @@ class LocalConfig:
     }
     data_handler = DataHandler()
     data_handler_properties = [
-        "f0_weight_type",
+        "weight_type",
         "mag_loss_type",
         "f0_weight",
         "mag_env_weight",
