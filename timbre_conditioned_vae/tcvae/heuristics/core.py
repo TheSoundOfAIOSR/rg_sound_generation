@@ -27,8 +27,8 @@ def dahdr_envelope(attack_alpha=0.0, decay_alpha=0.0, release_alpha=0.0,
     t0 = tf.linspace(0.0, 1.0, delay_samples)
     t1 = tf.linspace(0.0, 1.0, attack_samples)
     t2 = tf.linspace(0.0, 1.0, hold_samples)
-    t3 = tf.linspace(0.0, 1.0, decay_samples)
-    t4 = tf.linspace(0.0, 1.0, release_samples)
+    t3 = tf.linspace(0.0, 1.0, decay_samples + 1)
+    t4 = tf.linspace(0.0, 1.0, release_samples + 1)
 
     e0 = t0 * 0.0
     e1 = exp_envelope(t1, attack_alpha)

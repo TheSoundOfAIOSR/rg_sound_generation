@@ -3,7 +3,7 @@ import numpy as np
 import soundfile as sf
 import matplotlib.pyplot as plt
 import tsms
-from . import core
+import core
 
 # pip install git+
 # https://github.com/fabiodimarco/tf-spectral-modeling-synthesis.git
@@ -48,7 +48,7 @@ def main():
     audio = np.squeeze(audio.numpy())
     audio = audio / np.max(np.abs(audio))
 
-    sf.write('samples/synth_audio.wav', audio, sample_rate)
+    sf.write('synth_audio.wav', audio, sample_rate)
 
     plt.figure()
     plt.plot(audio)
