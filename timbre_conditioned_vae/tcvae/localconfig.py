@@ -20,6 +20,8 @@ class LocalConfig:
     default_k = 3
     deep_decoder = False
     add_z_to_decoder_blocks = True
+    check_decoder_hidden_dim = True
+    print_model_summary = False
     skip_channels = 32
     lstm_dim = 256
     lstm_dropout = 0.4

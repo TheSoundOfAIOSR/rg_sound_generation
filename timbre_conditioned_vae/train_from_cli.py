@@ -20,13 +20,15 @@ if __name__ == "__main__":
     conf.lr_plateau = 4
     conf.model_name = "test"
     conf.early_stopping = 10
+    conf.print_model_summary = True
+    conf.check_decoder_hidden_dim = False
     # Data Handler
     conf.data_handler.mag_loss_type = "l2_db"
     conf.data_handler.mag_scale_fn = "exp_sigmoid"
 
     conf.num_train_steps = 5
     conf.num_valid_steps = 3
-    conf.epochs = 2
+    conf.epochs = 0
 
     # conf.save_config()
 

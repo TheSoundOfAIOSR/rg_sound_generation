@@ -60,6 +60,8 @@ def create_encoder(conf: LocalConfig):
         encoder_input, outputs, name="encoder"
     )
     tf.keras.utils.plot_model(model, to_file="encoder.png", show_shapes=True)
+    if conf.print_model_summary:
+        print(model.summary())
     return model
 
 
@@ -120,6 +122,8 @@ def create_strides_encoder(conf: LocalConfig):
         encoder_input, outputs, name="encoder"
     )
     tf.keras.utils.plot_model(model, to_file="encoder.png", show_shapes=True)
+    if conf.print_model_summary:
+        print(model.summary())
     return model
 
 
@@ -164,6 +168,8 @@ def create_1d_encoder(conf: LocalConfig):
 
     model = tf.keras.models.Model(encoder_input, outputs)
     tf.keras.utils.plot_model(model, to_file="encoder.png", show_shapes=True)
+    if conf.print_model_summary:
+        print(model.summary())
     return model
 
 
@@ -194,9 +200,9 @@ def create_decoder(conf: LocalConfig):
     else:
         inputs_list = [note_number, velocity, heuristic_measures]
 
-    # if conf.hidden_dim < conf.latent_dim:
-    #     conf.hidden_dim = max(conf.hidden_dim, conf.latent_dim)
-    #     print("Decoder hidden dimension updated to", conf.hidden_dim)
+    if conf.hidden_dim < conf.latent_dim and conf.check_decoder_hidden_dim:
+        conf.hidden_dim = max(conf.hidden_dim, conf.latent_dim)
+        print("Decoder hidden dimension updated to", conf.hidden_dim)
 
     inputs = tf.keras.layers.concatenate(inputs_list)
 
@@ -263,6 +269,8 @@ def create_decoder(conf: LocalConfig):
         reconstructed, name="decoder"
     )
     tf.keras.utils.plot_model(model, to_file="decoder.png", show_shapes=True)
+    if conf.print_model_summary:
+        print(model.summary())
     return model
 
 
@@ -296,6 +304,8 @@ def create_rnn_decoder(conf: LocalConfig):
         inputs_list,
         output, name="decoder"
     )
+    if conf.print_model_summary:
+        print(model.summary())
     return model
 
 
@@ -334,6 +344,8 @@ def create_vae(conf: LocalConfig):
         outputs,
         name="auto_encoder"
     )
+    if conf.print_model_summary:
+        print(model.summary())
     return model
 
 
