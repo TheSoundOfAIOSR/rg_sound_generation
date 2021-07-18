@@ -17,6 +17,8 @@ class LocalConfig:
     strides = 2
     use_lstm_in_encoder = True
     hidden_dim = 256
+    default_k = 3
+    deep_decoder = False
     add_z_to_decoder_blocks = True
     skip_channels = 32
     lstm_dim = 256

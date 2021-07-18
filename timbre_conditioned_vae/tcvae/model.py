@@ -26,7 +26,7 @@ def create_encoder(conf: LocalConfig):
     encoder_input = tf.keras.layers.Input(shape=(conf.row_dim, conf.col_dim, 2), name="encoder_input")
 
     filters = [32] * 2 + [64] * 2
-    kernels = [3] * 4
+    kernels = [conf.default_k] * 4
 
     filters_kernels = iter(zip(filters, kernels))
 
@@ -41,22 +41,21 @@ def create_encoder(conf: LocalConfig):
         wrapper[f"skip_{i + 1}"] = tf.keras.layers.concatenate([wrapper[f"block_{i + 1}"], wrapper[f"out_{i}"]])
         wrapper[f"out_{i + 1}"] = tf.keras.layers.MaxPool2D(2, name=f"encoder_pool_{i}")(wrapper[f"skip_{i + 1}"])
 
-    flattened = tf.keras.layers.TimeDistributed(tf.keras.layers.Flatten())(wrapper[f"out_{len(filters)}"])
-    lstm = tf.keras.layers.Bidirectional(
-        tf.keras.layers.LSTM(conf.lstm_dim, activation="tanh", recurrent_activation="sigmoid",
-                             return_sequences=False, dropout=conf.lstm_dropout,
-                             recurrent_dropout=0, unroll=False, use_bias=True))(flattened)
+    if conf.use_lstm_in_encoder:
+        flattened = tf.keras.layers.TimeDistributed(tf.keras.layers.Flatten())(wrapper[f"out_{len(filters)}"])
+        hidden = tf.keras.layers.Bidirectional(
+            tf.keras.layers.LSTM(conf.lstm_dim, activation="tanh", recurrent_activation="sigmoid",
+                                 return_sequences=False, dropout=conf.lstm_dropout,
+                                 recurrent_dropout=0, unroll=False, use_bias=True))(flattened)
+    else:
+        hidden = tf.keras.layers.Flatten()(wrapper[f"out_{len(filters)}"])
     if conf.is_variational:
-        z_mean = tf.keras.layers.Dense(conf.latent_dim,
-                                       kernel_initializer=tf.initializers.glorot_uniform(),
-                                       name="z_mean")(lstm)
-        z_log_variance = tf.keras.layers.Dense(conf.latent_dim,
-                                               kernel_initializer=tf.initializers.glorot_uniform(),
-                                               name="z_log_variance")(lstm)
+        z_mean = tf.keras.layers.Dense(conf.latent_dim, name="z_mean")(hidden)
+        z_log_variance = tf.keras.layers.Dense(conf.latent_dim, name="z_log_variance")(hidden)
         z = tf.keras.layers.Lambda(sample_from_latent_space)([z_mean, z_log_variance])
         outputs = [z, z_mean, z_log_variance]
     else:
-        outputs = tf.keras.layers.Dense(conf.latent_dim, activation="relu")(lstm)
+        outputs = tf.keras.layers.Dense(conf.latent_dim, activation="relu")(hidden)
     model = tf.keras.models.Model(
         encoder_input, outputs, name="encoder"
     )
@@ -78,7 +77,7 @@ def create_strides_encoder(conf: LocalConfig):
     encoder_input = tf.keras.layers.Input(shape=(conf.row_dim, conf.col_dim, 2), name="encoder_input")
 
     filters = [32] * 2 + [64] * 2
-    kernels = [3] * 4
+    kernels = [conf.default_k] * 4
     max_blocks = len(filters)
 
     filters_kernels = iter(zip(filters, kernels))
@@ -194,18 +193,37 @@ def create_decoder(conf: LocalConfig):
         inputs_list = [z_input, note_number, velocity, heuristic_measures]
     else:
         inputs_list = [note_number, velocity, heuristic_measures]
+
+    if conf.hidden_dim < conf.latent_dim:
+        conf.hidden_dim = max(conf.hidden_dim, conf.latent_dim)
+        print("Decoder hidden dimension updated to", conf.hidden_dim)
+
     inputs = tf.keras.layers.concatenate(inputs_list)
-    hidden = tf.keras.layers.Dense(conf.hidden_dim, activation="relu",
-                                   kernel_initializer=tf.initializers.glorot_uniform())(inputs)
-    num_repeats = int((conf.final_conv_units // conf.hidden_dim) / 2)
-    repeat = tf.keras.layers.RepeatVector(num_repeats)(hidden)
-    lstm = tf.keras.layers.Bidirectional(
-        tf.keras.layers.LSTM(conf.lstm_dim, activation="tanh", recurrent_activation="sigmoid",
-                             return_sequences=True, dropout=conf.lstm_dropout,
-                             recurrent_dropout=0, unroll=False, use_bias=True))(repeat)
-    reshaped = tf.keras.layers.Reshape(conf.final_conv_shape)(lstm)
-    filters = list(reversed([32] * 2 + [64] * 2))
-    kernels = list(reversed([3] * 4))
+
+    if not conf.deep_decoder:
+        hidden = tf.keras.layers.Dense(conf.hidden_dim, activation="relu")(inputs)
+        num_repeats = int((conf.final_conv_units // conf.hidden_dim) / 2)
+        repeat = tf.keras.layers.RepeatVector(num_repeats)(hidden)
+        conv_input = tf.keras.layers.Bidirectional(
+            tf.keras.layers.LSTM(conf.lstm_dim, activation="tanh", recurrent_activation="sigmoid",
+                                 return_sequences=True, dropout=conf.lstm_dropout,
+                                 recurrent_dropout=0, unroll=False, use_bias=True))(repeat)
+        f_repeat = 2
+        k_repeat = 4
+        final_conv_shape = conf.final_conv_shape
+    else:
+        if conf.add_z_to_decoder_blocks:
+            print("Deeper decoder can not add z to decoder blocks, disabling conf.add_z_to_decoder_blocks")
+            conf.add_z_to_decoder_blocks = False
+        units = int(conf.final_conv_units / 16)
+        conv_input = tf.keras.layers.Dense(units, activation="relu")(inputs)
+        f_repeat = 3
+        k_repeat = 6
+        final_conv_shape = [int(n/4) for n in conf.final_conv_shape[:-1]] + [192]
+    reshaped = tf.keras.layers.Reshape(final_conv_shape)(conv_input)
+
+    filters = list(reversed([32] * f_repeat + [64] * f_repeat))
+    kernels = list(reversed([conf.default_k] * k_repeat))
     filters_kernels = iter(zip(filters, kernels))
     wrapper = {
         "up_in_0": reshaped
