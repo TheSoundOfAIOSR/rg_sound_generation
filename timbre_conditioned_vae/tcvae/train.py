@@ -45,6 +45,7 @@ def _step(_model, h, mask, note_number, velocity, all_measures, conf):
     f0_loss, mag_env_loss, h_freq_shifts_loss, h_mag_loss = \
         reconstruction_loss(h, reconstruction, mask, conf)
     if conf.use_encoder and conf.is_variational:
+        # Note this is weighted kl loss as kl_loss function applies the weight
         _kl_loss = kl_loss(z_mean, z_log_var, conf)
     else:
         _kl_loss = 0.
@@ -89,6 +90,15 @@ def write_step(name, epoch, step, conf, loss,
         f.write(write_string)
     if step % conf.step_log_interval == 0 and conf.log_steps:
         print(out_string)
+
+
+def set_kl_weight(epoch, conf: LocalConfig):
+    if not conf.use_kl_anneal:
+        return
+    if epoch >= conf.kl_anneal_start:
+        conf.kl_weight += conf.kl_anneal_factor
+        conf.kl_weight = min(conf.kl_weight, conf.kl_weight_max)
+        print(f"KL Weight set to {conf.kl_weight}")
 
 
 def train(conf: LocalConfig):
@@ -136,6 +146,9 @@ def train(conf: LocalConfig):
 
         train_set = iter(train_dataset)
         valid_set = iter(valid_dataset)
+
+        if conf.is_variational:
+            set_kl_weight(epoch, conf)
 
         for step, batch in enumerate(train_set):
             loss, f0_loss, mag_env_loss, h_freq_shifts_loss, h_mag_loss, _kl_loss = \
