@@ -264,8 +264,9 @@ def create_decoder(conf: LocalConfig):
                 wrapper[f"act_{i}"], z_added
             ])
         else:
-            wrapper[f"up_in_{i + 1}"] = tf.keras.layers.concatenate([
-                wrapper[f"act_{i}"],wrapper[f"up_out_{i}"]
+            wrapper[f"up_out_{i}"] = tf.keras.layers.Conv2D(1, 1, padding="same")(wrapper[f"up_out_{i}"])
+            wrapper[f"up_in_{i + 1}"] = tf.keras.layers.Add()([
+                wrapper[f"act_{i}"], wrapper[f"up_out_{i}"]
             ])
 
     reconstructed = tf.keras.layers.Conv2D(
