@@ -37,6 +37,7 @@ def _step(_model, h, mask, note_number, velocity, measures, conf):
         _kl_loss = 0.
 
     losses["kl_loss"] = _kl_loss
+    losses["loss"] += _kl_loss
 
     return losses
 

@@ -66,11 +66,12 @@ def create_encoder(conf: LocalConfig):
 
 
 def create_strides_encoder(conf: LocalConfig):
-    def conv_block(x, f, k):
+    def conv_block(x, f, k, skip=False):
         x = tf.keras.layers.Conv2D(
             f, k, padding=conf.padding, strides=conf.strides)(x)
-        x = tf.keras.layers.BatchNormalization()(x)
-        x = tf.keras.layers.Activation("elu")(x)
+        if not skip:
+            x = tf.keras.layers.BatchNormalization()(x)
+            x = tf.keras.layers.Activation("elu")(x)
         return x
 
     if conf is None:
@@ -92,11 +93,11 @@ def create_strides_encoder(conf: LocalConfig):
         if i == 0:
             wrapper[f"block_{i + 1}_input"] = wrapper[f"block_{i}_output"]
         else:
-            wrapper[f"block_{i + 1}_input"] = tf.keras.layers.concatenate(
+            wrapper[f"block_{i + 1}_input"] = tf.keras.layers.Add()(
                 [wrapper[f"block_{i}_output"], wrapper[f"block_{i}_skip"]]
             )
         if i < max_blocks:
-            wrapper[f"block_{i + 1}_skip"] = conv_block(wrapper[f"block_{i}_output"], conf.skip_channels, 3)
+            wrapper[f"block_{i + 1}_skip"] = conv_block(wrapper[f"block_{i}_output"], 1, 1, skip=True)
 
     if conf.use_lstm_in_encoder:
         flattened = tf.keras.layers.TimeDistributed(tf.keras.layers.Flatten())(wrapper[f"block_{max_blocks}_input"])
@@ -253,10 +254,10 @@ def create_decoder(conf: LocalConfig):
             kernel_initializer=tf.initializers.glorot_uniform())(wrapper[f"up_out_{i}"])
         wrapper[f"bn_out_{i}"] = tf.keras.layers.BatchNormalization(name=f"decoder_bn_{i}")(wrapper[f"conv_out_{i}"])
         wrapper[f"act_{i}"] = tf.keras.layers.Activation("relu", name=f"decoder_act_{i}")(wrapper[f"bn_out_{i}"])
-        wrapper[f"up_conv_{i}"] = tf.keras.layers.Conv2D(
-            up_conv_channels, 3, padding="same", name=f"decoder_up_conv_{i}"
-        )(wrapper[f"up_out_{i}"])
         if conf.use_encoder and conf.add_z_to_decoder_blocks:
+            wrapper[f"up_conv_{i}"] = tf.keras.layers.Conv2D(
+                up_conv_channels, 3, padding="same", name=f"decoder_up_conv_{i}"
+            )(wrapper[f"up_out_{i}"])
             current_z = reshape_z(i, z_input, conf)
             z_added = tf.keras.layers.Add()([wrapper[f"up_conv_{i}"], current_z])
             wrapper[f"up_in_{i + 1}"] = tf.keras.layers.concatenate([
@@ -264,7 +265,7 @@ def create_decoder(conf: LocalConfig):
             ])
         else:
             wrapper[f"up_in_{i + 1}"] = tf.keras.layers.concatenate([
-                wrapper[f"act_{i}"], wrapper[f"up_conv_{i}"]
+                wrapper[f"act_{i}"],wrapper[f"up_out_{i}"]
             ])
 
     reconstructed = tf.keras.layers.Conv2D(
