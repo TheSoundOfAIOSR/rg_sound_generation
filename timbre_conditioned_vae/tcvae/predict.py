@@ -55,25 +55,20 @@ def get_prediction(_model, batch, conf: LocalConfig, **kwargs):
         reconstruction = _model.predict(
             [note_number_one_hot, velocity_one_hot, measures])
 
-    f0_shifts_true, mag_env_true, \
-    h_freq_shifts_true, h_mag_dist_true, h_phase_diff_true = \
-        conf.data_handler.output_transform(h, pred=False)
+    h_true = h
+    h_pred = reconstruction
 
-    f0_shifts_pred, mag_env_pred, \
-    h_freq_shifts_pred, h_mag_dist_pred, h_phase_diff_pred = \
-        conf.data_handler.output_transform(reconstruction, pred=True)
+    normalized_data_true = conf.data_handler.output_transform(
+        h_true, pred=False)
+
+    normalized_data_pred = conf.data_handler.output_transform(
+        h_pred, pred=True)
     
     h_freq_true, h_mag_true, h_phase_true = conf.data_handler.denormalize(
-        f0_shifts_true, mag_env_true,
-        h_freq_shifts_true, h_mag_dist_true,
-        h_phase_diff_true,
-        mask, note_number, pred=False)
+        normalized_data_true, mask, note_number)
 
     h_freq_pred, h_mag_pred, h_phase_pred = conf.data_handler.denormalize(
-        f0_shifts_pred, mag_env_pred,
-        h_freq_shifts_pred, h_mag_dist_pred,
-        h_phase_diff_pred,
-        mask, note_number, pred=True)
+        normalized_data_pred, mask, note_number)
     
     return h_freq_true, h_mag_true, h_phase_true, \
            h_freq_pred, h_mag_pred, h_phase_pred

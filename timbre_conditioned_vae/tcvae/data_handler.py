@@ -204,13 +204,23 @@ class DataHandler:
         h_mag_dist *= mask
         h_phase_diff *= mask
 
-        return f0_shifts, mag_env, h_freq_shifts, h_mag_dist, h_phase_diff, mask
+        normalized_data = {
+            "f0_shifts": f0_shifts,
+            "mag_env": mag_env,
+            "h_freq_shifts": h_freq_shifts,
+            "h_mag_dist": h_mag_dist,
+            "h_phase_diff": h_phase_diff,
+        }
 
-    def denormalize(self,
-                    f0_shifts, mag_env,
-                    h_freq_shifts, h_mag_dist,
-                    h_phase_diff,
-                    mask, note_number):
+        return normalized_data, mask
+
+    def denormalize(self, normalized_data, mask, note_number):
+        f0_shifts = normalized_data["f0_shifts"]
+        mag_env = normalized_data["mag_env"]
+        h_freq_shifts = normalized_data["h_freq_shifts"]
+        h_mag_dist = normalized_data["h_mag_dist"]
+        h_phase_diff = normalized_data["h_phase_diff"]
+
         note_number = tf.cast(note_number, dtype=tf.float32)
         f0_note = tsms.core.midi_to_hz(note_number)
         max_f0_displ = f0_note * self._f0_st_factor
@@ -244,9 +254,13 @@ class DataHandler:
 
         return h_freq, h_mag, h_phase
 
-    def input_transform(self, f0_shifts, mag_env,
-                        h_freq_shifts, h_mag_dist, h_phase_diff,
-                        rows=1001, cols=110):
+    def input_transform(self, normalized_data, rows=1001, cols=110):
+        f0_shifts = normalized_data["f0_shifts"]
+        mag_env = normalized_data["mag_env"]
+        h_freq_shifts = normalized_data["h_freq_shifts"]
+        h_mag_dist = normalized_data["h_mag_dist"]
+        h_phase_diff = normalized_data["h_phase_diff"]
+
         frames = self._frames
         harmonics = tf.shape(h_freq_shifts)[2]
 
@@ -299,15 +313,28 @@ class DataHandler:
             if self._use_phase:
                 h_phase_diff = h_phase_diff % 1.0
 
-        return f0_shifts, mag_env, h_freq_shifts, h_mag_dist, h_phase_diff
+        normalized_data = {
+            "f0_shifts": f0_shifts,
+            "mag_env": mag_env,
+            "h_freq_shifts": h_freq_shifts,
+            "h_mag_dist": h_mag_dist,
+            "h_phase_diff": h_phase_diff,
+        }
 
-    def loss(self,
-             f0_shifts_true, f0_shifts_pred,
-             mag_env_true, mag_env_pred,
-             h_freq_shifts_true, h_freq_shifts_pred,
-             h_mag_dist_true, h_mag_dist_pred,
-             h_phase_diff_true, h_phase_diff_pred,
-             mask):
+        return normalized_data
+
+    def loss(self, normalized_data_true, normalized_data_pred, mask):
+        f0_shifts_true = normalized_data_true["f0_shifts"]
+        mag_env_true = normalized_data_true["mag_env"]
+        h_freq_shifts_true = normalized_data_true["h_freq_shifts"]
+        h_mag_dist_true = normalized_data_true["h_mag_dist"]
+        h_phase_diff_true = normalized_data_true["h_phase_diff"]
+
+        f0_shifts_pred = normalized_data_pred["f0_shifts"]
+        mag_env_pred = normalized_data_pred["mag_env"]
+        h_freq_shifts_pred = normalized_data_pred["h_freq_shifts"]
+        h_mag_dist_pred = normalized_data_pred["h_mag_dist"]
+        h_phase_diff_pred = normalized_data_pred["h_phase_diff"]
 
         def compute_mag_weight(mag, mask, mode):
             weight = mask
@@ -401,5 +428,20 @@ class DataHandler:
         h_mag_loss *= self._h_mag_dist_weight
         h_phase_diff_loss *= self._h_phase_diff_weight
 
-        return f0_loss, mag_env_loss, \
-               h_freq_shifts_loss, h_mag_loss, h_phase_diff_loss
+        loss = \
+            f0_loss + \
+            mag_env_loss + \
+            h_freq_shifts_loss + \
+            h_mag_loss + \
+            h_phase_diff_loss
+
+        losses = {
+            "loss": loss,
+            "f0_loss": f0_loss,
+            "mag_env_loss": mag_env_loss,
+            "h_freq_shifts_loss": h_freq_shifts_loss,
+            "h_mag_loss": h_mag_loss,
+            "h_phase_diff_loss": h_phase_diff_loss,
+        }
+
+        return losses

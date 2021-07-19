@@ -30,24 +30,16 @@ def _step(_model, h, mask, note_number, velocity, measures, conf):
         reconstruction, z_mean, z_log_var = _model(model_input)
     else:
         reconstruction = _model(model_input)
-    f0_loss, mag_env_loss, h_freq_shifts_loss, h_mag_loss, h_phase_diff_loss = \
-        reconstruction_loss(h, reconstruction, mask, conf)
+    losses = reconstruction_loss(h, reconstruction, mask, conf)
     if conf.use_encoder and conf.is_variational:
         # Note this is weighted kl loss as kl_loss function applies the weight
         _kl_loss = kl_loss(z_mean, z_log_var, conf)
     else:
         _kl_loss = 0.
 
-    loss = \
-        f0_loss + \
-        mag_env_loss + \
-        h_freq_shifts_loss + \
-        h_mag_loss + \
-        h_phase_diff_loss + \
-        _kl_loss
+    losses["kl_loss"] = _kl_loss
 
-    return loss, f0_loss, mag_env_loss, h_freq_shifts_loss, \
-           h_mag_loss, h_phase_diff_loss, _kl_loss
+    return losses
 
 
 @tf.function
@@ -64,27 +56,56 @@ def training_step(_model, optimizer, batch, conf):
     note_number, velocity, h, mask, measures = _batch(batch)
 
     with tf.GradientTape() as tape:
-        loss, *losses = \
-            _step(_model, h, mask, note_number, velocity, measures, conf)
+        losses = _step(_model, h, mask, note_number, velocity, measures, conf)
 
-    _model_grads = tape.gradient(loss, _model.trainable_weights)
+    _model_grads = tape.gradient(losses["loss"], _model.trainable_weights)
     optimizer.apply_gradients(zip(_model_grads, _model.trainable_weights))
-    return loss, *losses
+    return losses
 
 
-def write_step(name, epoch, step, conf, loss,
-               f0_loss, mag_env_loss, h_freq_shifts_loss,
-               h_mag_loss, h_phase_diff_loss, _kl_loss):
-    write_string = f"{epoch},{step},{loss},{f0_loss},{mag_env_loss}," \
-                   f"{h_freq_shifts_loss},{h_mag_loss}," \
-                   f"{h_phase_diff_loss},{_kl_loss}\n"
-    out_string = f"{name}, Epoch {epoch:3d}, Step: {step:4d}, Loss: {loss:.4f} " \
-                 f"F0: {f0_loss:.4f}, Mag Env: {mag_env_loss:.4f} " \
-                 f"H Freq Shifts: {h_freq_shifts_loss:.4f}, H Mag: {h_mag_loss:.4f}, " \
-                 f"H Phase Diff: {h_phase_diff_loss:.4f}, KL Loss: {_kl_loss}"
+def dataset_loop(dataset_iterator, step_func, conf,
+                 epoch, num_steps, dataset_split="Train"):
+    steps = 0
+    losses = None
+    log_string = ""
 
-    csv_file_path = os.path.join(conf.checkpoints_dir,
-                                 f"{conf.model_name}_{name}_{conf.csv_log_file}")
+    for step, batch in enumerate(dataset_iterator):
+        step_losses = step_func(batch)
+
+        steps += 1
+        if losses is None:
+            losses = step_losses
+        else:
+            for k, v in step_losses.items():
+                losses[k] += v
+
+        write_step(dataset_split, epoch, step, conf, step_losses)
+
+        if num_steps is not None:
+            if step >= num_steps:
+                log_string += dataset_split + " steps completed\n"
+                break
+
+    log_string = f"{dataset_split} losses: "
+    for k, v in losses.items():
+        losses[k] = v / steps
+        log_string += f"{k}: {v:.4f}, "
+    log_string = log_string[:-2]
+
+    return losses, log_string
+
+
+def write_step(name, epoch, step, conf, step_losses):
+    write_string = ""
+    out_string = f"{name}, Epoch {epoch:3d}, Step: {step:4d}, "
+    for k, v in step_losses.items():
+        write_string += f"{v},"
+        out_string += f"{k}: {v:.4f}, "
+    write_string = write_string[:-1] + "\n"
+    out_string = out_string[:-2]
+
+    csv_file_path = os.path.join(
+        conf.checkpoints_dir, f"{conf.model_name}_{name}_{conf.csv_log_file}")
     mode = "w" if epoch == 0 and step == 0 else "a"
     with open(csv_file_path, mode) as f:
         f.write(write_string)
@@ -132,7 +153,6 @@ def train(conf: LocalConfig):
     best_loss = conf.best_loss
     last_good_epoch = 0
     lr_changed_at = 0
-    loss_names = ["loss", "f0_loss", "mag_env_loss", "h_freq_shifts_loss", "h_mag_loss", "h_phase_diff_loss", "kl_loss"]
 
     print("Loading datasets..")
     train_dataset, valid_dataset, test_dataset = get_dataset(conf)
@@ -141,76 +161,33 @@ def train(conf: LocalConfig):
     for epoch in range(0, conf.epochs):
         print(f"Epoch {epoch} started")
 
-        losses = dict((n, []) for n in loss_names)
-        val_losses = dict((n, []) for n in loss_names)
-
-        train_set = iter(train_dataset)
-        valid_set = iter(valid_dataset)
+        train_iterator = iter(train_dataset)
+        valid_iterator = iter(valid_dataset)
 
         if conf.is_variational:
             set_kl_weight(epoch, conf)
 
-        for step, batch in enumerate(train_set):
-            loss, f0_loss, mag_env_loss, h_freq_shifts_loss, \
-            h_mag_loss, h_phase_diff_loss, _kl_loss = \
-                training_step(_model, optimizer, batch, conf)
+        def train_step(batch):
+            return training_step(_model, optimizer, batch, conf)
 
-            losses["loss"].append(loss)
-            losses["f0_loss"].append(f0_loss)
-            losses["mag_env_loss"].append(mag_env_loss)
-            losses["h_freq_shifts_loss"].append(h_freq_shifts_loss)
-            losses["h_mag_loss"].append(h_mag_loss)
-            losses["h_phase_diff_loss"].append(h_phase_diff_loss)
-            losses["kl_loss"].append(_kl_loss)
+        losses, log_string = dataset_loop(
+            train_iterator, train_step, conf,
+            epoch, conf.num_train_steps, dataset_split="Train")
 
-            write_step("train", epoch, step, conf, loss, f0_loss,
-                       mag_env_loss, h_freq_shifts_loss, h_mag_loss,
-                       h_phase_diff_loss, _kl_loss)
+        print(log_string)
 
-            if conf.num_train_steps is not None:
-                if step >= conf.num_train_steps:
-                    print("Training steps completed")
-                    break
-
-        print(f"Epoch: {epoch} ended")
-        print(f"Training losses: Loss: {np.mean(losses['loss']):.4f} "
-              f"F0: {np.mean(losses['f0_loss']):.4f} "
-              f"Mag Env: {np.mean(losses['mag_env_loss']):.4f} "
-              f"H Freq Shifts: {np.mean(losses['h_freq_shifts_loss']):.4f} "
-              f"H Mag: {np.mean(losses['h_mag_loss']):.4f} "
-              f"KL: {np.mean(losses['kl_loss'])} ")
         print("Starting validation")
 
-        for valid_step, batch in enumerate(valid_set):
-            loss, f0_loss, mag_env_loss, h_freq_shifts_loss, \
-            h_mag_loss, h_phase_diff_loss, _kl_loss = \
-                validation_step(_model, batch, conf)
+        def valid_step(batch):
+            return validation_step(_model, batch, conf)
 
-            val_losses["loss"].append(loss)
-            val_losses["f0_loss"].append(f0_loss)
-            val_losses["mag_env_loss"].append(mag_env_loss)
-            val_losses["h_freq_shifts_loss"].append(h_freq_shifts_loss)
-            val_losses["h_mag_loss"].append(h_mag_loss)
-            val_losses["h_phase_diff_loss"].append(h_phase_diff_loss)
-            val_losses["kl_loss"].append(_kl_loss)
+        losses, log_string = dataset_loop(
+            valid_iterator, valid_step, conf,
+            epoch, conf.num_valid_steps, dataset_split="Valid")
 
-            write_step("valid", epoch, valid_step, conf, loss, f0_loss,
-                       mag_env_loss, h_freq_shifts_loss, h_mag_loss,
-                       h_phase_diff_loss, _kl_loss)
+        print(log_string)
 
-            if conf.num_valid_steps is not None:
-                if valid_step >= conf.num_valid_steps:
-                    print("Validation steps completed")
-                    break
-
-        print(f"Validation losses: Loss: {np.mean(val_losses['loss']):.4f} "
-              f"F0: {np.mean(val_losses['f0_loss']):.4f} "
-              f"Mag Env: {np.mean(val_losses['mag_env_loss']):.4f} "
-              f"H Freq Shifts: {np.mean(val_losses['h_freq_shifts_loss']):.4f} "
-              f"H Mag: {np.mean(val_losses['h_mag_loss']):.4f} "
-              f"KL: {np.mean(val_losses['kl_loss'])} ")
-
-        valid_loss = np.mean(val_losses['loss'])
+        valid_loss = losses['loss']
 
         if valid_loss < best_loss:
             last_good_epoch = epoch
@@ -233,9 +210,6 @@ def train(conf: LocalConfig):
             conf.learning_rate *= conf.lr_factor
             print(f"New learning rate is {conf.learning_rate}")
             lr_changed_at = epoch
-
-        del losses
-        del val_losses
 
     if conf.best_model_path is not None:
         print(f"Best model: {conf.best_model_path}")

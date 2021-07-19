@@ -57,12 +57,11 @@ def map_features(features):
     h_mag = tf.expand_dims(h_mag, axis=0)
     h_phase = tf.expand_dims(h_phase, axis=0)
 
-    f0_shifts, mag_env, h_freq_shifts, h_mag_dist, h_phase_diff, mask = \
+    normalized_data, mask = \
         conf.data_handler.normalize(h_freq, h_mag, h_phase, note_number)
 
     h = conf.data_handler.input_transform(
-        f0_shifts, mag_env, h_freq_shifts, h_mag_dist, h_phase_diff,
-        rows=conf.row_dim, cols=conf.col_dim)
+        normalized_data, rows=conf.row_dim, cols=conf.col_dim)
 
     h = tf.squeeze(h, axis=0)
     mask = tf.squeeze(mask, axis=0)
