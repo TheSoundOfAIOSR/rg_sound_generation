@@ -34,7 +34,12 @@ def update_latent_input(note_number, velocity, measures, **kwargs):
 
 
 def get_prediction(_model, batch, conf: LocalConfig, **kwargs):
-    note_number_one_hot, velocity_one_hot, h, mask, measures = batch
+    note_number_one_hot = batch["note_number"]
+    velocity_one_hot = batch["velocity"]
+    h = batch["h"]
+    mask = batch["mask"]
+    measures = batch["measures"]
+    # note_number_one_hot, velocity_one_hot, h, mask, measures = batch
 
     note_number = tf.argmax(
         note_number_one_hot, axis=-1) + conf.starting_midi_pitch
@@ -70,5 +75,5 @@ def get_prediction(_model, batch, conf: LocalConfig, **kwargs):
     h_freq_pred, h_mag_pred, h_phase_pred = conf.data_handler.denormalize(
         normalized_data_pred, mask, note_number)
     
-    return h_freq_true, h_mag_true, h_phase_true, \
-           h_freq_pred, h_mag_pred, h_phase_pred
+    return (h_freq_true, h_mag_true, h_phase_true,
+            h_freq_pred, h_mag_pred, h_phase_pred)

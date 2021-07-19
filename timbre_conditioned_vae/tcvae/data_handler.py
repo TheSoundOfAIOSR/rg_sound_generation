@@ -64,8 +64,9 @@ class SimpleDataHandler:
         f0_note = tsms.core.midi_to_hz(note_number)
         max_f0_displ = f0_note * self._f0_st_factor
 
-        harmonics = tf.math.reduce_sum(mask[0, 0, :])
-        harmonic_numbers = tf.range(1, harmonics + 1, dtype=tf.float32)
+        harmonics = tf.cast(tf.math.reduce_sum(mask[0, 0, :]), dtype=tf.int64)
+        # harmonic_numbers = tf.range(1, harmonics + 1, dtype=tf.float32)
+        harmonic_numbers = tf.range(1, self._max_harmonics + 1, dtype=tf.float32)
         harmonic_numbers = harmonic_numbers[tf.newaxis, tf.newaxis, :]
         h_freq = (h_freq_shifts * max_f0_displ + f0_note) * harmonic_numbers
 
