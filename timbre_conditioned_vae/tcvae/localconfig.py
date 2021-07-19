@@ -1,7 +1,7 @@
 import os
 import json
 from typing import Dict
-from .data_handler import DataHandler
+from .data_handler import DataHandler, SimpleDataHandler
 
 
 class LocalConfig:
@@ -70,28 +70,43 @@ class LocalConfig:
         "high_mid": [2000, 6000],
         "high": [6000, 20000]
     }
-    data_handler = DataHandler()
-    data_handler_properties = [
-        "weight_type",
-        "mag_loss_type",
-        "f0_weight",
-        "mag_env_weight",
-        "h_freq_shifts_weight",
-        "h_mag_dist_weight",
-        "mag_scale_fn"
-    ]
+    data_handler = None
+    data_handler_properties = []
+    data_handler_type = "none"
 
     _instance = None
 
-    def __new__(cls):
+    def __new__(cls, *args, **kwargs):
         if cls._instance is None:
             cls._instance = super(LocalConfig, cls).__new__(cls)
         return cls._instance
 
+    def __init__(self, data_handler_type="none"):
+        self.set_data_handler_by_type(data_handler_type)
+
+    def set_data_handler_by_type(self, data_handler_type: str):
+        assert data_handler_type in ["data_handler", "simple_data_handler", "none"]
+        self.data_handler_type = data_handler_type
+        if data_handler_type == "data_handler":
+            self.data_handler = DataHandler()
+            self.data_handler_properties = [
+                "weight_type",
+                "mag_loss_type",
+                "f0_weight",
+                "mag_env_weight",
+                "h_freq_shifts_weight",
+                "h_mag_dist_weight",
+                "mag_scale_fn"
+            ]
+        elif data_handler_type == "simple_data_handler":
+            self.data_handler = SimpleDataHandler()
+
     def set_config(self, params: Dict):
         params_conf = dict((k, v) for k, v in params.items()
                            if k not in self.data_handler_properties)
+
         vars(self).update(params_conf)
+
         for p in self.data_handler_properties:
             if p in params:
                 exec(f"self.data_handler.{p} = params['{p}']")
@@ -101,13 +116,24 @@ class LocalConfig:
 
         with open(file_path, "r") as f:
             params = json.load(f)
+
+        if "data_handler_type" in params:
+            self.set_data_handler_by_type(params["data_handler_type"])
+
         self.set_config(params)
 
     def save_config(self):
         target_path = os.path.join(self.checkpoints_dir,
                                    f"{self.run_name}_{self.model_name}.json")
-        to_save = vars(self)
+
+        to_save = vars(self).copy()
+
         for p in self.data_handler_properties:
             to_save[p] = eval(f"self.data_handler.{p}")
+
+        if "data_handler" in to_save:
+            # to_save is not a deep copy so, we pop item
+            to_save.pop("data_handler")
+
         with open(target_path, "w") as f:
             json.dump(to_save, f)

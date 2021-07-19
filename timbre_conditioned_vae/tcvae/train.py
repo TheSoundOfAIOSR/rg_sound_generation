@@ -1,7 +1,6 @@
 import os
 import warnings
 import tensorflow as tf
-import numpy as np
 from .dataset import get_dataset
 from . import model
 from .losses import reconstruction_loss, kl_loss

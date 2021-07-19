@@ -88,8 +88,9 @@ class SimpleDataHandler:
         h_mag = tf.pad(
             h_mag, ((0, 0), (0, rows - frames), (0, cols - harmonics)))
 
+        h_freq_shifts = tf.expand_dims(h_freq_shifts, axis=-1)
+        h_mag = tf.expand_dims(h_mag, axis=-1)
         h = tf.concat([h_freq_shifts, h_mag], axis=-1)
-
         return h
 
     def output_transform(self, h, pred=True):

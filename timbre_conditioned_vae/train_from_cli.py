@@ -4,8 +4,8 @@ from tcvae import localconfig, train
 
 
 if __name__ == "__main__":
-    conf = localconfig.LocalConfig()
-    # conf.load_config_from_file("checkpoints/Default_test.json")
+    conf = localconfig.LocalConfig("simple_data_handler")
+
     conf.use_encoder = True
     conf.use_max_pool = False
     conf.is_variational = True
@@ -13,7 +13,7 @@ if __name__ == "__main__":
     conf.deep_decoder = True
     conf.add_z_to_decoder_blocks = False
     conf.deep_decoder = True
-    conf.encoder_type = "1d"
+    conf.encoder_type = "2d"
     conf.decoder_type = "cnn"
     conf.latent_dim = 64
     # Training
@@ -34,5 +34,6 @@ if __name__ == "__main__":
     conf.epochs = 3
 
     # conf.save_config()
+    # conf.load_config_from_file("checkpoints/Default_test.json")
 
     train.train(conf)
