@@ -64,17 +64,19 @@ def training_step(_model, optimizer, batch, conf):
 
 def dataset_loop(dataset_iterator, step_func, conf,
                  epoch, num_steps, dataset_split="Train"):
+    steps = 0.0
     losses = None
     log_string = ""
 
     for step, batch in enumerate(dataset_iterator):
         step_losses = step_func(batch)
 
+        steps += 1.0
         if losses is None:
             losses = step_losses
         else:
             for k, v in step_losses.items():
-                losses[k] += (losses[k] * float(step) + v) / (float(step) + 1.0)
+                losses[k] += v
 
         write_step(dataset_split, epoch, step, conf, step_losses)
 
@@ -85,7 +87,8 @@ def dataset_loop(dataset_iterator, step_func, conf,
 
     log_string = f"{dataset_split} losses: "
     for k, v in losses.items():
-        log_string += f"{k}: {v:.4f}, "
+        losses[k] = v / steps
+        log_string += f"{k}: {losses[k]:.4f}, "
     log_string = log_string[:-2]
 
     return losses, log_string

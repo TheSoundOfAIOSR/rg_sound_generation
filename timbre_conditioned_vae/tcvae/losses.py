@@ -7,7 +7,7 @@ def reconstruction_loss(h_true, h_pred, mask, conf):
         conf.data_handler.output_transform(h_true, pred=False)
 
     normalized_data_pred = \
-        conf.data_handler.output_transform(h_pred, pred=False)
+        conf.data_handler.output_transform(h_pred, pred=True)
 
     losses = conf.data_handler.loss(
         normalized_data_true, normalized_data_pred, mask)
