@@ -44,16 +44,16 @@ def get_prediction(_model, batch, conf: LocalConfig, **kwargs):
     #     measures.numpy(), **kwargs
     # )
 
+    model_input = [note_number_one_hot, velocity_one_hot]
+
+    if conf.use_heuristics:
+        model_input += [measures]
     if conf.use_encoder:
-        if conf.is_variational:
-            reconstruction, z_mean, z_log_var = _model.predict(
-                [h, note_number_one_hot, velocity_one_hot, measures])
-        else:
-            reconstruction = _model.predict(
-                [h, note_number_one_hot, velocity_one_hot, measures])
+        model_input = [h] + model_input
+    if conf.use_encoder and conf.is_variational:
+        reconstruction, z_mean, z_log_var = _model.predict(model_input)
     else:
-        reconstruction = _model.predict(
-            [note_number_one_hot, velocity_one_hot, measures])
+        reconstruction = _model.predict(model_input)
 
     h_true = h
     h_pred = reconstruction
