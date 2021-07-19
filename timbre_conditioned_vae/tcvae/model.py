@@ -130,10 +130,13 @@ def create_strides_encoder(conf: LocalConfig):
 def create_1d_encoder(conf: LocalConfig):
     def conv1d_model(inputs, name):
         filters = [256, 32, 32, 32, 64, 128]
-        if name == "mag":
+        if conf.same_kernels_in_1d:
             kernels = [128, 16, 16, 16, 16, 16]
         else:
-            kernels = [7, 3, 3, 3, 3, 3]
+            if name == "mag":
+                kernels = [128, 16, 16, 16, 16, 16]
+            else:
+                kernels = [7, 3, 3, 3, 3, 3]
         strides = [8, 2, 2, 2, 2, 2]
         # ToDo: Find better values for kernels for both freq
 

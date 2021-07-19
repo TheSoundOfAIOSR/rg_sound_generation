@@ -63,6 +63,7 @@ class LocalConfig:
     st_var = (2.0 ** (1.0 / 12.0) - 1.0)
     db_limit = -120
     encoder_type = "2d" # or "1d"
+    same_kernels_in_1d = True
     decoder_type = "cnn"
     freq_bands = {
         "bass": [60, 270],
