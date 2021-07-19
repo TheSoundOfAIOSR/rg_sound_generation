@@ -29,10 +29,12 @@ class SimpleDataHandler:
         self._frame_step = frame_step
         self._frames = frames
         self._max_harmonics = max_harmonics
+        self._f0_st_factor = 2.0 ** (1.0 / 12.0) - 1.0
 
     def normalize(self, h_freq, h_mag, h_phase, note_number):
         note_number = tf.cast(note_number, dtype=tf.float32)
         f0_note = tsms.core.midi_to_hz(note_number)
+        max_f0_displ = f0_note * self._f0_st_factor
 
         batches = tf.shape(h_freq)[0]
         frames = tf.shape(h_freq)[1]
@@ -40,7 +42,7 @@ class SimpleDataHandler:
         harmonic_numbers = tf.range(1, harmonics + 1, dtype=tf.float32)
         harmonic_numbers = harmonic_numbers[tf.newaxis, tf.newaxis, :]
 
-        h_freq_shifts = h_freq / harmonic_numbers - f0_note
+        h_freq_shifts = (h_freq / harmonic_numbers - f0_note) / max_f0_displ
 
         normalized_data = {
             "h_freq_shifts": h_freq_shifts,
@@ -60,11 +62,12 @@ class SimpleDataHandler:
 
         note_number = tf.cast(note_number, dtype=tf.float32)
         f0_note = tsms.core.midi_to_hz(note_number)
+        max_f0_displ = f0_note * self._f0_st_factor
 
         harmonics = tf.math.reduce_sum(mask[0, 0, :])
         harmonic_numbers = tf.range(1, harmonics + 1, dtype=tf.float32)
         harmonic_numbers = harmonic_numbers[tf.newaxis, tf.newaxis, :]
-        h_freq = (h_freq_shifts + f0_note) * harmonic_numbers
+        h_freq = (h_freq_shifts * max_f0_displ + f0_note) * harmonic_numbers
 
         h_freq = h_freq[:, :, :harmonics]
         h_mag = h_mag[:, :, :harmonics]
@@ -117,12 +120,16 @@ class SimpleDataHandler:
         h_mag_true_pred = normalized_data_pred["h_mag"]
 
         # compute frequencies loss
-        h_freq_shifts_loss = tf.math.reduce_mean(
-            tf.math.square(h_freq_shifts_true - h_freq_shifts_pred))
+        h_freq_shifts_loss = tf.math.square(
+            h_freq_shifts_true - h_freq_shifts_pred) * h_mag_true
+        h_freq_shifts_loss = tf.math.reduce_sum(
+            h_freq_shifts_loss) / tf.math.reduce_sum(h_mag_true)
 
         # compute magnitude loss
-        h_mag_loss = tf.math.reduce_mean(
-            tf.math.square(h_mag_true - h_mag_true_pred))
+        h_mag_loss = tf.math.square(
+            h_mag_true - h_mag_true_pred) * mask
+        h_mag_loss = tf.math.reduce_sum(
+            h_mag_loss) / tf.math.reduce_sum(mask)
 
         loss = h_freq_shifts_loss + h_mag_loss
 
