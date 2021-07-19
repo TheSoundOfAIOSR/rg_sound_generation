@@ -27,15 +27,13 @@ def _step(_model, h, mask, note_number, velocity, measures, conf):
         model_input = [h] + model_input
     if conf.use_encoder and conf.is_variational:
         reconstruction, z_mean, z_log_var = _model(model_input)
-    else:
-        reconstruction = _model(model_input)
-    losses = reconstruction_loss(h, reconstruction, mask, conf)
-    if conf.use_encoder and conf.is_variational:
         # Note this is weighted kl loss as kl_loss function applies the weight
         _kl_loss = kl_loss(z_mean, z_log_var, conf)
     else:
-        _kl_loss = 0.
+        reconstruction = _model(model_input)
+        _kl_loss = 0.0
 
+    losses = reconstruction_loss(h, reconstruction, mask, conf)
     losses["kl_loss"] = _kl_loss
     losses["loss"] += _kl_loss
 
@@ -96,7 +94,7 @@ def dataset_loop(dataset_iterator, step_func, conf,
 
 
 def write_step(name, epoch, step, conf, step_losses):
-    write_string = ""
+    write_string = f"{epoch},{step},"
     out_string = f"{name}, Epoch {epoch:3d}, Step: {step:4d}, "
     for k, v in step_losses.items():
         write_string += f"{v},"
