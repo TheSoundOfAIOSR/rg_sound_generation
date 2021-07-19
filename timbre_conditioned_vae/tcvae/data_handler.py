@@ -19,6 +19,121 @@ def exp_sigmoid(x, exponent=10.0, max_value=2.0, threshold=0.0):
     return max_value * tf.nn.sigmoid(x) ** tf.math.log(exponent) + threshold
 
 
+class SimpleDataHandler:
+    def __init__(self,
+                 sample_rate=16000,
+                 frame_step=64,
+                 frames=1001,
+                 max_harmonics=110):
+        self._sample_rate = sample_rate
+        self._frame_step = frame_step
+        self._frames = frames
+        self._max_harmonics = max_harmonics
+
+    def normalize(self, h_freq, h_mag, h_phase, note_number):
+        note_number = tf.cast(note_number, dtype=tf.float32)
+        f0_note = tsms.core.midi_to_hz(note_number)
+
+        batches = tf.shape(h_freq)[0]
+        frames = tf.shape(h_freq)[1]
+        harmonics = tf.shape(h_freq)[2]
+        harmonic_numbers = tf.range(1, harmonics + 1, dtype=tf.float32)
+        harmonic_numbers = harmonic_numbers[tf.newaxis, tf.newaxis, :]
+
+        h_freq_shifts = h_freq / harmonic_numbers - f0_note
+
+        normalized_data = {
+            "h_freq_shifts": h_freq_shifts,
+            "h_mag": h_mag,
+        }
+
+        mask = tf.concat([
+            tf.ones((batches, frames, harmonics)),
+            tf.zeros((batches, frames, self._max_harmonics - harmonics))],
+            axis=2)
+
+        return normalized_data, mask
+
+    def denormalize(self, normalized_data, mask, note_number):
+        h_freq_shifts = normalized_data["h_freq_shifts"]
+        h_mag = normalized_data["h_mag"]
+
+        note_number = tf.cast(note_number, dtype=tf.float32)
+        f0_note = tsms.core.midi_to_hz(note_number)
+
+        harmonics = tf.math.reduce_sum(mask[0, 0, :])
+        harmonic_numbers = tf.range(1, harmonics + 1, dtype=tf.float32)
+        harmonic_numbers = harmonic_numbers[tf.newaxis, tf.newaxis, :]
+        h_freq = (h_freq_shifts + f0_note) * harmonic_numbers
+
+        h_freq = h_freq[:, :, :harmonics]
+        h_mag = h_mag[:, :, :harmonics]
+
+        h_phase = tsms.core.generate_phase(
+            h_freq,
+            sample_rate=self._sample_rate,
+            frame_step=self._frame_step)
+
+        return h_freq, h_mag, h_phase
+
+    def input_transform(self, normalized_data, rows=1001, cols=110):
+        h_freq_shifts = normalized_data["h_freq_shifts"]
+        h_mag = normalized_data["h_mag"]
+
+        frames = self._frames
+        harmonics = tf.shape(h_freq_shifts)[2]
+
+        h_freq_shifts = tf.pad(
+            h_freq_shifts, ((0, 0), (0, rows - frames), (0, cols - harmonics)))
+        h_mag = tf.pad(
+            h_mag, ((0, 0), (0, rows - frames), (0, cols - harmonics)))
+
+        h = tf.concat([h_freq_shifts, h_mag], axis=-1)
+
+        return h
+
+    def output_transform(self, h, pred=True):
+        frames = self._frames
+        max_harmonics = self._max_harmonics
+
+        h_freq_shifts, h_mag = tf.unstack(h, axis=-1)
+
+        h_freq_shifts = h_freq_shifts[:, :frames, :max_harmonics]
+        h_mag = h_mag[:, :frames, :max_harmonics]
+
+        normalized_data = {
+            "h_freq_shifts": h_freq_shifts,
+            "h_mag": h_mag,
+        }
+
+        return normalized_data
+
+    def loss(self, normalized_data_true, normalized_data_pred, mask):
+        h_freq_shifts_true = normalized_data_true["h_freq_shifts"]
+        h_mag_true = normalized_data_true["h_mag"]
+
+        h_freq_shifts_pred = normalized_data_pred["h_freq_shifts"]
+        h_mag_true_pred = normalized_data_pred["h_mag"]
+
+        # compute frequencies loss
+        h_freq_shifts_loss = tf.math.reduce_mean(
+            tf.math.square(h_freq_shifts_true - h_freq_shifts_pred))
+
+        # compute magnitude loss
+        h_mag_loss = tf.math.reduce_mean(
+            tf.math.square(h_mag_true - h_mag_true_pred))
+
+        loss = h_freq_shifts_loss + h_mag_loss
+
+        losses = {
+            "loss": loss,
+            "h_freq_shifts_loss": h_freq_shifts_loss,
+            "h_mag_loss": h_mag_loss,
+        }
+
+        return losses
+
+
 class DataHandler:
     def __init__(self,
                  fix_pitch=True,
