@@ -31,6 +31,12 @@ class SimpleDataHandler:
         self._max_harmonics = max_harmonics
         self._f0_st_factor = 2.0 ** (1.0 / 12.0) - 1.0
 
+        self.losses_name = ["h_freq_shifts_loss", "h_mag_loss"]
+        self.losses_weights = {
+            "h_freq_shifts_loss": 10.0,
+            "h_mag_loss": 200.0,
+        }
+
     def normalize(self, h_freq, h_mag, h_phase, note_number):
         note_number = tf.cast(note_number, dtype=tf.float32)
         f0_note = tsms.core.midi_to_hz(note_number)
@@ -64,19 +70,16 @@ class SimpleDataHandler:
         f0_note = tsms.core.midi_to_hz(note_number)
         max_f0_displ = f0_note * self._f0_st_factor
 
-        harmonics = tf.cast(tf.math.reduce_sum(mask[0, 0, :]), dtype=tf.int64)
-        # harmonic_numbers = tf.range(1, harmonics + 1, dtype=tf.float32)
-        harmonic_numbers = tf.range(1, self._max_harmonics + 1, dtype=tf.float32)
+        harmonic_numbers = tf.range(1, self._max_harmonics+1, dtype=tf.float32)
         harmonic_numbers = harmonic_numbers[tf.newaxis, tf.newaxis, :]
         h_freq = (h_freq_shifts * max_f0_displ + f0_note) * harmonic_numbers
 
+        harmonics = tf.cast(tf.math.reduce_sum(mask[0, 0, :]), dtype=tf.int64)
         h_freq = h_freq[:, :, :harmonics]
         h_mag = h_mag[:, :, :harmonics]
 
         h_phase = tsms.core.generate_phase(
-            h_freq,
-            sample_rate=self._sample_rate,
-            frame_step=self._frame_step)
+            h_freq, sample_rate=self._sample_rate, frame_step=self._frame_step)
 
         return h_freq, h_mag, h_phase
 
@@ -106,6 +109,9 @@ class SimpleDataHandler:
         h_freq_shifts = h_freq_shifts[:, :frames, :max_harmonics]
         h_mag = h_mag[:, :frames, :max_harmonics]
 
+        if pred:
+            h_mag = exp_sigmoid(h_mag)
+
         normalized_data = {
             "h_freq_shifts": h_freq_shifts,
             "h_mag": h_mag,
@@ -131,6 +137,9 @@ class SimpleDataHandler:
             h_mag_true - h_mag_true_pred) * mask
         h_mag_loss = tf.math.reduce_sum(
             h_mag_loss) / tf.math.reduce_sum(mask)
+
+        h_freq_shifts_loss *= self.losses_weights["h_freq_shifts_loss"]
+        h_mag_loss *= self.losses_weights["h_mag_loss"]
 
         loss = h_freq_shifts_loss + h_mag_loss
 
