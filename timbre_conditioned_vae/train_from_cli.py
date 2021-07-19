@@ -9,10 +9,11 @@ if __name__ == "__main__":
     conf.use_encoder = True
     conf.use_max_pool = False
     conf.is_variational = True
-    conf.use_heuristics = False
+    conf.use_heuristics = True
+    conf.deep_decoder = True
     conf.add_z_to_decoder_blocks = False
     conf.deep_decoder = True
-    conf.encoder_type = "2d"
+    conf.encoder_type = "1d"
     conf.decoder_type = "cnn"
     conf.latent_dim = 64
     # Training
@@ -23,14 +24,14 @@ if __name__ == "__main__":
     conf.model_name = "test"
     conf.early_stopping = 10
     conf.print_model_summary = True
-    conf.check_decoder_hidden_dim = False
+    conf.check_decoder_hidden_dim = True
     # Data Handler
     conf.data_handler.mag_loss_type = "l2_db"
     conf.data_handler.mag_scale_fn = "exp_sigmoid"
 
     conf.num_train_steps = 5
     conf.num_valid_steps = 3
-    conf.epochs = 2
+    conf.epochs = 3
 
     # conf.save_config()
 

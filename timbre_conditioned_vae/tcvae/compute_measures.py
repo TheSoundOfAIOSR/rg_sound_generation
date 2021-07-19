@@ -43,8 +43,9 @@ def get_measures(h_freq, h_mag, conf: LocalConfig):
         )
 
     measures = [inharmonic, even_odd, sparse_rich,
-              attack_rms, decay_rms, attack_time, decay_time,
-              bass, mid, high_mid, high]
+                attack_rms, decay_rms, attack_time, decay_time,
+                bass, mid, high_mid, high]
+    measures = [tf.squeeze(m) for m in measures]
     measures = tf.stack(measures, axis=-1)
 
     return measures
