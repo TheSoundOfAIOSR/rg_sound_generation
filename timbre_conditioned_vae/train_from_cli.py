@@ -8,7 +8,7 @@ if __name__ == "__main__":
 
     conf.use_encoder = True
     conf.use_max_pool = False
-    conf.is_variational = False
+    conf.is_variational = True
     conf.use_heuristics = False
     conf.deep_decoder = False
     conf.add_z_to_decoder_blocks = True

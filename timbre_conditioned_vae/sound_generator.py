@@ -3,12 +3,12 @@ import numpy as np
 
 
 class SoundGenerator:
-    def __init__(self, config_path, data_handler_type, batch_size=8):
+    def __init__(self, config_path, data_handler_type):
         print("Initializing SoundGenerator")
         self.config_path = config_path
-        self.batch_size = batch_size
         self.conf = localconfig.LocalConfig(data_handler_type)
         self.conf.load_config_from_file(config_path)
+        self.conf.batch_size = 1
         self.model = None
         assert data_handler_type == self.conf.data_handler_type, "Data handler type " \
                                                                  "does not match saved config"
@@ -28,11 +28,6 @@ class SoundGenerator:
         pitch = data.get("pitch") or 60
         heuristics = data.get("heuristics")
         predict_single = data.get("predict_single") or True
-
-        if predict_single:
-            self.conf.batch_size = 1
-        else:
-            self.conf.batch_size = self.batch_size
 
     def load_model(self, checkpoint_path):
         print("Creating model from config")

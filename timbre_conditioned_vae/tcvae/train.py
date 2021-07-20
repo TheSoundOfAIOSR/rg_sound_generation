@@ -112,12 +112,12 @@ def write_step(name, epoch, step, conf, step_losses):
 
 
 def set_kl_weight(epoch, conf: LocalConfig):
-    if not conf.use_kl_anneal:
-        return
-    if epoch >= conf.kl_anneal_start:
-        conf.kl_weight += conf.kl_anneal_factor
-        conf.kl_weight = min(conf.kl_weight, conf.kl_weight_max)
-        print(f"KL Weight set to {conf.kl_weight}")
+    if conf.use_kl_anneal:
+        print(f"KL weight = {conf.kl_weight}")
+        if epoch >= conf.kl_anneal_start:
+            conf.kl_weight += conf.kl_anneal_factor
+            conf.kl_weight = min(conf.kl_weight, conf.kl_weight_max)
+            print(f"KL Weight updated to {conf.kl_weight}")
 
 
 def train(conf: LocalConfig):

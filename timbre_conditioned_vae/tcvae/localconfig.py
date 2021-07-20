@@ -11,7 +11,8 @@ class LocalConfig:
     model_name = "VAE"
     run_name = "Default"
     best_model_path = None
-    use_encoder = False
+    use_encoder = True
+    use_phase = False
     latent_dim = 16
     use_max_pool = True
     strides = 2
@@ -54,6 +55,14 @@ class LocalConfig:
     log_steps = True
     step_log_interval = 100
     is_variational = True
+    using_mt = True
+    mt_model_ffn_in_encoder = True
+    mt_outputs = (
+        ("f0_shifts", {"enabled": True, "indices": [0, 32], "channels": 1}),
+        ("h_freq_shifts", {"enabled": True, "indices": [32, 96], "channels": 128}),
+        ("mag_env", {"enabled": True, "indices": [96, 128], "channels": 1}),
+        ("h_mag_dist", {"enabled": True, "indices": [128, 192], "channels": 128})
+    )
     use_kl_anneal = False
     kl_weight = 1.
     kl_weight_max = 1.
@@ -63,7 +72,6 @@ class LocalConfig:
     st_var = (2.0 ** (1.0 / 12.0) - 1.0)
     db_limit = -120
     encoder_type = "2d" # or "1d"
-    same_kernels_in_1d = True
     decoder_type = "cnn"
     freq_bands = {
         "bass": [60, 270],
@@ -82,11 +90,11 @@ class LocalConfig:
             cls._instance = super(LocalConfig, cls).__new__(cls)
         return cls._instance
 
-    def __init__(self, data_handler_type="none"):
+    def __init__(self, data_handler_type="data_handler"):
         self.set_data_handler_by_type(data_handler_type)
 
     def set_data_handler_by_type(self, data_handler_type: str):
-        assert data_handler_type in ["data_handler", "simple_data_handler", "none"]
+        assert data_handler_type in ["data_handler", "simple_data_handler"]
         self.data_handler_type = data_handler_type
         if data_handler_type == "data_handler":
             self.data_handler = DataHandler()
