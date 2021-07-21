@@ -10,51 +10,40 @@ from .localconfig import LocalConfig
 warnings.simplefilter("ignore")
 
 
-def _batch(batch):
-    note_number = batch["note_number"]
-    velocity = batch["velocity"]
-    h = batch["h"]
-    mask = batch["mask"]
-    measures = batch["measures"]
-    return note_number, velocity, h, mask, measures
+def _step(_model, inputs, conf):
+    # model_input = [note_number, velocity]
+    # if conf.use_heuristics:
+    #     model_input += [measures]
+    # if conf.use_encoder:
+    #     model_input = [h] + model_input
+    # if conf.use_encoder and conf.is_variational:
+    #     reconstruction, z_mean, z_log_var = _model(model_input)
+    #     # Note this is weighted kl loss as kl_loss function applies the weight
+    #     _kl_loss = kl_loss(z_mean, z_log_var, conf)
+    # else:
+    #     reconstruction = _model(model_input)
+    #     _kl_loss = 0.0
 
-
-def _step(_model, h, mask, note_number, velocity, measures, conf):
-    model_input = [note_number, velocity]
-    if conf.use_heuristics:
-        model_input += [measures]
-    if conf.use_encoder:
-        model_input = [h] + model_input
-    if conf.use_encoder and conf.is_variational:
-        reconstruction, z_mean, z_log_var = _model(model_input)
-        # Note this is weighted kl loss as kl_loss function applies the weight
-        _kl_loss = kl_loss(z_mean, z_log_var, conf)
-    else:
-        reconstruction = _model(model_input)
-        _kl_loss = 0.0
-
-    losses = reconstruction_loss(h, reconstruction, mask, conf)
-    losses["kl_loss"] = _kl_loss
-    losses["loss"] += _kl_loss
+    outputs = _model(inputs)
+    losses = reconstruction_loss(inputs, outputs, conf)
+    # losses["kl_loss"] = _kl_loss
+    # losses["loss"] += _kl_loss
 
     return losses
 
 
 @tf.function
 def validation_step(_model, batch, conf):
-    note_number, velocity, h, mask, measures = _batch(batch)
-
-    losses = _step(_model, h, mask, note_number, velocity, measures, conf)
+    losses = _step(_model, batch, conf)
 
     return losses
 
 
 @tf.function
 def training_step(_model, optimizer, batch, conf):
-    note_number, velocity, h, mask, measures = _batch(batch)
 
     with tf.GradientTape() as tape:
-        losses = _step(_model, h, mask, note_number, velocity, measures, conf)
+        losses = _step(_model, batch, conf)
 
     _model_grads = tape.gradient(losses["loss"], _model.trainable_weights)
     optimizer.apply_gradients(zip(_model_grads, _model.trainable_weights))

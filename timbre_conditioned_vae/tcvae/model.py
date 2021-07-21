@@ -365,15 +365,15 @@ def create_vae(conf: LocalConfig):
     return model
 
 
-def mt_encoder_inputs(conf: LocalConfig):
-    time_steps = conf.row_dim
-    num_features = conf.col_dim
-
-    f0_shifts = tf.keras.layers.Input(shape=(time_steps, 1), name="f0_shifts")
-    h_freq_shifts = tf.keras.layers.Input(shape=(time_steps, num_features), name="h_freq_shifts")
-    mag_env = tf.keras.layers.Input(shape=(time_steps, 1), name="mag_env")
-    h_mag_dist = tf.keras.layers.Input(shape=(time_steps, num_features), name="h_mag_dist")
-    return f0_shifts, h_freq_shifts, mag_env, h_mag_dist
+# def mt_encoder_inputs(conf: LocalConfig):
+#     time_steps = conf.row_dim
+#     num_features = conf.col_dim
+#
+#     f0_shifts = tf.keras.layers.Input(shape=(time_steps, 1), name="f0_shifts")
+#     h_freq_shifts = tf.keras.layers.Input(shape=(time_steps, num_features), name="h_freq_shifts")
+#     mag_env = tf.keras.layers.Input(shape=(time_steps, 1), name="mag_env")
+#     h_mag_dist = tf.keras.layers.Input(shape=(time_steps, num_features), name="h_mag_dist")
+#     return f0_shifts, h_freq_shifts, mag_env, h_mag_dist
 
 
 def bn_act(inputs, name=None):
@@ -397,30 +397,29 @@ def conv_2d_encoder_block(inputs, filters, kernel, stride=1, use_act=True, name=
                                   strides=stride, name=name)(inputs)
 
 
-def ffn_block(inputs, num_repeats, conf: LocalConfig):
-    x = tf.keras.layers.Dense(conf.hidden_dim, activation="elu")(inputs)
+def ffn_block(inputs, num_repeats, hidden_dim):
+    x = tf.keras.layers.Dense(hidden_dim, activation="elu")(inputs)
     x = tf.keras.layers.LayerNormalization()(x)
 
     for i in range(0, num_repeats):
-        y = tf.keras.layers.Dense(conf.hidden_dim, activation="elu")(x)
+        y = tf.keras.layers.Dense(hidden_dim, activation="elu")(x)
         x = tf.keras.layers.Add()([x, y])
         x = tf.keras.layers.LayerNormalization()(x)
     return x
 
 
-def create_mt_encoder(conf: LocalConfig):
+def create_mt_encoder(inputs, conf: LocalConfig):
     if conf is None:
         conf = LocalConfig()
 
-    f0_shifts, h_freq_shifts, mag_env, h_mag_dist = mt_encoder_inputs(conf)
+    concat_inputs = []
+    for k, v in conf.mt_inputs.items():
+        if k in inputs:
+            filters = v["shape"][1]
+            out = conv_1d_encoder_block(inputs[k], filters, 5)
+            concat_inputs += [out]
 
-    f0_shifts_out = conv_1d_encoder_block(f0_shifts, 32, 5)
-    h_freq_shifts_out = conv_1d_encoder_block(h_freq_shifts, 64, 5)
-    mag_env_out = conv_1d_encoder_block(mag_env, 32, 5)
-    h_mag_dist_out = conv_1d_encoder_block(h_mag_dist, 64, 5)
-
-    concat = tf.keras.layers.concatenate(
-        [f0_shifts_out, h_freq_shifts_out, mag_env_out, h_mag_dist_out])
+    concat = tf.keras.layers.concatenate(concat_inputs)
     dense = tf.keras.layers.Dense(192, activation="elu")(concat)
     dense = tf.keras.layers.LayerNormalization()(dense)
     block_0 = tf.keras.layers.Lambda(lambda x: tf.expand_dims(x, axis=-1))(dense)
@@ -440,33 +439,25 @@ def create_mt_encoder(conf: LocalConfig):
     hidden = tf.keras.layers.Flatten()(wrapper["block_6"])
 
     if conf.mt_model_ffn_in_encoder:
-        hidden = ffn_block(hidden, 2, conf)
+        hidden = ffn_block(hidden, 2, conf.hidden_dim)
 
-    z = tf.keras.layers.Dense(conf.latent_dim, activation="relu", name="z_output")(hidden)
+    z = tf.keras.layers.Dense(conf.latent_dim, activation="linear", name="z_output")(hidden)
 
-    m = tf.keras.models.Model(
-        [f0_shifts, h_freq_shifts, mag_env, h_mag_dist],
-        z
-    )
+    m = tf.keras.models.Model(inputs, z)
     tf.keras.utils.plot_model(m, to_file="encoder.png", show_shapes=True)
     return m
 
 
-def create_mt_decoder(conf: LocalConfig):
+def create_mt_decoder(inputs, conf: LocalConfig):
     if conf is None:
         conf = LocalConfig()
-    z_input, note_number, velocity = decoder_inputs(conf)
-    inputs_list = [note_number, velocity]
 
-    if conf.use_encoder:
-        inputs_list = [z_input] + inputs_list
+    concat_inputs = []
+    for k, v in inputs.items():
+        concat_inputs += [v]
 
-    if conf.use_heuristics:
-        heuristic_measures = tf.keras.layers.Input(shape=(conf.num_measures,), name="measures")
-        inputs_list += [heuristic_measures]
-
-    inputs = tf.keras.layers.concatenate(inputs_list)
-    ffn_out = ffn_block(inputs, 2, conf)
+    concat_inputs = tf.keras.layers.concatenate(concat_inputs)
+    ffn_out = ffn_block(concat_inputs, 2, conf.hidden_dim)
     dense = tf.keras.layers.Dense(6144, activation="elu")(ffn_out)
     reshaped = tf.keras.layers.Reshape((16, 3, 128))(dense)
 
@@ -484,77 +475,115 @@ def create_mt_decoder(conf: LocalConfig):
             f, k, padding=conf.padding, name=f"decoder_conv_{i}",
             kernel_initializer=tf.initializers.glorot_uniform())(wrapper[f"up_out_{i}"])
         wrapper[f"bn_out_{i}"] = tf.keras.layers.BatchNormalization(name=f"decoder_bn_{i}")(wrapper[f"conv_out_{i}"])
-        wrapper[f"act_{i}"] = tf.keras.layers.Activation("relu", name=f"decoder_act_{i}")(wrapper[f"bn_out_{i}"])
-        wrapper[f"up_out_{i}"] = tf.keras.layers.Conv2D(1, 1, padding="same")(wrapper[f"up_out_{i}"])
+        wrapper[f"act_{i}"] = tf.keras.layers.Activation("elu", name=f"decoder_act_{i}")(wrapper[f"bn_out_{i}"])
+        # wrapper[f"up_out_{i}"] = tf.keras.layers.Conv2D(1, 1, padding="same")(wrapper[f"up_out_{i}"])
+        wrapper[f"up_out_{i}"] = tf.keras.layers.Dense(units=f)(wrapper[f"up_out_{i}"])
         wrapper[f"up_in_{i + 1}"] = tf.keras.layers.Add()([
             wrapper[f"act_{i}"], wrapper[f"up_out_{i}"]
         ])
 
-    final_conv_out = wrapper[f"up_in_{len(filters)}"]
-    final_conv_out = tf.keras.layers.Conv2D(1, 5, padding=conf.padding, activation="elu")(final_conv_out)
+    shared_out = wrapper[f"up_in_{len(filters)}"]
 
-    model_outputs = []
+    outputs = {}
 
-    for k, v in conf.mt_outputs:
+    for k, v in conf.mt_outputs.items():
         if v["enabled"]:
-            units = abs(v["indices"][1] - v["indices"][0])
-            split = tf.keras.layers.Lambda(lambda y: y[..., v["indices"][0]:v["indices"][1], :])(final_conv_out)
-            squeezed = tf.keras.layers.Lambda(lambda y: tf.squeeze(y, axis=-1), name=f"{k}_squeeze")(split)
-            fc = tf.keras.layers.Dense(units, activation="elu", name=f"{k}_fc")(squeezed)
-            conv_1 = conv_1d_encoder_block(fc, 32, 5)
-            conv_2 = conv_1d_encoder_block(conv_1, v["channels"], 5, use_act=False, name=f"{k}_out")
-            model_outputs.append(conv_2)
+            time_steps = v["shape"][0]
+
+            filters = [v["shape"][2]] * 4
+            kernels = [5] * 4
+            filters_kernels = iter(zip(filters, kernels))
+
+            task_in = tf.keras.layers.Permute(dims=(1, 3, 2))(shared_out)
+            task_in = tf.keras.layers.Dense(units=v["shape"][1])(task_in)
+            task_in = tf.keras.layers.Permute(dims=(1, 3, 2))(task_in)
+            task_in = tf.keras.layers.Dense(units=v["shape"][2])(task_in)
+
+            wrapper = {f"up_out_0": task_in}
+
+            for i in range(0, len(filters)):
+                _f, _k = next(filters_kernels)
+                wrapper[f"conv_out_{i}"] = tf.keras.layers.Conv2D(
+                    _f, _k, padding=conf.padding, name=f"{k}_decoder_conv_{i}",
+                    kernel_initializer=tf.initializers.glorot_uniform())(wrapper[f"up_out_{i}"])
+                wrapper[f"bn_out_{i}"] = tf.keras.layers.BatchNormalization(name=f"{k}_decoder_bn_{i}")(wrapper[f"conv_out_{i}"])
+                wrapper[f"act_{i}"] = tf.keras.layers.Activation("elu", name=f"{k}_decoder_act_{i}")(wrapper[f"bn_out_{i}"])
+                # wrapper[f"up_out_{i}"] = tf.keras.layers.Dense(units=f)(wrapper[f"up_out_{i}"])
+                wrapper[f"up_out_{i + 1}"] = tf.keras.layers.Add()([
+                    wrapper[f"act_{i}"], wrapper[f"up_out_{i}"]
+                ])
+
+            conv2d_out = wrapper[f"up_out_{len(filters)}"]
+            conv2d_out = tf.keras.layers.Conv2D(1, 1, padding="same")(conv2d_out)
+            task_out = tf.keras.layers.Lambda(lambda y: tf.squeeze(y, axis=-1))(conv2d_out)
+            task_out = ffn_block(task_out, 2, v["shape"][1])
+            task_out = tf.keras.layers.Dense(units=v["channels"])(task_out)
+            outputs[k] = task_out
 
     m = tf.keras.models.Model(
-        inputs_list, model_outputs
+        inputs, outputs
     )
     tf.keras.utils.plot_model(m, to_file="decoder.png", show_shapes=True)
     return m
 
 
-def create_mt_vae(conf: LocalConfig):
-    conf = LocalConfig() if conf is None else conf
-    if conf.hidden_dim < conf.latent_dim and conf.check_decoder_hidden_dim:
-        conf.hidden_dim = max(conf.hidden_dim, conf.latent_dim)
-        print("Changing hidden dim to match latent dim")
+class MtVae(tf.keras.Model):
+    def __init__(self, conf):
+        super(MtVae, self).__init__()
+        self.conf = LocalConfig() if conf is None else conf
+        self.encoder = None
+        self.decoder = None
 
-    note_number = tf.keras.layers.Input(shape=(conf.num_pitches, ), name="note_number")
-    velocity = tf.keras.layers.Input(shape=(conf.num_velocities, ), name="velocity")
+    def build(self, input_shape):
+        conf = self.conf
 
-    encoder_input = None
-    decoder_input = [note_number, velocity]
-    encoder_output = None
+        encoder_inputs = {}
+        decoder_inputs = {}
 
-    if conf.use_encoder:
-        f0_shifts, h_freq_shifts, mag_env, h_mag_dist = mt_encoder_inputs(conf)
-        encoder_input = [f0_shifts, h_freq_shifts, mag_env, h_mag_dist]
-        encoder = create_mt_encoder(conf)
-        print("Encoder created")
-        encoder_output = encoder(encoder_input)
-        decoder_input = [encoder_output] + decoder_input
+        if conf.use_encoder:
+            for k, v in conf.mt_inputs.items():
+                if k in input_shape["data"]:
+                    shape = input_shape["data"][k]
+                    encoder_inputs[k] = tf.keras.layers.Input(shape=shape[1:])
 
-    if conf.use_heuristics:
-        measures = tf.keras.layers.Input(shape=(conf.num_measures, ), name="measures")
-        decoder_input += [measures]
+            self.encoder = create_mt_encoder(encoder_inputs, conf)
+            decoder_inputs["z"] = tf.keras.layers.Input(
+                shape=(conf.latent_dim,), name="z")
 
-    decoder = create_mt_decoder(conf)
-    print("Decoder created")
-    decoder_output = decoder(decoder_input)
+        if "note_number" in input_shape:
+            decoder_inputs["note_number"] = tf.keras.layers.Input(
+                shape=(conf.num_pitches,), name="note_number")
 
-    vae_inputs = encoder_input + decoder_input
-    vae_outputs = [encoder_output] + decoder_output
+        if "velocity" in input_shape:
+            decoder_inputs["velocity"] = tf.keras.layers.Input(
+                shape=(conf.num_velocities,), name="velocity")
 
-    m = tf.keras.models.Model(
-        vae_inputs,
-        vae_outputs
-    )
-    return m
+        if conf.use_heuristics:
+            if "measures" in input_shape:
+                decoder_inputs["measures"] = tf.keras.layers.Input(
+                    shape=(conf.num_measures,), name="measures")
+
+        self.decoder = create_mt_decoder(decoder_inputs, conf)
+
+    def call(self, inputs, training=None, mask=None):
+        decoder_inputs = inputs.copy()
+        if self.encoder is not None:
+            encoder_outputs = self.encoder(inputs)
+            decoder_inputs["z"] = encoder_outputs
+
+        decoder_outputs = self.decoder(decoder_inputs)
+
+        return decoder_outputs
+
+    def get_config(self):
+        pass
 
 
 def get_model_from_config(conf):
     if conf.use_encoder:
         print("Creating Auto Encoder")
-        return create_vae(conf)
+        mt_vae = MtVae(conf)
+        return mt_vae
     print("Creating Decoder")
     if conf.decoder_type == "rnn":
         return create_rnn_decoder(conf)

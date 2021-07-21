@@ -2,12 +2,16 @@ import tensorflow as tf
 from .localconfig import LocalConfig
 
 
-def reconstruction_loss(h_true, h_pred, mask, conf):
+def reconstruction_loss(inputs, outputs, conf):
+    mask = inputs["mask"]
+    data_true = inputs["data"]
+    data_pred = outputs
+
     normalized_data_true = \
-        conf.data_handler.output_transform(h_true, pred=False)
+        conf.data_handler.output_transform(data_true, pred=False)
 
     normalized_data_pred = \
-        conf.data_handler.output_transform(h_pred, pred=True)
+        conf.data_handler.output_transform(data_pred, pred=True)
 
     losses = conf.data_handler.loss(
         normalized_data_true, normalized_data_pred, mask)
