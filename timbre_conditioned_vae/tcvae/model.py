@@ -552,14 +552,14 @@ class MtVae(tf.keras.Model):
             decoder_inputs["z"] = tf.keras.layers.Input(
                 shape=(conf.latent_dim,), name="z")
 
-        if "note_number" in input_shape:
-            decoder_inputs["note_number"] = tf.keras.layers.Input(
-                shape=(conf.num_pitches,), name="note_number")
-
-        if "velocity" in input_shape:
-            decoder_inputs["velocity"] = tf.keras.layers.Input(
-                shape=(conf.num_velocities,), name="velocity")
-
+        if conf.use_note_number:
+            if "note_number" in input_shape:
+                decoder_inputs["note_number"] = tf.keras.layers.Input(
+                    shape=(conf.num_pitches,), name="note_number")
+        if conf.use_velocity:
+            if "velocity" in input_shape:
+                decoder_inputs["velocity"] = tf.keras.layers.Input(
+                    shape=(conf.num_velocities,), name="velocity")
         if conf.use_heuristics:
             if "measures" in input_shape:
                 decoder_inputs["measures"] = tf.keras.layers.Input(

@@ -17,6 +17,8 @@ class LocalConfig:
     use_max_pool = True
     strides = 2
     use_lstm_in_encoder = True
+    use_note_number = True
+    use_velocity = True
     use_heuristics = True
     hidden_dim = 256
     default_k = 3
