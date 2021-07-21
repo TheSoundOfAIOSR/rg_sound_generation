@@ -182,7 +182,7 @@ def train(conf: LocalConfig):
             print(f"Best loss updated to {best_loss: .4f}, saving model weights")
             model_path = os.path.join(conf.checkpoints_dir,
                                       f"{epoch}_{conf.model_name}_{best_loss:.4}.h5")
-            _model.save(model_path)
+            _model.save_weights(model_path)
             print(f"Updated model weights saved at {model_path}")
             conf.best_model_path = model_path
         else:

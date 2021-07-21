@@ -109,12 +109,9 @@ class LocalConfig:
         if data_handler_type == "data_handler":
             self.data_handler = DataHandler()
             self.data_handler_properties = [
+                "use_phase",
                 "weight_type",
                 "mag_loss_type",
-                "f0_weight",
-                "mag_env_weight",
-                "h_freq_shifts_weight",
-                "h_mag_dist_weight",
                 "mag_scale_fn"
             ]
         elif data_handler_type == "simple_data_handler":

@@ -2,9 +2,12 @@ import tensorflow as tf
 from .localconfig import LocalConfig
 
 
-def reconstruction_loss(inputs, outputs, conf):
+def reconstruction_loss(inputs, outputs, conf: LocalConfig):
     mask = inputs["mask"]
-    data_true = inputs["data"]
+    data_true = {}
+    for k, v in conf.mt_outputs.items():
+        if k in inputs:
+            data_true[k] = inputs[k]
     data_pred = outputs
 
     normalized_data_true = \

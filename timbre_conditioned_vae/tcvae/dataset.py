@@ -72,13 +72,14 @@ def map_features(features):
 
     note_number = tf.one_hot(note_number - conf.starting_midi_pitch, depth=conf.num_pitches)
 
-    return {
-        "data": normalized_data,
+    data = {
         "mask": mask,
         "note_number": tf.squeeze(note_number),
         "velocity": tf.squeeze(velocity),
         "measures": measures,
     }
+    data.update(normalized_data)
+    return data
 
 
 def get_dataset(conf: LocalConfig):

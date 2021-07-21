@@ -542,8 +542,8 @@ class MtVae(tf.keras.Model):
 
         if conf.use_encoder:
             for k, v in conf.mt_inputs.items():
-                if k in input_shape["data"]:
-                    shape = input_shape["data"][k]
+                if k in input_shape:
+                    shape = input_shape[k]
                     encoder_inputs[k] = tf.keras.layers.Input(shape=shape[1:])
 
             self.encoder = create_mt_encoder(encoder_inputs, conf)
