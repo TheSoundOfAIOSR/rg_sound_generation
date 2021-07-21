@@ -433,7 +433,7 @@ def create_mt_encoder(inputs, conf: LocalConfig):
         else:
             conv_out = conv_2d_encoder_block(wrapper[f"block_{i}"], filters[i], 5, stride=2)
             wrapper[f"skip_{i + 1}"] = conv_2d_encoder_block(wrapper[f"block_{i - 1}"],
-                                                             1, 1, stride=4, use_act=False)
+                                                             filters[i], 1, stride=4, use_act=False)
             wrapper[f"block_{i + 1}"] = tf.keras.layers.Add()([conv_out, wrapper[f"skip_{i + 1}"]])
 
     hidden = tf.keras.layers.Flatten()(wrapper["block_6"])
@@ -476,7 +476,7 @@ def create_mt_decoder(inputs, conf: LocalConfig):
             kernel_initializer=tf.initializers.glorot_uniform())(wrapper[f"up_out_{i}"])
         wrapper[f"bn_out_{i}"] = tf.keras.layers.BatchNormalization(name=f"decoder_bn_{i}")(wrapper[f"conv_out_{i}"])
         wrapper[f"act_{i}"] = tf.keras.layers.Activation("elu", name=f"decoder_act_{i}")(wrapper[f"bn_out_{i}"])
-        # wrapper[f"up_out_{i}"] = tf.keras.layers.Conv2D(1, 1, padding="same")(wrapper[f"up_out_{i}"])
+        # wrapper[f"up_out_{i}"] = tf.keras.layers.Conv2D(f, 1, padding="same")(wrapper[f"up_out_{i}"])
         wrapper[f"up_out_{i}"] = tf.keras.layers.Dense(units=f)(wrapper[f"up_out_{i}"])
         wrapper[f"up_in_{i + 1}"] = tf.keras.layers.Add()([
             wrapper[f"act_{i}"], wrapper[f"up_out_{i}"]
@@ -547,6 +547,8 @@ class MtVae(tf.keras.Model):
                     encoder_inputs[k] = tf.keras.layers.Input(shape=shape[1:])
 
             self.encoder = create_mt_encoder(encoder_inputs, conf)
+            if conf.print_model_summary:
+                print(self.encoder.summary())
             decoder_inputs["z"] = tf.keras.layers.Input(
                 shape=(conf.latent_dim,), name="z")
 
@@ -564,6 +566,8 @@ class MtVae(tf.keras.Model):
                     shape=(conf.num_measures,), name="measures")
 
         self.decoder = create_mt_decoder(decoder_inputs, conf)
+        if conf.print_model_summary:
+            print(self.decoder.summary())
 
     def call(self, inputs, training=None, mask=None):
         decoder_inputs = inputs.copy()

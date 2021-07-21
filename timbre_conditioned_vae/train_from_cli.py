@@ -16,7 +16,7 @@ if __name__ == "__main__":
     conf.lr_plateau = 4
     conf.model_name = "test"
     conf.early_stopping = 10
-    conf.print_model_summary = False
+    conf.print_model_summary = True
     # Data Handler
 
     conf.num_train_steps = 5
