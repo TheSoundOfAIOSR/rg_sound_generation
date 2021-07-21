@@ -1,6 +1,7 @@
 import asyncio
 import logging
 from rgws.interface import WebsocketServer
+from sound_generator import SoundGenerator
 
 
 logging.basicConfig(level=logging.DEBUG)
@@ -10,6 +11,7 @@ class SGServerInterface(WebsocketServer):
     def __init__(self, **kwargs):
         super(SGServerInterface, self).__init__(**kwargs)
         self.state = "Initializing"
+        self.generator = SoundGenerator()
         self._register(self.get_prediction)
         self._register(self.setup_model)
         self._register(self.status)
@@ -22,11 +24,12 @@ class SGServerInterface(WebsocketServer):
 
     async def get_prediction(self, data):
         self.state = "Processing"
-        resp, success = get_prediction(data)
-        yield {"resp": resp.tolist(), "success": success}
+        resp, success = self.generator.get_prediction(data)
+        yield {"resp": resp, "success": success}
         self.state = "Processed"
 
     async def setup_model(self):
+        self.generator.load_model()
         yield {"resp": True}
 
     async def status(self):
