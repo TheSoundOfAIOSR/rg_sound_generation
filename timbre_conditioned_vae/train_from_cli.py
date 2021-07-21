@@ -23,6 +23,10 @@ if __name__ == "__main__":
     conf.num_valid_steps = 3
     conf.epochs = 1
 
+    conf.mt_outputs["mag_env"]["enabled"] = False
+    conf.mt_outputs["f0_shifts"]["enabled"] = False
+    conf.mt_outputs["h_mag_dist"]["enabled"] = False
+    conf.mt_outputs["h_phase_diff"]["enabled"] = False
     # conf.save_config()
     # conf.load_config_from_file("checkpoints/Default_test.json")
 

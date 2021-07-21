@@ -469,7 +469,7 @@ class DataHandler:
                 h_freq_shifts_loss) / tf.math.reduce_sum(f_w1)
 
         # compute magnitudes loss
-        if "h_freq_shifts" in normalized_data_pred and "h_freq_shifts" in normalized_data_pred:
+        if "mag_env" in normalized_data_pred and "h_mag_dist" in normalized_data_pred:
             mag_env_pred = normalized_data_pred["mag_env"]
             h_mag_dist_pred = normalized_data_pred["h_mag_dist"]
 
