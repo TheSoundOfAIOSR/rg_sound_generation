@@ -20,6 +20,13 @@ def exp_sigmoid(x, exponent=10.0, max_value=2.0, threshold=0.0):
 
 
 class SimpleDataHandler:
+    _instance = None
+
+    def __new__(cls, *args, **kwargs):
+        if cls._instance is None:
+            cls._instance = super(SimpleDataHandler, cls).__new__(cls, *args, **kwargs)
+        return cls._instance
+
     def __init__(self,
                  sample_rate=16000,
                  frame_step=64,
@@ -153,6 +160,13 @@ class SimpleDataHandler:
 
 
 class DataHandler:
+    _instance = None
+
+    def __new__(cls, *args, **kwargs):
+        if cls._instance is None:
+            cls._instance = super(DataHandler, cls).__new__(cls, *args, **kwargs)
+        return cls._instance
+
     def __init__(self,
                  fix_pitch=True,
                  normalize_mag=False,

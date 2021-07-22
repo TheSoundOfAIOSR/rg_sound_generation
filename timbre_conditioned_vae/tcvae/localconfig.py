@@ -104,7 +104,8 @@ class LocalConfig:
         return cls._instance
 
     def __init__(self, data_handler_type="data_handler"):
-        self.set_data_handler_by_type(data_handler_type)
+        if self.data_handler is None:
+            self.set_data_handler_by_type(data_handler_type)
 
     def set_data_handler_by_type(self, data_handler_type: str):
         assert data_handler_type in ["data_handler", "simple_data_handler"]

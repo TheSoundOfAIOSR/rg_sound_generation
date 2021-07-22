@@ -586,7 +586,7 @@ def create_mt_decoder(inputs, conf: LocalConfig):
 
 
 class MtVae(tf.keras.Model):
-    def __init__(self, conf):
+    def __init__(self, conf: LocalConfig):
         super(MtVae, self).__init__()
         self.conf = LocalConfig() if conf is None else conf
         self.encoder = None

@@ -19,16 +19,18 @@ if __name__ == "__main__":
     conf.print_model_summary = True
     # Data Handler
 
-    conf.num_train_steps = None
-    conf.num_valid_steps = None
-    conf.epochs = 10
-    conf.simple = True
+    conf.num_train_steps = 2
+    conf.num_valid_steps = 2
+    conf.epochs = 1
+    conf.simple = False
 
-    conf.mt_outputs["mag_env"]["enabled"] = False
-    conf.mt_outputs["h_freq_shifts"]["enabled"] = True
+    conf.mt_outputs["mag_env"]["enabled"] = True
+    conf.mt_outputs["h_freq_shifts"]["enabled"] = False
     conf.mt_outputs["f0_shifts"]["enabled"] = False
-    conf.mt_outputs["h_mag_dist"]["enabled"] = False
+    conf.mt_outputs["h_mag_dist"]["enabled"] = True
     conf.mt_outputs["h_phase_diff"]["enabled"] = False
+
+    conf.data_handler.losses_weights["mag_env_loss"] = 0
     # conf.save_config()
     # conf.load_config_from_file("checkpoints/Default_test.json")
 
