@@ -605,7 +605,7 @@ class MtVae(tf.keras.Model):
                     encoder_inputs[k] = tf.keras.layers.Input(shape=shape[1:])
 
             self.encoder = create_mt_encoder(encoder_inputs, conf) \
-                if not conf.simple else simple_mt_encoder(encoder_inputs, conf)
+                if not conf.simple_encoder else simple_mt_encoder(encoder_inputs, conf)
             if conf.print_model_summary:
                 print(self.encoder.summary())
             decoder_inputs["z"] = tf.keras.layers.Input(
@@ -625,7 +625,7 @@ class MtVae(tf.keras.Model):
                     shape=(conf.num_measures,), name="measures")
 
         self.decoder = create_mt_decoder(decoder_inputs, conf) \
-            if not conf.simple else simple_mt_decoder(decoder_inputs, conf)
+            if not conf.simple_decoder else simple_mt_decoder(decoder_inputs, conf)
         if conf.print_model_summary:
             print(self.decoder.summary())
 
