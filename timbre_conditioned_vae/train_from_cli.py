@@ -8,10 +8,10 @@ if __name__ == "__main__":
 
     conf.use_encoder = True
     conf.use_heuristics = False
-    conf.latent_dim = 64
+    conf.latent_dim = 16
     # Training
-    conf.batch_size = 2
-    conf.learning_rate = 2e-4
+    conf.batch_size = 4
+    conf.learning_rate = 2e-3
     conf.lr_factor = 0.5
     conf.lr_plateau = 4
     conf.model_name = "test"
@@ -19,11 +19,13 @@ if __name__ == "__main__":
     conf.print_model_summary = True
     # Data Handler
 
-    conf.num_train_steps = 5
-    conf.num_valid_steps = 3
-    conf.epochs = 1
+    conf.num_train_steps = None
+    conf.num_valid_steps = None
+    conf.epochs = 10
+    conf.simple = True
 
     conf.mt_outputs["mag_env"]["enabled"] = False
+    conf.mt_outputs["h_freq_shifts"]["enabled"] = True
     conf.mt_outputs["f0_shifts"]["enabled"] = False
     conf.mt_outputs["h_mag_dist"]["enabled"] = False
     conf.mt_outputs["h_phase_diff"]["enabled"] = False
