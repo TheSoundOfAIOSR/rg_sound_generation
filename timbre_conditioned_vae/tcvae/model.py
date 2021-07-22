@@ -187,6 +187,13 @@ def reshape_z(block, z_input, conf: LocalConfig):
     current_z = tf.keras.layers.Reshape(target_shape=target_shape)(current_z)
     return current_z
 
+def embedding_layers(note_number, velocity, conf: LocalConfig):
+    pitch_emb = tf.keras.layers.Embedding(conf.num_pitches, conf.pitch_emb_size, input_length=1, name="pitch_emb")(note_number)
+    velocity_emb = tf.keras.layers.Embedding(conf.num_velocities, conf.velocity_emb_size, input_length=1, name="vel_emb")(velocity)
+    pitch_emb = tf.keras.layers.Flatten()(pitch_emb)
+    velocity_emb = tf.keras.layers.Flatten()(velocity_emb)
+    return pitch_emb, velocity_emb
+
 
 def create_decoder(conf: LocalConfig):
     if conf is None:
@@ -195,9 +202,17 @@ def create_decoder(conf: LocalConfig):
     heuristic_measures = tf.keras.layers.Input(shape=(conf.num_measures,), name="measures")
 
     if conf.use_encoder:
-        inputs_list = [z_input, note_number, velocity]
+        if conf.use_embeddings:
+            pitch_emb, vel_emb = embedding_layers(note_number, velocity)
+            inputs_list = [z_input, pitch_emb, vel_emb]
+        else:
+            inputs_list = [z_input, note_number, velocity]
     else:
-        inputs_list = [note_number, velocity]
+        if conf.use_embeddings:
+            pitch_emb, vel_emb = embedding_layers(note_number, velocity)
+            inputs_list = [pitch_emb, vel_emb]
+        else:
+            inputs_list = [note_number, velocity]
 
     if conf.use_heuristics:
         inputs_list += [heuristic_measures]
@@ -283,7 +298,11 @@ def create_rnn_decoder(conf: LocalConfig):
     note_number = tf.keras.layers.Input(shape=(conf.num_pitches,), name="note_number")
     velocity = tf.keras.layers.Input(shape=(conf.num_velocities,), name="velocity")
     heuristic_measures = tf.keras.layers.Input(shape=(conf.num_measures,), name="measures")
-    inputs_list = [note_number, velocity]
+    if conf.use_embeddings:
+        pitch_emb, vel_emb = embedding_layers(note_number, velocity)
+        inputs_list = [pitch_emb, vel_emb]
+    else:
+        inputs_list = [note_number, velocity]
 
     if conf.use_heuristics:
         inputs_list += [heuristic_measures]
@@ -456,7 +475,11 @@ def create_mt_decoder(conf: LocalConfig):
     if conf is None:
         conf = LocalConfig()
     z_input, note_number, velocity = decoder_inputs(conf)
-    inputs_list = [note_number, velocity]
+    if conf.use_embeddings:
+        pitch_emb, vel_emb = embedding_layers(note_number, velocity)
+        inputs_list = [pitch_emb, vel_emb]
+    else:
+        inputs_list = [note_number, velocity]
 
     if conf.use_encoder:
         inputs_list = [z_input] + inputs_list
