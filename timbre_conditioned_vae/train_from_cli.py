@@ -6,8 +6,8 @@ from tcvae import localconfig, train
 if __name__ == "__main__":
     conf = localconfig.LocalConfig("data_handler")
 
-    conf.use_encoder = True
-    conf.use_heuristics = False
+    conf.use_encoder = False
+    conf.use_heuristics = True
     conf.latent_dim = 16
     # Training
     conf.batch_size = 4
@@ -23,15 +23,15 @@ if __name__ == "__main__":
     conf.num_valid_steps = 2
     conf.epochs = 1
     conf.simple_encoder = False
-    conf.simple_decoder = True
+    conf.simple_decoder = False
 
     conf.mt_outputs["mag_env"]["enabled"] = True
-    conf.mt_outputs["h_freq_shifts"]["enabled"] = False
-    conf.mt_outputs["f0_shifts"]["enabled"] = False
+    conf.mt_outputs["h_freq_shifts"]["enabled"] = True
+    conf.mt_outputs["f0_shifts"]["enabled"] = True
     conf.mt_outputs["h_mag_dist"]["enabled"] = True
     conf.mt_outputs["h_phase_diff"]["enabled"] = False
 
-    conf.data_handler.losses_weights["mag_env_loss"] = 0
+    # conf.data_handler.losses_weights["mag_env_loss"] = 0
     # conf.save_config()
     # conf.load_config_from_file("checkpoints/Default_test.json")
 

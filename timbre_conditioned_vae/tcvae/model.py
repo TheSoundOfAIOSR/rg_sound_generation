@@ -441,7 +441,7 @@ def create_mt_encoder(inputs, conf: LocalConfig):
     if conf.mt_model_ffn_in_encoder:
         hidden = ffn_block(hidden, 2, conf.hidden_dim)
 
-    z = tf.keras.layers.Dense(conf.latent_dim, activation="linear", name="z_output")(hidden)
+    z = tf.keras.layers.Dense(conf.latent_dim, activation="sigmoid", name="z_output")(hidden)
 
     m = tf.keras.models.Model(inputs, z)
     tf.keras.utils.plot_model(m, to_file="encoder.png", show_shapes=True)
@@ -471,7 +471,7 @@ def simple_mt_encoder(inputs, conf: LocalConfig):
         tf.keras.layers.LSTM(64, activation="tanh", recurrent_activation="sigmoid",
                              return_sequences=False, dropout=conf.lstm_dropout,
                              recurrent_dropout=0, unroll=False, use_bias=True))(lstm)
-    z = tf.keras.layers.Dense(conf.latent_dim, activation="linear", name="z_output")(lstm)
+    z = tf.keras.layers.Dense(conf.latent_dim, activation="sigmoid", name="z_output")(lstm)
     m = tf.keras.models.Model(inputs, z)
     tf.keras.utils.plot_model(m, to_file="encoder.png", show_shapes=True)
     return m
@@ -644,11 +644,10 @@ class MtVae(tf.keras.Model):
 
 
 def get_model_from_config(conf):
-    if conf.use_encoder:
-        print("Creating Auto Encoder")
-        mt_vae = MtVae(conf)
-        return mt_vae
-    print("Creating Decoder")
-    if conf.decoder_type == "rnn":
-        return create_rnn_decoder(conf)
-    return create_decoder(conf)
+    print("Creating Auto Encoder")
+    mt_vae = MtVae(conf)
+    return mt_vae
+    # print("Creating Decoder")
+    # if conf.decoder_type == "rnn":
+    #     return create_rnn_decoder(conf)
+    # return create_decoder(conf)
