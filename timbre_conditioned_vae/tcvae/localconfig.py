@@ -18,6 +18,7 @@ class LocalConfig:
     strides = 2
     use_lstm_in_encoder = True
     use_heuristics = True
+    use_embeddings = False
     hidden_dim = 256
     default_k = 3
     deep_decoder = False
@@ -35,6 +36,8 @@ class LocalConfig:
     starting_midi_pitch = 40
     num_pitches = 49
     num_velocities = 5
+    pitch_emb_size = 16
+    velocity_emb_size = 4
     max_num_harmonics = 98
     row_dim = 1024
     col_dim = 128
