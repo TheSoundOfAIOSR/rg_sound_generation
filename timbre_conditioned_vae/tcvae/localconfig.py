@@ -71,10 +71,10 @@ class LocalConfig:
     }
     mt_outputs = {
         "f0_shifts": {"enabled": True, "shape": (row_dim, 64, 16), "channels": 1},
-        "h_freq_shifts": {"enabled": True, "shape": (row_dim, 128, 16), "channels": 128},
+        "h_freq_shifts": {"enabled": True, "shape": (row_dim, 110, 16), "channels": 110},
         "mag_env": {"enabled": True, "shape": (row_dim, 64, 16), "channels": 1},
-        "h_mag_dist": {"enabled": True, "shape": (row_dim, 128, 16), "channels": 128},
-        "h_phase_diff": {"enabled": False, "shape": (row_dim, 128, 16), "channels": 128},
+        "h_mag_dist": {"enabled": True, "shape": (row_dim, 110, 16), "channels": 110},
+        "h_phase_diff": {"enabled": False, "shape": (row_dim, 110, 16), "channels": 110},
     }
 
     use_kl_anneal = False
