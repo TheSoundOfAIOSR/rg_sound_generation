@@ -134,7 +134,14 @@ class LocalConfig:
 
     def load_config_from_file(self, file_path: str):
         assert os.path.isfile(file_path)
+        file_ext = os.path.splitext(file_path)[-1]
+        assert file_ext in [".json", ".txt"]
+        if file_ext == ".json":
+            self.load_config_from_json(file_path)
+        elif file_ext == ".txt":
+            self.load_config_from_text(file_path)
 
+    def load_config_from_json(self, file_path: str):
         with open(file_path, "r") as f:
             params = json.load(f)
 
@@ -142,6 +149,21 @@ class LocalConfig:
             self.set_data_handler_by_type(params["data_handler_type"])
 
         self.set_config(params)
+
+    def load_config_from_text(self, file_path: str):
+        assert self.data_handler is not None
+        with open(file_path, "r") as f:
+            rows = f.read().splitlines()
+        for r in rows:
+            if len(r) == 0:
+                continue
+            if r.startswith("#"):
+                continue
+            if r.startswith("conf."):
+                command = f"self.{r[5:]}"
+                if command.startswith("self.save_config"):
+                    continue
+                exec(command)
 
     def save_config(self):
         target_path = os.path.join(self.checkpoints_dir,
