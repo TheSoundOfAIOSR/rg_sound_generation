@@ -7,6 +7,8 @@ from .data_handler import DataHandler, SimpleDataHandler
 class LocalConfig:
     dataset_dir = os.path.join(os.getcwd(), "complete_dataset")
     checkpoints_dir = os.path.join(os.getcwd(), "checkpoints")
+    simple_encoder = False
+    simple_decoder = False
     pretrained_model_path = None
     model_name = "VAE"
     run_name = "Default"
@@ -17,6 +19,8 @@ class LocalConfig:
     use_max_pool = True
     strides = 2
     use_lstm_in_encoder = True
+    use_note_number = True
+    use_velocity = True
     use_heuristics = True
     hidden_dim = 256
     default_k = 3
@@ -48,8 +52,8 @@ class LocalConfig:
     lr_factor = 0.5
     gradient_norm = 5.
     csv_log_file = "logs.csv"
-    final_conv_shape = (64, 8, 192) # ToDo: to be calculated dynamically
-    final_conv_units = 64 * 8 * 192 # ToDo: to be calculated dynamically
+    final_conv_shape = (64, 8, 192)  # ToDo: to be calculated dynamically
+    final_conv_units = 64 * 8 * 192  # ToDo: to be calculated dynamically
     best_loss = 1e6
     sample_rate = 16000
     log_steps = True
@@ -57,12 +61,22 @@ class LocalConfig:
     is_variational = True
     using_mt = True
     mt_model_ffn_in_encoder = True
-    mt_outputs = (
-        ("f0_shifts", {"enabled": True, "indices": [0, 32], "channels": 1}),
-        ("h_freq_shifts", {"enabled": True, "indices": [32, 96], "channels": 128}),
-        ("mag_env", {"enabled": True, "indices": [96, 128], "channels": 1}),
-        ("h_mag_dist", {"enabled": True, "indices": [128, 192], "channels": 128})
-    )
+
+    mt_inputs = {
+        "f0_shifts": {"shape": (row_dim, 32)},
+        "h_freq_shifts": {"shape": (row_dim, 64)},
+        "mag_env": {"shape": (row_dim, 32)},
+        "h_mag_dist": {"shape": (row_dim, 64)},
+        "h_phase_diff": {"shape": (row_dim, 64)},
+    }
+    mt_outputs = {
+        "f0_shifts": {"enabled": True, "shape": (row_dim, 64, 16), "channels": 1},
+        "h_freq_shifts": {"enabled": True, "shape": (row_dim, 128, 16), "channels": 128},
+        "mag_env": {"enabled": True, "shape": (row_dim, 64, 16), "channels": 1},
+        "h_mag_dist": {"enabled": True, "shape": (row_dim, 128, 16), "channels": 128},
+        "h_phase_diff": {"enabled": False, "shape": (row_dim, 128, 16), "channels": 128},
+    }
+
     use_kl_anneal = False
     kl_weight = 1.
     kl_weight_max = 1.
@@ -91,7 +105,8 @@ class LocalConfig:
         return cls._instance
 
     def __init__(self, data_handler_type="data_handler"):
-        self.set_data_handler_by_type(data_handler_type)
+        if self.data_handler is None:
+            self.set_data_handler_by_type(data_handler_type)
 
     def set_data_handler_by_type(self, data_handler_type: str):
         assert data_handler_type in ["data_handler", "simple_data_handler"]
@@ -99,12 +114,9 @@ class LocalConfig:
         if data_handler_type == "data_handler":
             self.data_handler = DataHandler()
             self.data_handler_properties = [
+                "use_phase",
                 "weight_type",
                 "mag_loss_type",
-                "f0_weight",
-                "mag_env_weight",
-                "h_freq_shifts_weight",
-                "h_mag_dist_weight",
                 "mag_scale_fn"
             ]
         elif data_handler_type == "simple_data_handler":

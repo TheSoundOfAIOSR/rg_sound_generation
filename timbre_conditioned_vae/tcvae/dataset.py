@@ -35,8 +35,8 @@ def create_dataset(
 def map_features(features):
     conf = LocalConfig()
 
-    name = features["sample_name"]
-    instrument_id = tf.one_hot(features["instrument_id"], depth=conf.num_instruments)
+    # name = features["sample_name"]
+    # instrument_id = tf.one_hot(features["instrument_id"], depth=conf.num_instruments)
     note_number = features["note_number"]
     velocity = tf.cast(features["velocity"], dtype=tf.float32) / 25. - 1.
     velocity = tf.one_hot(tf.cast(velocity, dtype=tf.uint8), depth=conf.num_velocities)
@@ -60,25 +60,26 @@ def map_features(features):
     normalized_data, mask = \
         conf.data_handler.normalize(h_freq, h_mag, h_phase, note_number)
 
-    h = conf.data_handler.input_transform(
+    normalized_data = conf.data_handler.input_transform(
         normalized_data, rows=conf.row_dim, cols=conf.col_dim)
 
-    h = tf.squeeze(h, axis=0)
+    for k, v in normalized_data.items():
+        normalized_data[k] = tf.squeeze(v, axis=0)
+
     mask = tf.squeeze(mask, axis=0)
 
     measures = get_measures(h_freq, h_mag, conf)
 
     note_number = tf.one_hot(note_number - conf.starting_midi_pitch, depth=conf.num_pitches)
 
-    return {
-        "sample_name": name,
-        "instrument_id": tf.squeeze(instrument_id),
+    data = {
+        "mask": mask,
         "note_number": tf.squeeze(note_number),
         "velocity": tf.squeeze(velocity),
-        "h": h,
-        "mask": mask,
         "measures": measures,
     }
+    data.update(normalized_data)
+    return data
 
 
 def get_dataset(conf: LocalConfig):

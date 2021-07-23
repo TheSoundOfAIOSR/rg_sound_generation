@@ -4,34 +4,34 @@ from tcvae import localconfig, train
 
 
 if __name__ == "__main__":
-    conf = localconfig.LocalConfig("simple_data_handler")
+    conf = localconfig.LocalConfig("data_handler")
 
-    conf.use_encoder = True
-    conf.use_max_pool = False
-    conf.is_variational = True
-    conf.use_heuristics = False
-    conf.deep_decoder = False
-    conf.add_z_to_decoder_blocks = True
-    conf.encoder_type = "2d"
-    conf.decoder_type = "cnn"
-    conf.latent_dim = 64
+    conf.use_encoder = False
+    conf.use_heuristics = True
+    conf.latent_dim = 16
     # Training
-    conf.batch_size = 2
-    conf.learning_rate = 2e-4
+    conf.batch_size = 4
+    conf.learning_rate = 2e-3
     conf.lr_factor = 0.5
     conf.lr_plateau = 4
     conf.model_name = "test"
     conf.early_stopping = 10
-    conf.print_model_summary = False
-    conf.check_decoder_hidden_dim = True
+    conf.print_model_summary = True
     # Data Handler
-    conf.data_handler.mag_loss_type = "l2_db"
-    conf.data_handler.mag_scale_fn = "exp_sigmoid"
 
-    conf.num_train_steps = 5
-    conf.num_valid_steps = 3
+    conf.num_train_steps = 2
+    conf.num_valid_steps = 2
     conf.epochs = 1
+    conf.simple_encoder = False
+    conf.simple_decoder = False
 
+    conf.mt_outputs["mag_env"]["enabled"] = True
+    conf.mt_outputs["h_freq_shifts"]["enabled"] = True
+    conf.mt_outputs["f0_shifts"]["enabled"] = True
+    conf.mt_outputs["h_mag_dist"]["enabled"] = True
+    conf.mt_outputs["h_phase_diff"]["enabled"] = False
+
+    # conf.data_handler.losses_weights["mag_env_loss"] = 0
     # conf.save_config()
     # conf.load_config_from_file("checkpoints/Default_test.json")
 
