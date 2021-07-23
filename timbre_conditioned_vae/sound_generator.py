@@ -2,8 +2,8 @@ import os
 import logging
 import tensorflow as tf
 import tsms
-from typing import List, Dict
-from tcvae import model, localconfig, predict
+from typing import Dict
+from tcvae import model, localconfig
 import numpy as np
 
 
@@ -22,18 +22,22 @@ class SoundGenerator:
     def __init__(self, config_path: str = None,
                  data_handler_type: str = "data_handler"):
         logger.info("Initializing SoundGenerator")
-        if config_path is None:
-            config_path = os.path.join(os.getcwd(), "checkpoints", "Default.json")
         self.config_path = config_path
         self.conf = localconfig.LocalConfig(data_handler_type)
         self.conf.load_config_from_file(config_path)
         self.conf.batch_size = 1
-        self.decoder = None
-        self.encoder = None
-        self.complete_model = None
+        self.model = None
         assert data_handler_type == self.conf.data_handler_type, "Data handler type " \
                                                                  "does not match saved config"
         logger.info("SoundGenerator initialized")
+
+    def load_model(self, checkpoint_path: str = None) -> None:
+        assert os.path.isfile(checkpoint_path), f"No checkpoint found at {checkpoint_path}"
+        logger.info("Creating complete model from config")
+        self.model = model.get_model_from_config(self.conf)
+        logger.info("Loading pretrained weights for complete model")
+        self.model.load_weights(checkpoint_path)
+        logger.info("Complete model loaded")
 
     def prepare_data(self, data: Dict) -> Dict:
         """
@@ -72,23 +76,6 @@ class SoundGenerator:
             "note_number": pitch_out,
             "measures": measures_out
         }
-
-    def load_model(self, checkpoint_path: str = None) -> None:
-        assert os.path.isfile(checkpoint_path), f"No checkpoint found at {checkpoint_path}"
-        logger.info("Creating complete model from config")
-        self.complete_model = model.get_model_from_config(self.conf)
-        logger.info("Loading pretrained weights for complete model")
-        self.complete_model.load_weights(checkpoint_path)
-        logger.info("Complete model loaded")
-        logger.info("Creating decoder")
-        self.decoder = tf.keras.Model(
-            self.complete_model.layers[-1].input, self.complete_model.layers[-1].output
-        )
-        self.decoder.trainable = False
-        self.encoder = tf.keras.Model(
-            self.complete_model.layers[1].input, self.complete_model.layers[1].output
-        )
-        logger.info("Decoder created")
 
     def get_prediction(self, data) -> Dict:
         processed_data = self.prepare_data(data)

@@ -6,7 +6,7 @@ from tcvae import localconfig, train
 if __name__ == "__main__":
     conf = localconfig.LocalConfig("data_handler")
 
-    conf.use_encoder = False
+    conf.use_encoder = True
     conf.use_heuristics = True
     conf.latent_dim = 16
     # Training

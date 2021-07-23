@@ -444,7 +444,8 @@ def create_mt_encoder(inputs, conf: LocalConfig):
     z = tf.keras.layers.Dense(conf.latent_dim, activation="sigmoid", name="z_output")(hidden)
 
     m = tf.keras.models.Model(inputs, z)
-    tf.keras.utils.plot_model(m, to_file="encoder.png", show_shapes=True)
+    tf.keras.utils.plot_model(m, to_file="encoder.png", show_shapes=False,
+                              show_layer_names=False, rankdir="LR")
     return m
 
 
@@ -581,7 +582,8 @@ def create_mt_decoder(inputs, conf: LocalConfig):
     m = tf.keras.models.Model(
         inputs, outputs
     )
-    tf.keras.utils.plot_model(m, to_file="decoder.png", show_shapes=True)
+    tf.keras.utils.plot_model(m, to_file="decoder.png", show_shapes=False,
+                              show_layer_names=False, rankdir="LR")
     return m
 
 
