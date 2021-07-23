@@ -60,9 +60,6 @@ def map_features(features):
     normalized_data, mask = \
         conf.data_handler.normalize(h_freq, h_mag, h_phase, note_number)
 
-    normalized_data = conf.data_handler.input_transform(
-        normalized_data, rows=conf.row_dim, cols=conf.col_dim)
-
     for k, v in normalized_data.items():
         normalized_data[k] = tf.squeeze(v, axis=0)
 

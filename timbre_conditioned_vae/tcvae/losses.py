@@ -4,17 +4,11 @@ from .localconfig import LocalConfig
 
 def reconstruction_loss(inputs, outputs, conf: LocalConfig):
     mask = inputs["mask"]
-    data_true = {}
-    for k, v in conf.mt_outputs.items():
-        if k in inputs:
-            data_true[k] = inputs[k]
-    data_pred = outputs
-
-    normalized_data_true = \
-        conf.data_handler.output_transform(data_true, pred=False)
+    normalized_data_true = inputs
+    normalized_data_pred = outputs
 
     normalized_data_pred = \
-        conf.data_handler.output_transform(data_pred, pred=True)
+        conf.data_handler.prediction_transform(normalized_data_pred)
 
     losses = conf.data_handler.loss(
         normalized_data_true, normalized_data_pred, mask)

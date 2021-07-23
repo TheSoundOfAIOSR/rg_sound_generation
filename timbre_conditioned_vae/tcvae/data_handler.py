@@ -359,43 +359,7 @@ class DataHandler:
 
         return h_freq, h_mag, h_phase
 
-    def input_transform(self, normalized_data, rows=1001, cols=110):
-        f0_shifts = normalized_data["f0_shifts"]
-        mag_env = normalized_data["mag_env"]
-        h_freq_shifts = normalized_data["h_freq_shifts"]
-        h_mag_dist = normalized_data["h_mag_dist"]
-        h_phase_diff = normalized_data["h_phase_diff"]
-
-        frames = self._frames
-        harmonics = tf.shape(h_freq_shifts)[2]
-
-        f0_shifts = tf.pad(
-            f0_shifts,
-            ((0, 0), (0, rows - frames), (0, 0)))
-        mag_env = tf.pad(
-            mag_env,
-            ((0, 0), (0, rows - frames), (0, 0)))
-        h_freq_shifts = tf.pad(
-            h_freq_shifts,
-            ((0, 0), (0, rows - frames), (0, cols - harmonics)))
-        h_mag_dist = tf.pad(
-            h_mag_dist,
-            ((0, 0), (0, rows - frames), (0, cols - harmonics)))
-        h_phase_diff = tf.pad(
-            h_phase_diff,
-            ((0, 0), (0, rows - frames), (0, cols - harmonics)))
-
-        normalized_data = {
-            "f0_shifts": f0_shifts,
-            "mag_env": mag_env,
-            "h_freq_shifts": h_freq_shifts,
-            "h_mag_dist": h_mag_dist,
-            "h_phase_diff": h_phase_diff,
-        }
-
-        return normalized_data
-
-    def output_transform(self, normalized_data, pred=True):
+    def prediction_transform(self, normalized_data):
         frames = self._frames
         max_harmonics = self.max_harmonics
 
@@ -407,10 +371,9 @@ class DataHandler:
             normalized_data["mag_env"] = \
                 normalized_data["mag_env"][:, :frames, :]
 
-            if pred:
-                if self._mag_scale_fn is not None:
-                    normalized_data["mag_env"] = \
-                        exp_sigmoid(normalized_data["mag_env"])
+            if self._mag_scale_fn is not None:
+                normalized_data["mag_env"] = \
+                    exp_sigmoid(normalized_data["mag_env"])
 
         if "h_freq_shifts" in normalized_data:
             normalized_data["h_freq_shifts"] = \
@@ -420,18 +383,16 @@ class DataHandler:
             normalized_data["h_mag_dist"] = \
                 normalized_data["h_mag_dist"][:, :frames, :max_harmonics]
 
-            if pred:
-                if self._mag_scale_fn is not None:
-                    normalized_data["h_mag_dist"] = \
-                        exp_sigmoid(normalized_data["h_mag_dist"])
+            if self._mag_scale_fn is not None:
+                normalized_data["h_mag_dist"] = \
+                    exp_sigmoid(normalized_data["h_mag_dist"])
 
         if "h_phase_diff" in normalized_data:
             normalized_data["h_phase_diff"] = \
                 normalized_data["h_phase_diff"][:, :frames, :max_harmonics]
 
-            if pred:
-                normalized_data["h_phase_diff"] = \
-                    normalized_data["h_phase_diff"] % 1.0
+            normalized_data["h_phase_diff"] = \
+                normalized_data["h_phase_diff"] % 1.0
 
         return normalized_data
 

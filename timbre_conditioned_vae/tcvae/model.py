@@ -415,8 +415,12 @@ def create_mt_encoder(inputs, conf: LocalConfig):
     concat_inputs = []
     for k, v in conf.mt_inputs.items():
         if k in inputs:
+            steps = v["shape"][0]
             filters = v["shape"][1]
-            out = conv_1d_encoder_block(inputs[k], filters, 5)
+
+            padding = steps - inputs[k].shape[1]
+            padded = tf.keras.layers.ZeroPadding1D((0, padding))(inputs[k])
+            out = conv_1d_encoder_block(padded, filters, 5)
             concat_inputs += [out]
 
     concat = tf.keras.layers.concatenate(concat_inputs)
