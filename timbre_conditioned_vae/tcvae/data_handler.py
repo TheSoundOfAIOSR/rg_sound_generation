@@ -324,7 +324,6 @@ class DataHandler:
         mag_env = normalized_data["mag_env"]
         h_freq_shifts = normalized_data["h_freq_shifts"]
         h_mag_dist = normalized_data["h_mag_dist"]
-        h_phase_diff = normalized_data["h_phase_diff"]
 
         note_number = tf.cast(note_number, dtype=tf.float32)
         f0_note = tsms.core.midi_to_hz(note_number)
@@ -347,6 +346,7 @@ class DataHandler:
             frame_step=self._frame_step)
 
         if self._use_phase:
+            h_phase_diff = normalized_data["h_phase_diff"]
             h_phase = (h_phase + h_phase_diff) % (2.0 * np.pi)
 
         f0_estimate = tsms.core.harmonic_analysis_to_f0(h_freq, h_mag)
