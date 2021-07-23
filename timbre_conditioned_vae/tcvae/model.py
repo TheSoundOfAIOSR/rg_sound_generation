@@ -519,8 +519,13 @@ def create_mt_decoder(inputs, conf: LocalConfig):
         concat_inputs += [v]
 
     concat_inputs = tf.keras.layers.concatenate(concat_inputs)
-    ffn_out = ffn_block(concat_inputs, 2, conf.hidden_dim)
-    dense = tf.keras.layers.Dense(6144, activation="elu")(ffn_out)
+    if not conf.simple_decoder:
+        dense = ffn_block(concat_inputs, 2, conf.hidden_dim)
+    else:
+        dense = concat_inputs
+    dense = tf.keras.layers.Dense(6144, activation="elu")(dense)
+    if conf.simple_decoder:
+        dense = tf.keras.layers.LayerNormalization()(dense)
     reshaped = tf.keras.layers.Reshape((16, 3, 128))(dense)
 
     filters = list(reversed([32] * 3 + [64] * 3))
