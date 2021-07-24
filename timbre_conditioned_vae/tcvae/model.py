@@ -576,7 +576,7 @@ def create_mt_decoder(inputs, conf: LocalConfig):
                 task_out = tf.keras.layers.Permute(dims=(1, 3, 2))(conv2d_out)
                 task_out = tf.keras.layers.Dense(v["channels"], activation="elu")(task_out)
                 task_out = tf.keras.layers.Permute(dims=(1, 3, 2))(task_out)
-                task_out = tf.keras.layers.Conv2D(256, 1, padding="same", activation="softmax")(task_out)
+                task_out = tf.keras.layers.Conv2D(256, 1, padding="same")(task_out)
             else:
                 conv2d_out = tf.keras.layers.Conv2D(1, 1, padding="same")(conv2d_out)
                 task_out = tf.keras.layers.Lambda(lambda y: tf.squeeze(y, axis=-1))(conv2d_out)
