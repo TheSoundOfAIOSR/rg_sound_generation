@@ -365,17 +365,6 @@ def create_vae(conf: LocalConfig):
     return model
 
 
-# def mt_encoder_inputs(conf: LocalConfig):
-#     time_steps = conf.row_dim
-#     num_features = conf.col_dim
-#
-#     f0_shifts = tf.keras.layers.Input(shape=(time_steps, 1), name="f0_shifts")
-#     h_freq_shifts = tf.keras.layers.Input(shape=(time_steps, num_features), name="h_freq_shifts")
-#     mag_env = tf.keras.layers.Input(shape=(time_steps, 1), name="mag_env")
-#     h_mag_dist = tf.keras.layers.Input(shape=(time_steps, num_features), name="h_mag_dist")
-#     return f0_shifts, h_freq_shifts, mag_env, h_mag_dist
-
-
 def bn_act(inputs, name=None):
     x = tf.keras.layers.BatchNormalization()(inputs)
     return tf.keras.layers.Activation("elu", name=name)(x)
@@ -583,11 +572,18 @@ def create_mt_decoder(inputs, conf: LocalConfig):
                 ])
 
             conv2d_out = wrapper[f"up_out_{len(filters)}"]
-            conv2d_out = tf.keras.layers.Conv2D(1, 1, padding="same")(conv2d_out)
-            task_out = tf.keras.layers.Lambda(lambda y: tf.squeeze(y, axis=-1))(conv2d_out)
-            if not conf.simple_decoder:
-                task_out = ffn_block(task_out, 2, v["shape"][1])
-            task_out = tf.keras.layers.Dense(units=v["channels"])(task_out)
+            if conf.using_categorical:
+                task_out = tf.keras.layers.Permute(dims=(1, 3, 2))(conv2d_out)
+                task_out = tf.keras.layers.Dense(v["channels"], activation="elu")(task_out)
+                task_out = tf.keras.layers.Permute(dims=(1, 3, 2))(task_out)
+                task_out = tf.keras.layers.Conv2D(255, 1, padding="same", activation="softmax")(task_out)
+            else:
+                conv2d_out = tf.keras.layers.Conv2D(1, 1, padding="same")(conv2d_out)
+                task_out = tf.keras.layers.Lambda(lambda y: tf.squeeze(y, axis=-1))(conv2d_out)
+                if not conf.simple_decoder:
+                    task_out = ffn_block(task_out, 2, v["shape"][1])
+                if not conf.using_categorical:
+                    task_out = tf.keras.layers.Dense(units=v["channels"])(task_out)
             outputs[k] = task_out
 
     m = tf.keras.models.Model(

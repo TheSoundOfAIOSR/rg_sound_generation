@@ -61,6 +61,7 @@ class LocalConfig:
     step_log_interval = 100
     is_variational = True
     using_mt = True
+    using_categorical = False
 
     mt_inputs = {
         "f0_shifts": {"shape": (row_dim, 32)},
