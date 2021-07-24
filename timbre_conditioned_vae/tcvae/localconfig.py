@@ -32,6 +32,7 @@ class LocalConfig:
     lstm_dim = 256
     lstm_dropout = 0.4
     harmonic_frame_steps = 1001
+    max_harmonics = 110
     frame_size = 64
     batch_size = 2
     num_instruments = 74
@@ -60,7 +61,6 @@ class LocalConfig:
     step_log_interval = 100
     is_variational = True
     using_mt = True
-    mt_model_ffn_in_encoder = True
 
     mt_inputs = {
         "f0_shifts": {"shape": (row_dim, 32)},

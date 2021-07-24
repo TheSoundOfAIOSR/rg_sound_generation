@@ -1,6 +1,7 @@
 import os
 import warnings
 import tensorflow as tf
+from tensorflow import TensorShape
 from .dataset import get_dataset
 from . import model
 from .losses import reconstruction_loss, kl_loss
@@ -8,6 +9,37 @@ from .localconfig import LocalConfig
 
 
 warnings.simplefilter("ignore")
+
+
+def _input_shapes(conf: LocalConfig):
+    mask = TensorShape([conf.batch_size, conf.harmonic_frame_steps, conf.max_harmonics])
+    note_number = TensorShape([conf.batch_size, conf.num_pitches])
+    velocity = TensorShape([conf.batch_size, conf.num_velocities])
+    measures = TensorShape([conf.batch_size, conf.num_measures])
+    f0_shifts = TensorShape([conf.batch_size, conf.harmonic_frame_steps, 1])
+    mag_env = TensorShape([conf.batch_size, conf.harmonic_frame_steps, 1])
+    h_freq_shifts = TensorShape([conf.batch_size, conf.harmonic_frame_steps, conf.max_harmonics])
+    h_mag_dist = TensorShape([conf.batch_size, conf.harmonic_frame_steps, conf.max_harmonics])
+    h_phase_diff = TensorShape([conf.batch_size, conf.harmonic_frame_steps, conf.max_harmonics])
+
+    _shapes = {}
+
+    _shapes.update({
+        "mask": tf.zeros(mask),
+        "f0_shifts": tf.zeros(f0_shifts),
+        "mag_env": tf.zeros(mag_env),
+        "h_freq_shifts": tf.zeros(h_freq_shifts),
+        "h_mag_dist": tf.zeros(h_mag_dist),
+        "h_phase_diff": tf.zeros(h_phase_diff)
+    })
+
+    if conf.use_note_number:
+        _shapes.update({"note_number": tf.zeros(note_number)})
+    if conf.use_velocity:
+        _shapes.update({"velocity": tf.zeros(velocity)})
+    if conf.use_heuristics:
+        _shapes.update({"measures": tf.zeros(measures)})
+    return _shapes
 
 
 def _step(_model, inputs, conf):
@@ -131,6 +163,7 @@ def train(conf: LocalConfig):
     if conf.pretrained_model_path is not None:
         assert os.path.isfile(conf.pretrained_model_path), "No pretrained model found"
         print("Loading model")
+        _ = _model(_input_shapes(conf))
         _model.load_weights(conf.pretrained_model_path)
     else:
         print("No pretrained model provided")
