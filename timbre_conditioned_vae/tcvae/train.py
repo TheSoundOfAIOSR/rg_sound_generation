@@ -11,7 +11,7 @@ from .localconfig import LocalConfig
 warnings.simplefilter("ignore")
 
 
-def _input_shapes(conf: LocalConfig):
+def _zero_batch(conf: LocalConfig):
     mask = TensorShape([conf.batch_size, conf.harmonic_frame_steps, conf.max_harmonics])
     note_number = TensorShape([conf.batch_size, conf.num_pitches])
     velocity = TensorShape([conf.batch_size, conf.num_velocities])
@@ -163,7 +163,7 @@ def train(conf: LocalConfig):
     if conf.pretrained_model_path is not None:
         assert os.path.isfile(conf.pretrained_model_path), "No pretrained model found"
         print("Loading model")
-        _ = _model(_input_shapes(conf))
+        _ = _model(_zero_batch(conf))
         _model.load_weights(conf.pretrained_model_path)
     else:
         print("No pretrained model provided")

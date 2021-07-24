@@ -22,8 +22,8 @@ if __name__ == "__main__":
     conf.num_train_steps = 2
     conf.num_valid_steps = 2
     conf.epochs = 1
-    conf.simple_encoder = False
-    conf.simple_decoder = False
+    conf.simple_encoder = True
+    conf.simple_decoder = True
     conf.using_categorical = True
 
     conf.mt_outputs["mag_env"]["enabled"] = True
