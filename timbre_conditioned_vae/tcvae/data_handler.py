@@ -221,6 +221,7 @@ class DataHandler:
                  frames=1001,
                  max_semitone_displacement=2,
                  db_limit=-120.0,
+                 h_mag_dist_modifier=1e-2,
                  max_pool_length=5):
         self._fix_pitch = fix_pitch
         self._normalize_mag = normalize_mag
@@ -235,6 +236,7 @@ class DataHandler:
         self._f0_st_factor = 2.0 ** (max_semitone_displacement / 12.0) - 1.0
         self._db_limit = db_limit
         self._lin_limit = tsms.core.db_to_lin(db_limit)
+        self._h_mag_dist_modifier = h_mag_dist_modifier
         self._max_pool_length = max_pool_length
         self.max_harmonics = max_harmonics
 
@@ -313,7 +315,6 @@ class DataHandler:
             h_mag = h_mag / tf.math.reduce_max(h_mag)
 
         mag_env = tf.math.reduce_sum(h_mag, axis=2, keepdims=True)
-        mag_env = tf.where(mag_env < self._lin_limit, self._lin_limit, mag_env)
 
         batches = tf.shape(h_freq)[0]
         frames = tf.shape(h_freq)[1]
@@ -322,7 +323,7 @@ class DataHandler:
         harmonic_numbers = harmonic_numbers[tf.newaxis, tf.newaxis, :]
 
         h_freq_shifts = (h_freq / harmonic_numbers - f0) / max_f0_displ
-        h_mag_dist = h_mag / mag_env
+        h_mag_dist = h_mag / (mag_env + self._h_mag_dist_modifier)
         mag_env /= self.global_max["mag_env"]
 
         h_freq_shifts = tf.pad(
@@ -401,7 +402,7 @@ class DataHandler:
         f0 = f0_note + f0_shifts * max_f0_displ
         h_freq = harmonic_numbers * (f0 + h_freq_shifts * max_f0_displ)
         mag_env *= self.global_max["mag_env"]
-        h_mag = h_mag_dist * mag_env
+        h_mag = h_mag_dist * (mag_env + self._h_mag_dist_modifier)
 
         h_phase = tsms.core.generate_phase(
             h_freq,
@@ -412,10 +413,7 @@ class DataHandler:
             h_phase_diff = normalized_data["h_phase_diff"]
             h_phase = (h_phase + h_phase_diff) % (2.0 * np.pi)
 
-        f0_estimate = tsms.core.harmonic_analysis_to_f0(h_freq, h_mag)
-        min_f0 = tf.math.reduce_min(f0_estimate)
-        harmonics = tsms.core.get_number_harmonics(min_f0, self._sample_rate)
-
+        harmonics = tf.cast(tf.math.reduce_sum(mask[0, 0, :]), dtype=tf.int64)
         h_freq = h_freq[:, :, :harmonics]
         h_mag = h_mag[:, :, :harmonics]
         h_phase = h_phase[:, :, :harmonics]
@@ -483,13 +481,9 @@ class DataHandler:
 
         f_w0 = compute_mag_weight(mag0, 1.0, self._weight_type)
         f_w1 = compute_mag_weight(mag1, mask, self._weight_type)
-        p_w = f_w1
-
         m_w0 = 1.0
-        if self._mag_loss_type == 'cross_entropy':
-            m_w1 = f_w1
-        else:
-            m_w1 = mask
+        m_w1 = mask
+        p_w = f_w1
 
         f0_loss = 0.0
         h_freq_shifts_loss = 0.0
@@ -524,7 +518,6 @@ class DataHandler:
                 h_freq_shifts_loss = tf.math.reduce_sum(
                     h_freq_shifts_loss * f_w1) / tf.math.reduce_sum(f_w1)
 
-
         # compute magnitudes loss
         if "mag_env" in normalized_data_pred and "h_mag_dist" in normalized_data_pred:
             mag_env_pred = normalized_data_pred["mag_env"]
@@ -539,7 +532,7 @@ class DataHandler:
 
                 h_mag_dist_true = mu_law_encode(h_mag_dist_true, 256, range_0_1=True)
                 h_mag_dist_loss = tf.nn.sparse_softmax_cross_entropy_with_logits(
-                    h_mag_dist_true,h_mag_dist_pred)
+                    h_mag_dist_true, h_mag_dist_pred)
                 h_mag_loss = tf.math.reduce_sum(  # TODO: rename it
                     h_mag_dist_loss * m_w1) / tf.math.reduce_sum(m_w1)
             else:
