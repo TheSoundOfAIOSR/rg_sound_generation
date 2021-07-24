@@ -10,7 +10,7 @@ if __name__ == "__main__":
     conf.use_heuristics = True
     conf.latent_dim = 16
     # Training
-    conf.batch_size = 4
+    conf.batch_size = 2
     conf.learning_rate = 2e-3
     conf.lr_factor = 0.5
     conf.lr_plateau = 4
@@ -22,8 +22,8 @@ if __name__ == "__main__":
     conf.num_train_steps = 2
     conf.num_valid_steps = 2
     conf.epochs = 1
-    conf.simple_encoder = True
-    conf.simple_decoder = True
+    conf.simple_encoder = False
+    conf.simple_decoder = False
     conf.using_categorical = True
 
     conf.mt_outputs["mag_env"]["enabled"] = True
@@ -31,6 +31,9 @@ if __name__ == "__main__":
     conf.mt_outputs["f0_shifts"]["enabled"] = True
     conf.mt_outputs["h_mag_dist"]["enabled"] = True
     conf.mt_outputs["h_phase_diff"]["enabled"] = False
+
+    conf.data_handler.freq_loss_type = "cross_entropy"
+    conf.data_handler.mag_loss_type = "cross_entropy"
 
     # conf.data_handler.losses_weights["mag_env_loss"] = 0
     # conf.save_config()

@@ -118,7 +118,8 @@ class LocalConfig:
                 "use_phase",
                 "weight_type",
                 "mag_loss_type",
-                "mag_scale_fn"
+                "mag_scale_fn",
+                "freq_loss_type"
             ]
         elif data_handler_type == "simple_data_handler":
             self.data_handler = SimpleDataHandler()
