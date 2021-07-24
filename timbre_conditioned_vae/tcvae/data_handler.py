@@ -420,7 +420,7 @@ class DataHandler:
 
         return h_freq, h_mag, h_phase
 
-    def prediction_transform(self, normalized_data):
+    def prediction_transform(self, normalized_data, loss_data=False):
         frames = self._frames
         max_harmonics = self.max_harmonics
 
@@ -444,7 +444,8 @@ class DataHandler:
             normalized_data["h_mag_dist"] = \
                 normalized_data["h_mag_dist"][:, :frames, :max_harmonics, ...]
 
-            if self._mag_scale_fn is not None and self._mag_loss_type != 'cross_entropy':
+            if self._mag_scale_fn is not None and \
+                    self._mag_loss_type != 'cross_entropy':
                 normalized_data["h_mag_dist"] = \
                     exp_sigmoid(normalized_data["h_mag_dist"])
 
@@ -454,6 +455,34 @@ class DataHandler:
 
             normalized_data["h_phase_diff"] = \
                 normalized_data["h_phase_diff"] % 1.0
+
+        if self._mag_loss_type == 'cross_entropy' and not loss_data:
+            normalized_data["f0_shifts"] = tf.nn.softmax(
+                normalized_data["f0_shifts"])
+            normalized_data["mag_env"] = tf.nn.softmax(
+                normalized_data["mag_env"])
+            normalized_data["h_freq_shifts"] = tf.nn.softmax(
+                normalized_data["h_freq_shifts"])
+            normalized_data["h_mag_dist"] = tf.nn.softmax(
+                normalized_data["h_mag_dist"])
+
+            normalized_data["f0_shifts"] = tf.math.argmax(
+                normalized_data["f0_shifts"], axis=-1, output_type=tf.int32)
+            normalized_data["mag_env"] = tf.math.argmax(
+                normalized_data["mag_env"], axis=-1, output_type=tf.int32)
+            normalized_data["h_freq_shifts"] = tf.math.argmax(
+                normalized_data["h_freq_shifts"], axis=-1, output_type=tf.int32)
+            normalized_data["h_mag_dist"] = tf.math.argmax(
+                normalized_data["h_mag_dist"], axis=-1, output_type=tf.int32)
+
+            normalized_data["f0_shifts"] = mu_law_decode(
+                normalized_data["f0_shifts"], 256, range_0_1=False)
+            normalized_data["mag_env"] = mu_law_decode(
+                normalized_data["mag_env"], 256, range_0_1=True)
+            normalized_data["h_freq_shifts"] = mu_law_decode(
+                normalized_data["h_freq_shifts"], 256, range_0_1=False)
+            normalized_data["h_mag_dist"] = mu_law_decode(
+                normalized_data["h_mag_dist"], 256, range_0_1=True)
 
         return normalized_data
 
