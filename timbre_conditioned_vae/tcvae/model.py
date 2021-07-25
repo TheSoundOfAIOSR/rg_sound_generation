@@ -582,8 +582,7 @@ def create_mt_decoder(inputs, conf: LocalConfig):
                 task_out = tf.keras.layers.Lambda(lambda y: tf.squeeze(y, axis=-1))(conv2d_out)
                 if not conf.simple_decoder:
                     task_out = ffn_block(task_out, 2, v["shape"][1])
-                if not conf.using_categorical:
-                    task_out = tf.keras.layers.Dense(units=v["channels"])(task_out)
+                task_out = tf.keras.layers.Dense(units=v["channels"])(task_out)
             outputs[k] = task_out
 
     m = tf.keras.models.Model(

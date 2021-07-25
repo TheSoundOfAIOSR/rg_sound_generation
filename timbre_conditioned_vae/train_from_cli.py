@@ -19,9 +19,9 @@ if __name__ == "__main__":
     conf.print_model_summary = True
     # Data Handler
 
-    conf.num_train_steps = 2
-    conf.num_valid_steps = 2
-    conf.epochs = 1
+    conf.num_train_steps = 5
+    conf.num_valid_steps = 5
+    conf.epochs = 4
     conf.simple_encoder = False
     conf.simple_decoder = False
     conf.using_categorical = True

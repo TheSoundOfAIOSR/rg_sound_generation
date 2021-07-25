@@ -539,7 +539,7 @@ class DataHandler:
 
                 h_mag_dist_true = mu_law_encode(h_mag_dist_true, 256, range_0_1=True)
                 h_mag_dist_loss = tf.nn.sparse_softmax_cross_entropy_with_logits(
-                    h_mag_dist_true,h_mag_dist_pred)
+                    h_mag_dist_true, h_mag_dist_pred)
                 h_mag_loss = tf.math.reduce_sum(  # TODO: rename it
                     h_mag_dist_loss * m_w1) / tf.math.reduce_sum(m_w1)
             else:
