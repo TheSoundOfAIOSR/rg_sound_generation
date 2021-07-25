@@ -214,6 +214,7 @@ class DataHandler:
                  weight_type='mag_max_pool',  # 'mag_max_pool', 'mag', 'none'
                  freq_loss_type='mse',  # 'cross_entropy', 'mse'
                  mag_loss_type='l2_db',  # 'cross_entropy', 'l2_db' 'l1_db', 'rms_db', 'mse'
+                 mag_loss_mode='h_mag',  # 'h_mag_dist', 'h_mag'
                  mag_scale_fn=exp_sigmoid,
                  max_harmonics=110,
                  sample_rate=16000,
@@ -229,6 +230,7 @@ class DataHandler:
         self._weight_type = weight_type
         self._freq_loss_type = freq_loss_type
         self._mag_loss_type = mag_loss_type
+        self._mag_loss_mode = mag_loss_mode
         self._mag_scale_fn = mag_scale_fn
         self._sample_rate = sample_rate
         self._frame_step = frame_step
@@ -289,6 +291,15 @@ class DataHandler:
     def mag_loss_type(self, value: str):
         assert value in ['cross_entropy', 'l2_db', 'l1_db', 'rms_db', 'mse']
         self._mag_loss_type = value
+
+    @property
+    def mag_loss_mode(self):
+        return self._mag_loss_mode
+
+    @mag_loss_mode.setter
+    def mag_loss_mode(self, value: str):
+        assert value in ['h_mag', 'h_mag_dist']
+        self._mag_loss_mode = value
 
     @property
     def mag_scale_fn(self):
@@ -565,8 +576,12 @@ class DataHandler:
                 h_mag_loss = tf.math.reduce_sum(  # TODO: rename it
                     h_mag_dist_loss * m_w1) / tf.math.reduce_sum(m_w1)
             else:
-                h_mag_true = mag_env_true * h_mag_dist_true
-                h_mag_pred = mag_env_pred * h_mag_dist_pred
+                if self._mag_loss_mode == 'h_mag':
+                    h_mag_true = mag_env_true * h_mag_dist_true
+                    h_mag_pred = mag_env_pred * h_mag_dist_pred
+                else:  # self._mag_loss_mode == 'h_mag_dist':
+                    h_mag_true = h_mag_dist_true
+                    h_mag_pred = h_mag_dist_pred
 
                 if self._mag_loss_type == 'mse':
                     mag_env_loss = tf.math.square(mag_env_true - mag_env_pred) * m_w0
