@@ -8,7 +8,8 @@ def reconstruction_loss(inputs, outputs, conf: LocalConfig):
     normalized_data_pred = outputs
 
     normalized_data_pred = \
-        conf.data_handler.prediction_transform(normalized_data_pred)
+        conf.data_handler.prediction_transform(normalized_data_pred,
+                                               loss_data=True)
 
     losses = conf.data_handler.loss(
         normalized_data_true, normalized_data_pred, mask)
