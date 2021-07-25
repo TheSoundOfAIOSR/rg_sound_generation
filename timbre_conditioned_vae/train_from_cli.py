@@ -21,10 +21,10 @@ if __name__ == "__main__":
 
     conf.num_train_steps = 5
     conf.num_valid_steps = 5
-    conf.epochs = 4
-    conf.simple_encoder = False
-    conf.simple_decoder = False
-    conf.using_categorical = True
+    conf.epochs = 1
+    conf.simple_encoder = True
+    conf.simple_decoder = True
+    conf.using_categorical = False
 
     conf.mt_outputs["mag_env"]["enabled"] = True
     conf.mt_outputs["h_freq_shifts"]["enabled"] = True
@@ -32,8 +32,8 @@ if __name__ == "__main__":
     conf.mt_outputs["h_mag_dist"]["enabled"] = True
     conf.mt_outputs["h_phase_diff"]["enabled"] = False
 
-    conf.data_handler.freq_loss_type = "cross_entropy"
-    conf.data_handler.mag_loss_type = "cross_entropy"
+    # conf.data_handler.freq_loss_type = "cross_entropy"
+    # conf.data_handler.mag_loss_type = "cross_entropy"
 
     # conf.data_handler.losses_weights["mag_env_loss"] = 0
     # conf.save_config()

@@ -2,7 +2,8 @@ import tensorflow as tf
 from .localconfig import LocalConfig
 
 
-def reconstruction_loss(inputs, outputs, conf: LocalConfig):
+def reconstruction_loss(inputs, outputs):
+    conf = LocalConfig()
     mask = inputs["mask"]
     normalized_data_true = inputs
     normalized_data_pred = outputs
@@ -17,7 +18,8 @@ def reconstruction_loss(inputs, outputs, conf: LocalConfig):
     return losses
 
 
-def kl_loss(z_mean, z_log_variance, conf):
+def kl_loss(z_mean, z_log_variance):
+    conf = LocalConfig()
     loss = -0.5 * (1 + z_log_variance - tf.square(z_mean) - tf.exp(z_log_variance))
     loss = tf.reduce_mean(loss) * conf.kl_weight
     return loss

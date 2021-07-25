@@ -397,68 +397,7 @@ def ffn_block(inputs, num_repeats, hidden_dim):
     return x
 
 
-# def simple_mt_encoder(inputs, conf: LocalConfig):
-#     if conf is None:
-#         conf = LocalConfig()
-#
-#     concat_inputs = []
-#     for k, v in conf.mt_inputs.items():
-#         if k in inputs:
-#             filters = v["shape"][1]
-#             out = conv_1d_encoder_block(inputs[k], filters, 5)
-#             concat_inputs += [out]
-#
-#     concat = tf.keras.layers.concatenate(concat_inputs)
-#     dense = tf.keras.layers.Dense(192, activation="elu")(concat)
-#     dense = tf.keras.layers.LayerNormalization()(dense)
-#
-#     lstm = tf.keras.layers.Bidirectional(
-#         tf.keras.layers.LSTM(64, activation="tanh", recurrent_activation="sigmoid",
-#                              return_sequences=True, dropout=conf.lstm_dropout,
-#                              recurrent_dropout=0, unroll=False, use_bias=True))(dense)
-#     lstm = tf.keras.layers.Bidirectional(
-#         tf.keras.layers.LSTM(64, activation="tanh", recurrent_activation="sigmoid",
-#                              return_sequences=False, dropout=conf.lstm_dropout,
-#                              recurrent_dropout=0, unroll=False, use_bias=True))(lstm)
-#     z = tf.keras.layers.Dense(conf.latent_dim, activation="sigmoid", name="z_output")(lstm)
-#     m = tf.keras.models.Model(inputs, z)
-#     tf.keras.utils.plot_model(m, to_file="encoder.png", show_shapes=True)
-#     return m
-#
-#
-# def simple_mt_decoder(inputs, conf: LocalConfig):
-#     if conf is None:
-#         conf = LocalConfig()
-#
-#     concat_inputs = []
-#     for k, v in inputs.items():
-#         concat_inputs += [v]
-#
-#     concat_inputs = tf.keras.layers.concatenate(concat_inputs)
-#     ffn_out = ffn_block(concat_inputs, 2, conf.hidden_dim)
-#     repeat = tf.keras.layers.RepeatVector(1024)(ffn_out)
-#
-#     outputs = {}
-#
-#     for k, v in conf.mt_outputs.items():
-#         if v["enabled"]:
-#             lstm = tf.keras.layers.Bidirectional(
-#                 tf.keras.layers.LSTM(64, activation="tanh", recurrent_activation="sigmoid",
-#                                      return_sequences=True, dropout=conf.lstm_dropout,
-#                                      recurrent_dropout=0, unroll=False, use_bias=True))(repeat)
-#             task_out = tf.keras.layers.Dense(units=v["channels"])(lstm)
-#             outputs[k] = task_out
-#     m = tf.keras.models.Model(
-#         inputs, outputs
-#     )
-#     tf.keras.utils.plot_model(m, to_file="decoder.png", show_shapes=True)
-#     return m
-
-
-def create_mt_encoder(inputs, conf: LocalConfig):
-    if conf is None:
-        conf = LocalConfig()
-
+def get_encoder_inputs(inputs, conf: LocalConfig):
     concat_inputs = []
     for k, v in conf.mt_inputs.items():
         if k in inputs:
@@ -469,7 +408,14 @@ def create_mt_encoder(inputs, conf: LocalConfig):
             padded = tf.keras.layers.ZeroPadding1D((0, padding))(inputs[k])
             out = conv_1d_encoder_block(padded, filters, 5)
             concat_inputs += [out]
+    return concat_inputs
 
+
+def create_mt_encoder(inputs, conf: LocalConfig):
+    if conf is None:
+        conf = LocalConfig()
+
+    concat_inputs = get_encoder_inputs(inputs, conf)
     concat = tf.keras.layers.concatenate(concat_inputs)
     dense = tf.keras.layers.Dense(192, activation="elu")(concat)
     dense = tf.keras.layers.LayerNormalization()(dense)
@@ -488,8 +434,15 @@ def create_mt_encoder(inputs, conf: LocalConfig):
                                                              filters[i], 1, stride=4, use_act=False)
             wrapper[f"block_{i + 1}"] = tf.keras.layers.Add()([conv_out, wrapper[f"skip_{i + 1}"]])
 
-    hidden = tf.keras.layers.Flatten()(wrapper["block_6"])
-    hidden = ffn_block(hidden, 2, conf.hidden_dim)
+    if conf.simple_encoder:
+        flattened = tf.keras.layers.TimeDistributed(tf.keras.layers.Flatten())(wrapper["block_6"])
+        hidden = tf.keras.layers.Bidirectional(
+            tf.keras.layers.LSTM(conf.lstm_dim, activation="tanh", recurrent_activation="sigmoid",
+                                 return_sequences=False, dropout=conf.lstm_dropout,
+                                 recurrent_dropout=0, unroll=False, use_bias=True))(flattened)
+    else:
+        hidden = tf.keras.layers.Flatten()(wrapper["block_6"])
+        hidden = ffn_block(hidden, 2, conf.hidden_dim)
 
     z = tf.keras.layers.Dense(conf.latent_dim, activation="sigmoid", name="z_output")(hidden)
 
@@ -508,23 +461,30 @@ def create_mt_decoder(inputs, conf: LocalConfig):
         concat_inputs += [v]
 
     concat_inputs = tf.keras.layers.concatenate(concat_inputs)
-    if not conf.simple_decoder:
-        dense = ffn_block(concat_inputs, 2, conf.hidden_dim)
-    else:
-        dense = concat_inputs
-    dense = tf.keras.layers.Dense(6144, activation="elu")(dense)
+
     if conf.simple_decoder:
-        dense = tf.keras.layers.LayerNormalization()(dense)
-    reshaped = tf.keras.layers.Reshape((16, 3, 128))(dense)
+        # num_units = 3072
+        num_repeats = 6
+        repeat = tf.keras.layers.RepeatVector(num_repeats)(concat_inputs)
+        lstm_out = tf.keras.layers.Bidirectional(
+            tf.keras.layers.LSTM(conf.lstm_dim, activation="tanh", recurrent_activation="sigmoid",
+                                 return_sequences=True, dropout=conf.lstm_dropout,
+                                 recurrent_dropout=0, unroll=False, use_bias=True))(repeat)
+        conv_input = tf.keras.layers.Reshape((16, 3, 64))(lstm_out)
+    else:
+        dense = ffn_block(concat_inputs, 2, conf.hidden_dim)
+        num_units = 6144
+        dense = tf.keras.layers.Dense(num_units, activation="elu")(dense)
+        conv_input = tf.keras.layers.Reshape((16, 3, 128))(dense)
 
     filters = list(reversed([32] * 3 + [64] * 3))
     kernels = [5] * 6
     filters_kernels = iter(zip(filters, kernels))
     wrapper = {
-        "up_in_0": reshaped
+        "up_in_0": conv_input
     }
 
-    for i in range(0, len(filters)):
+    for i in range(0, 6):
         f, k = next(filters_kernels)
         wrapper[f"up_out_{i}"] = tf.keras.layers.UpSampling2D(2, name=f"decoder_up_{i}")(wrapper[f"up_in_{i}"])
         wrapper[f"conv_out_{i}"] = tf.keras.layers.Conv2D(
@@ -546,7 +506,7 @@ def create_mt_decoder(inputs, conf: LocalConfig):
 
     for k, v in conf.mt_outputs.items():
         if v["enabled"]:
-            repeats = 2 if conf.simple_decoder else 4
+            repeats = 4
             filters = [v["shape"][2]] * repeats
             kernels = [5] * repeats
             filters_kernels = iter(zip(filters, kernels))
@@ -580,8 +540,7 @@ def create_mt_decoder(inputs, conf: LocalConfig):
             else:
                 conv2d_out = tf.keras.layers.Conv2D(1, 1, padding="same")(conv2d_out)
                 task_out = tf.keras.layers.Lambda(lambda y: tf.squeeze(y, axis=-1))(conv2d_out)
-                if not conf.simple_decoder:
-                    task_out = ffn_block(task_out, 2, v["shape"][1])
+                task_out = ffn_block(task_out, 2, v["shape"][1])
                 task_out = tf.keras.layers.Dense(units=v["channels"])(task_out)
             outputs[k] = task_out
 

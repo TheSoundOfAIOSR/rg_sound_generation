@@ -42,7 +42,7 @@ def _zero_batch(conf: LocalConfig):
     return _shapes
 
 
-def _step(_model, inputs, conf):
+def _step(_model, inputs):
     # model_input = [note_number, velocity]
     # if conf.use_heuristics:
     #     model_input += [measures]
@@ -57,7 +57,7 @@ def _step(_model, inputs, conf):
     #     _kl_loss = 0.0
 
     outputs = _model(inputs)
-    losses = reconstruction_loss(inputs, outputs, conf)
+    losses = reconstruction_loss(inputs, outputs)
     # losses["kl_loss"] = _kl_loss
     # losses["loss"] += _kl_loss
 
@@ -65,17 +65,16 @@ def _step(_model, inputs, conf):
 
 
 @tf.function
-def validation_step(_model, batch, conf):
-    losses = _step(_model, batch, conf)
-
+def validation_step(_model, batch):
+    losses = _step(_model, batch)
     return losses
 
 
 @tf.function
-def training_step(_model, optimizer, batch, conf):
+def training_step(_model, optimizer, batch):
 
     with tf.GradientTape() as tape:
-        losses = _step(_model, batch, conf)
+        losses = _step(_model, batch)
 
     _model_grads = tape.gradient(losses["loss"], _model.trainable_weights)
     optimizer.apply_gradients(zip(_model_grads, _model.trainable_weights))
@@ -188,7 +187,7 @@ def train(conf: LocalConfig):
             set_kl_weight(epoch, conf)
 
         def train_step(batch):
-            return training_step(_model, optimizer, batch, conf)
+            return training_step(_model, optimizer, batch)
 
         losses, log_string = dataset_loop(
             train_iterator, train_step, conf,
@@ -199,7 +198,7 @@ def train(conf: LocalConfig):
         print("Starting validation")
 
         def valid_step(batch):
-            return validation_step(_model, batch, conf)
+            return validation_step(_model, batch)
 
         losses, log_string = dataset_loop(
             valid_iterator, valid_step, conf,
