@@ -187,6 +187,12 @@ def reshape_z(block, z_input, conf: LocalConfig):
     current_z = tf.keras.layers.Reshape(target_shape=target_shape)(current_z)
     return current_z
 
+def embedding_layers(note_number, velocity, conf: LocalConfig):
+    pitch_emb = tf.keras.layers.Embedding(conf.num_pitches, conf.pitch_emb_size, input_length=1, name="pitch_emb")(note_number)
+    velocity_emb = tf.keras.layers.Embedding(conf.num_velocities, conf.velocity_emb_size, input_length=1, name="vel_emb")(velocity)
+    pitch_emb = tf.keras.layers.Flatten()(pitch_emb)
+    velocity_emb = tf.keras.layers.Flatten()(velocity_emb)
+    return pitch_emb, velocity_emb
 
 def create_decoder(conf: LocalConfig):
     if conf is None:
