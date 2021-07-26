@@ -571,7 +571,7 @@ class DataHandler:
                     h_mag_dist_true, h_mag_dist_pred)
                 h_mag_dist_loss = tf.math.reduce_sum(
                     h_mag_dist_loss * h_mag_w) / tf.math.reduce_sum(h_mag_w)
-
+            else:
                 if self._mag_loss_type == 'mse':
                     mag_env_loss = tf.math.square(mag_env_true - mag_env_pred) * mag_env_w
                     h_mag_dist_loss = tf.math.square(
@@ -643,8 +643,8 @@ class DataHandler:
         losses = {
             "loss": loss,
             "f0_loss": f0_loss,
-            "mag_env_loss": mag_env_loss,
             "h_freq_shifts_loss": h_freq_shifts_loss,
+            "mag_env_loss": mag_env_loss,
             "h_mag_dist_loss": h_mag_dist_loss,
             "h_mag_loss": h_mag_loss,
             "h_phase_diff_loss": h_phase_diff_loss,
