@@ -25,6 +25,7 @@ if __name__ == "__main__":
     conf.simple_encoder = True
     conf.simple_decoder = True
     conf.using_categorical = False
+    conf.use_embeddings = True
 
     conf.mt_outputs["mag_env"]["enabled"] = True
     conf.mt_outputs["h_freq_shifts"]["enabled"] = True

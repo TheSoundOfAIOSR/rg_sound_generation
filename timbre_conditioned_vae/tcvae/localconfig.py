@@ -62,6 +62,9 @@ class LocalConfig:
     is_variational = True
     using_mt = True
     using_categorical = False
+    use_embeddings = False
+    pitch_emb_size = 16
+    velocity_emb_size = 4
 
     mt_inputs = {
         "f0_shifts": {"shape": (row_dim, 32)},

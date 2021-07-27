@@ -412,9 +412,9 @@ class DataHandler:
             sample_rate=self._sample_rate,
             frame_step=self._frame_step)
 
-        if self._use_phase:
-            h_phase_diff = normalized_data["h_phase_diff"]
-            h_phase = (h_phase + h_phase_diff) % (2.0 * np.pi)
+        # if self._use_phase:
+        #     h_phase_diff = normalized_data["h_phase_diff"]
+        #     h_phase = (h_phase + h_phase_diff) % (2.0 * np.pi)
 
         harmonics = tf.cast(tf.math.reduce_sum(mask[0, 0, :]), dtype=tf.int64)
         h_freq = h_freq[:, :, :harmonics]

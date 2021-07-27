@@ -187,12 +187,23 @@ def reshape_z(block, z_input, conf: LocalConfig):
     current_z = tf.keras.layers.Reshape(target_shape=target_shape)(current_z)
     return current_z
 
-def embedding_layers(note_number, velocity, conf: LocalConfig):
-    pitch_emb = tf.keras.layers.Embedding(conf.num_pitches, conf.pitch_emb_size, input_length=1, name="pitch_emb")(note_number)
-    velocity_emb = tf.keras.layers.Embedding(conf.num_velocities, conf.velocity_emb_size, input_length=1, name="vel_emb")(velocity)
-    pitch_emb = tf.keras.layers.Flatten()(pitch_emb)
-    velocity_emb = tf.keras.layers.Flatten()(velocity_emb)
-    return pitch_emb, velocity_emb
+
+def embedding_layers(inputs, input_dims, embedding_size):
+    numeric_val = tf.keras.layers.Lambda(lambda x: tf.argmax(x, axis=-1))(inputs)
+    numeric_val = tf.keras.layers.Lambda(lambda x: x / input_dims)(numeric_val)
+    emb_out = tf.keras.layers.Embedding(
+        input_dims, embedding_size, input_length=1
+    )(numeric_val)
+    # pitch_emb = tf.keras.layers.Embedding(
+    #     conf.num_pitches, conf.pitch_emb_size,
+    #     input_length=1, name="pitch_emb")(note_number)
+    # velocity_emb = tf.keras.layers.Embedding(
+    #     conf.num_velocities, conf.velocity_emb_size,
+    #     input_length=1, name="vel_emb")(velocity)
+    # pitch_emb = tf.keras.layers.Flatten()(pitch_emb)
+    # velocity_emb = tf.keras.layers.Flatten()(velocity_emb)
+    return emb_out
+
 
 def create_decoder(conf: LocalConfig):
     if conf is None:
@@ -464,6 +475,11 @@ def create_mt_decoder(inputs, conf: LocalConfig):
 
     concat_inputs = []
     for k, v in inputs.items():
+        if conf.use_embeddings:
+            if k == "note_number":
+                v = embedding_layers(v, conf.num_pitches, conf.pitch_emb_size)
+            elif k == "velocity":
+                v = embedding_layers(v, conf.num_velocities, conf.velocity_emb_size)
         concat_inputs += [v]
 
     concat_inputs = tf.keras.layers.concatenate(concat_inputs)
