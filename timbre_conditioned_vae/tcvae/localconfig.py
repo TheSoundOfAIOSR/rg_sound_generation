@@ -63,6 +63,7 @@ class LocalConfig:
     using_mt = True
     using_categorical = False
     use_embeddings = False
+    scalar_embedding = False
     pitch_emb_size = 16
     velocity_emb_size = 4
 
