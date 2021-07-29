@@ -42,6 +42,10 @@ def _zero_batch(conf: LocalConfig):
     return _shapes
 
 
+def get_zero_batch(conf: LocalConfig):
+    return _zero_batch(conf)
+
+
 def _step(_model, inputs):
     # model_input = [note_number, velocity]
     # if conf.use_heuristics:
