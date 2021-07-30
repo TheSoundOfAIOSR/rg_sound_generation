@@ -3,3 +3,5 @@ git+https://github.com/fabiodimarco/tf-spectral-modeling-synthesis.git@b81438676
 tensorflow_addons
 rgws
 loguru
+streamlit
+soundfile

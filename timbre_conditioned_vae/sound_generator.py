@@ -74,6 +74,10 @@ class SoundGenerator:
     def conf(self):
         return self._conf
 
+    @property
+    def model(self):
+        return self._model
+
     def load_config(self) -> None:
         assert os.path.isfile(self._config_path), f"No config at {self._config_path}"
         self._conf.load_config_from_file(self._config_path)
