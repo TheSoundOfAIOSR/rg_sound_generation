@@ -1,6 +1,7 @@
 import os
 import tsms
-import logging
+from loguru import logger
+from pprint import pprint
 import warnings
 from typing import Dict, Any
 from tcvae import model, localconfig, train
@@ -9,9 +10,6 @@ import numpy as np
 
 
 warnings.simplefilter("ignore")
-
-logger = logging.getLogger("sound_gen_logger")
-logger.setLevel(logging.INFO)
 
 
 class HeuristicMeasures:
@@ -139,6 +137,26 @@ class SoundGenerator:
             "measures": np.expand_dims(np.array(heuristic_measures), axis=0)
         }
         return decoder_inputs
+
+    def info(self):
+        print("=" * 40)
+        print("Expected input dictionary:")
+        print("=" * 40)
+        pprint({
+            "input_pitch": 40,
+            "pitch": 40,
+            "velocity": 100,
+            "heuristic_measures": np.random.rand(self._conf.num_measures).tolist(),
+            "latent_sample": np.random.rand(self._conf.latent_dim).tolist()
+        })
+        print("=" * 40)
+        print("input_pitch: Note number to use in decoder input")
+        print("pitch: Note number to use in audio synthesis")
+        print("velocity: Velocity of the note between 25 and 127")
+        print("heuristic_measures: List of values for following measures used in decoder in the sequence shown:")
+        pprint(heuristic_names)
+        print("latent_sample: Values for z input to decoder")
+        print("=" * 40)
 
     def get_prediction(self, data: Dict) -> Any:
         try:
