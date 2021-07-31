@@ -1,6 +1,8 @@
 import streamlit as st
 import numpy as np
 import soundfile as sf
+from time import time
+from loguru import logger
 from sound_generator import SoundGenerator
 
 
@@ -57,7 +59,9 @@ if st.button("Generate"):
     }
 
     sg = load_sound_generator()
+    start = time()
     success, audio = sg.get_prediction(data)
+    logger.info(f"Time taken for prediction + generation: {time() - start: .3} seconds")
     if success:
         audio = np.array(audio) / np.max(np.abs(audio))
         sf.write("temp.wav", audio, samplerate=sg.conf.sample_rate)
