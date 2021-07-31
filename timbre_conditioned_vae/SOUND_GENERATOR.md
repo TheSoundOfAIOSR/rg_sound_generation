@@ -24,10 +24,10 @@ Install required packages
 
 Download the model
 
-`curl https://osr-tsoai.s3.amazonaws.com/mt_5/model.h5 -o deploy/model.h5`
+`curl https://osr-tsoai.s3.amazonaws.com/mt_5/model.h5 -o deployed/model.h5`
 
 Run the server
 
 `streamlit run app.py`
 
-Go to http://localhost:8080 - the app should be running
+Go to http://localhost:8501 - the app should be running
