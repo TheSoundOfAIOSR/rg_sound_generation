@@ -12,8 +12,6 @@ class SGServerInterface(WebsocketServer):
         super(SGServerInterface, self).__init__(**kwargs)
         self.state = "Initializing"
         self.generator = SoundGenerator()
-        self.generator.config_path = "deployed/conf.txt"
-        self.generator.checkpoint_path = "deployed/model.h5"
         self._register(self.get_prediction)
         self._register(self.setup_model)
         self._register(self.status)
@@ -31,8 +29,6 @@ class SGServerInterface(WebsocketServer):
         self.state = "Processed"
 
     async def setup_model(self):
-        self.generator.load_config()
-        self.generator.load_model()
         yield {"resp": True}
 
     async def status(self):
