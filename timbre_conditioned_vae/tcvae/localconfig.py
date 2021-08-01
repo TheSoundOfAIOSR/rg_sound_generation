@@ -9,6 +9,7 @@ class LocalConfig:
     checkpoints_dir = os.path.join(os.getcwd(), "checkpoints")
     simple_encoder = False
     simple_decoder = False
+    mha_decoder = False
     pretrained_model_path = None
     model_name = "VAE"
     run_name = "Default"
@@ -21,7 +22,9 @@ class LocalConfig:
     use_lstm_in_encoder = True
     use_note_number = True
     use_velocity = True
+    use_instrument_id = False
     use_heuristics = True
+    use_one_hot_conditioning = True
     hidden_dim = 256
     default_k = 3
     deep_decoder = False

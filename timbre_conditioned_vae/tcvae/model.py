@@ -1,4 +1,5 @@
 import tensorflow as tf
+from . import multi_head_attention as mha
 from .localconfig import LocalConfig
 
 
@@ -569,6 +570,108 @@ def create_mt_decoder(inputs, conf: LocalConfig):
     return m
 
 
+def create_mt_mha_decoder(inputs, conf: LocalConfig):
+    if conf is None:
+        conf = LocalConfig()
+
+    d_model = 0
+    concat_inputs = []
+    for k, v in inputs.items():
+        if conf.use_embeddings:
+            if k == "note_number":
+                v = embedding_layers(v, conf.num_pitches, 64, conf)
+                d_model += 64
+            elif k == "velocity":
+                v = embedding_layers(v, conf.num_velocities, 64, conf)
+                d_model += 64
+            elif k == "instrument_id":
+                v = embedding_layers(v, conf.num_instruments, 64, conf)
+                d_model += 64
+        concat_inputs += [v]
+
+    dff = d_model * 2
+    num_heads = 8
+
+    embeddings = tf.keras.layers.concatenate(concat_inputs)
+    # embeddings = tf.keras.layers.Dense(d_model)(concat_inputs)
+    embeddings = tf.keras.layers.RepeatVector(
+        conf.harmonic_frame_steps)(embeddings)
+
+    shared_out = mha.Encoder(
+        num_layers=4,
+        d_model=d_model,
+        num_heads=num_heads,
+        dff=dff,
+        max_seq_len=conf.harmonic_frame_steps,
+        rate=0.0)(embeddings)
+
+    outputs = {}
+
+    for k, v in conf.mt_outputs.items():
+        if v["enabled"]:
+            d_model = float(v["shape"][1])
+            d_model = int(round(d_model / num_heads) * num_heads)
+
+            dff = d_model * 2
+            num_heads = 8
+
+            task_out = tf.keras.layers.Dense(d_model)(shared_out)
+
+            task_out = mha.Encoder(
+                num_layers=2,
+                d_model=d_model,
+                num_heads=num_heads,
+                dff=dff,
+                max_seq_len=conf.harmonic_frame_steps,
+                rate=0.0)(task_out)
+
+            task_out = tf.keras.layers.Dense(v["channels"])(task_out)
+
+            outputs[k] = task_out
+
+    m = tf.keras.models.Model(
+        inputs, outputs
+    )
+    tf.keras.utils.plot_model(m, to_file="decoder.png", show_shapes=True,
+                              show_layer_names=False)
+    return m
+
+
+# class FeedForward(tf.keras.layers.Layer):
+#     def __init__(self, output_dim, hidden_dim, num_layers=1, rate=0.1):
+#         super(FeedForward, self).__init__()
+#         self.output_dim = output_dim
+#         self.hidden_dim = hidden_dim
+#         self.num_layers = num_layers
+#         self.rate = rate
+#         self.fnn = None
+#
+#     def build(self, input_shape):
+#         inputs = tf.keras.layers.Input(shape=input_shape[1:])
+#
+#         if self.num_layers > 1:
+#             x = tf.keras.layers.Dense(self.hidden_dim)(inputs)
+#             x = tf.keras.layers.LayerNormalization(epsilon=1e-6)(x)
+#
+#             for i in range(self.num_layers - 1):
+#                 y = tf.keras.layers.Dense(self.hidden_dim, activation='relu')(x)
+#                 y = tf.keras.layers.Dropout(self.rate)(y)
+#                 x = tf.keras.layers.Add()([x, y])
+#                 x = tf.keras.layers.LayerNormalization(epsilon=1e-6)(x)
+#         elif self.num_layers == 1:
+#             x = tf.keras.layers.Dense(
+#                 self.hidden_dim, activation='relu')(inputs)
+#         else:
+#             x = inputs
+#
+#         outputs = tf.keras.layers.Dense(self.output_dim)(x)
+#         self.fnn = tf.keras.Model(inputs, outputs)
+#         super().build(input_shape)
+#
+#     def call(self, inputs, training=None, mask=None):
+#         return self.fnn(inputs)
+
+
 class MtVae(tf.keras.Model):
     def __init__(self, conf: LocalConfig):
         super(MtVae, self).__init__()
@@ -596,18 +699,29 @@ class MtVae(tf.keras.Model):
 
         if conf.use_note_number:
             if "note_number" in input_shape:
+                num_inputs = conf.num_pitches if conf.use_one_hot_conditioning else 1
                 decoder_inputs["note_number"] = tf.keras.layers.Input(
-                    shape=(conf.num_pitches,), name="note_number")
+                    shape=(num_inputs,), name="note_number")
         if conf.use_velocity:
             if "velocity" in input_shape:
+                num_inputs = conf.num_velocities if conf.use_one_hot_conditioning else 1
                 decoder_inputs["velocity"] = tf.keras.layers.Input(
-                    shape=(conf.num_velocities,), name="velocity")
+                    shape=(num_inputs,), name="velocity")
+        if conf.use_instrument_id:
+            if "instrument_id" in input_shape:
+                num_inputs = conf.num_instruments if conf.use_one_hot_conditioning else 1
+                decoder_inputs["instrument_id"] = tf.keras.layers.Input(
+                    shape=(num_inputs,), name="instrument_id")
         if conf.use_heuristics:
             if "measures" in input_shape:
                 decoder_inputs["measures"] = tf.keras.layers.Input(
                     shape=(conf.num_measures,), name="measures")
 
-        self.decoder = create_mt_decoder(decoder_inputs, conf)
+        if conf.mha_decoder:
+            self.decoder = create_mt_mha_decoder(decoder_inputs, conf)
+        else:
+            self.decoder = create_mt_decoder(decoder_inputs, conf)
+
         if conf.print_model_summary:
             print(self.decoder.summary())
 
