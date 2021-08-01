@@ -8,10 +8,7 @@ from sound_generator import SoundGenerator
 
 @st.cache(allow_output_mutation=True)
 def load_sound_generator():
-    return SoundGenerator(
-        config_path="deployed/conf.json",
-        checkpoint_path="deployed/model.h5"
-    )
+    return SoundGenerator()
 
 
 measure_max_val = 149

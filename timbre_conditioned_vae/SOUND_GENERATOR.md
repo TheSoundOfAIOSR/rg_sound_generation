@@ -22,10 +22,6 @@ Install required packages
 
 `pip install -r requirements.txt`
 
-Download the model
-
-`curl https://osr-tsoai.s3.amazonaws.com/mt_5/model.h5 -o deployed/model.h5`
-
 Run the server
 
 `streamlit run app.py`

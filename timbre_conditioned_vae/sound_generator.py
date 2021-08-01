@@ -1,12 +1,13 @@
 import os
 import tsms
+import numpy as np
+from urllib.request import urlretrieve
 from loguru import logger
 from pprint import pprint
 import warnings
 from typing import Dict, Any
 from tcvae import model, localconfig, train
 from tcvae.compute_measures import heuristic_names
-import numpy as np
 
 
 warnings.simplefilter("ignore")
@@ -40,13 +41,28 @@ class SoundGenerator:
         return cls._instance
 
     def __init__(self, config_path: str = None,
-                 checkpoint_path: str = None):
+                 checkpoint_path: str = None,
+                 auto_download: bool = True):
         self._config_path = config_path
         self._checkpoint_path = checkpoint_path
         self._conf = localconfig.LocalConfig()
         self._model = None
-        self._measure_to_index = dict((n, i) for i, n in enumerate(heuristic_names))
-        self._index_to_measure = dict((v, k) for k, v in self._measure_to_index.items())
+
+        # Use defaults
+        if self._config_path is None:
+            default_config_path = os.path.join(os.getcwd(), "deployed", "conf.json")
+            if os.path.isfile(default_config_path):
+                logger.info("Using default config")
+                self._config_path = default_config_path
+
+        if self._checkpoint_path is None:
+            default_checkpoint_path = os.path.join(os.getcwd(), "deployed", "model.h5")
+            if not os.path.isfile(default_checkpoint_path) and auto_download:
+                logger.info("Downloading default model checkpoint")
+                _ = urlretrieve("https://osr-tsoai.s3.amazonaws.com/mt_5/model.h5", "deployed/model.h5")
+            if os.path.isfile(default_checkpoint_path):
+                logger.info("Using default model checkpoint")
+                self._checkpoint_path = default_checkpoint_path
 
         if self._config_path is not None:
             self.load_config()
@@ -88,7 +104,6 @@ class SoundGenerator:
     def load_model(self) -> None:
         assert os.path.isfile(self._checkpoint_path), f"No checkpoint at {self._checkpoint_path}"
         self._model = model.MtVae(self._conf)
-        # For some reason model.build doesn't work
         _ = self._model(train.get_zero_batch(self._conf))
         self._model.load_weights(self._checkpoint_path)
         logger.info("Model loaded")
@@ -104,13 +119,13 @@ class SoundGenerator:
         mask[:, :, :harmonics] = np.ones((1, self._conf.harmonic_frame_steps, harmonics))
         return mask
 
-    def _prepare_note_number(self, note_number):
+    def _prepare_note_number(self, note_number) -> np.ndarray:
         index = note_number - self._conf.starting_midi_pitch
         encoded = np.zeros((self._conf.num_pitches, ))
         encoded[index] = 1.
         return encoded
 
-    def _prepare_velocity(self, velocity):
+    def _prepare_velocity(self, velocity) -> np.ndarray:
         index = velocity // 25 - 1
         encoded = np.zeros((self._conf.num_velocities, ))
         encoded[index] = 1.
@@ -142,7 +157,7 @@ class SoundGenerator:
         }
         return decoder_inputs
 
-    def info(self):
+    def info(self) -> None:
         print("=" * 40)
         print("Expected input dictionary:")
         print("=" * 40)
