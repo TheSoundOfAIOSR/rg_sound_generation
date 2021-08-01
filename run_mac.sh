@@ -1,2 +1,2 @@
 cd rg_sound_generation
-./venv/bin/python sound_generator/main_rgws.py
+./venv/bin/python timbre_conditioned_vae/main_rgws.py

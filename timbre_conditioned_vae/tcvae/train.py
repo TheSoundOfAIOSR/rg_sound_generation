@@ -144,7 +144,7 @@ def set_kl_weight(epoch, conf: LocalConfig):
             print(f"KL Weight updated to {conf.kl_weight}")
 
 
-def train(conf: LocalConfig):
+def train(conf: LocalConfig, unfrozen_layers = None):
     print("Using configuration:")
     print("="*50)
     for key, value in vars(conf).items():
@@ -168,6 +168,23 @@ def train(conf: LocalConfig):
         print("Loading model")
         _ = _model(_zero_batch(conf))
         _model.load_weights(conf.pretrained_model_path)
+
+        if unfrozen_layers is not None:
+            print("Freezing everything except given layers")
+            decoder_layer_names = [layer.name for layer in _model.decoder.layers]
+
+            for layer in unfrozen_layers:
+                assert layer in decoder_layer_names, f"{layer} to unfreeze not found in decoder"
+
+            for layer in _model.decoder.layers:
+                if layer.name not in unfrozen_layers:
+                    layer.trainable = False
+                else:
+                    layer.trainable = True
+
+            _model.encoder.trainable = False
+            print("Model summary after freezing model:")
+            print(_model.summary())
     else:
         print("No pretrained model provided")
 
