@@ -9,7 +9,7 @@ class LocalConfig:
     checkpoints_dir = os.path.join(os.getcwd(), "checkpoints")
     simple_encoder = False
     simple_decoder = False
-    mha_decoder = False
+    create_decoder_function = 'cnn'
     pretrained_model_path = None
     model_name = "VAE"
     run_name = "Default"

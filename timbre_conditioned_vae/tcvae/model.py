@@ -637,39 +637,39 @@ def create_mt_mha_decoder(inputs, conf: LocalConfig):
     return m
 
 
-# class FeedForward(tf.keras.layers.Layer):
-#     def __init__(self, output_dim, hidden_dim, num_layers=1, rate=0.1):
-#         super(FeedForward, self).__init__()
-#         self.output_dim = output_dim
-#         self.hidden_dim = hidden_dim
-#         self.num_layers = num_layers
-#         self.rate = rate
-#         self.fnn = None
-#
-#     def build(self, input_shape):
-#         inputs = tf.keras.layers.Input(shape=input_shape[1:])
-#
-#         if self.num_layers > 1:
-#             x = tf.keras.layers.Dense(self.hidden_dim)(inputs)
-#             x = tf.keras.layers.LayerNormalization(epsilon=1e-6)(x)
-#
-#             for i in range(self.num_layers - 1):
-#                 y = tf.keras.layers.Dense(self.hidden_dim, activation='relu')(x)
-#                 y = tf.keras.layers.Dropout(self.rate)(y)
-#                 x = tf.keras.layers.Add()([x, y])
-#                 x = tf.keras.layers.LayerNormalization(epsilon=1e-6)(x)
-#         elif self.num_layers == 1:
-#             x = tf.keras.layers.Dense(
-#                 self.hidden_dim, activation='relu')(inputs)
-#         else:
-#             x = inputs
-#
-#         outputs = tf.keras.layers.Dense(self.output_dim)(x)
-#         self.fnn = tf.keras.Model(inputs, outputs)
-#         super().build(input_shape)
-#
-#     def call(self, inputs, training=None, mask=None):
-#         return self.fnn(inputs)
+class FeedForward(tf.keras.layers.Layer):
+    def __init__(self, output_dim, hidden_dim, num_layers=1, rate=0.1):
+        super(FeedForward, self).__init__()
+        self.output_dim = output_dim
+        self.hidden_dim = hidden_dim
+        self.num_layers = num_layers
+        self.rate = rate
+        self.fnn = None
+
+    def build(self, input_shape):
+        inputs = tf.keras.layers.Input(shape=input_shape[1:])
+
+        if self.num_layers > 1:
+            x = tf.keras.layers.Dense(self.hidden_dim)(inputs)
+            x = tf.keras.layers.LayerNormalization(epsilon=1e-6)(x)
+
+            for i in range(self.num_layers - 1):
+                y = tf.keras.layers.Dense(self.hidden_dim, activation='relu')(x)
+                y = tf.keras.layers.Dropout(self.rate)(y)
+                x = tf.keras.layers.Add()([x, y])
+                x = tf.keras.layers.LayerNormalization(epsilon=1e-6)(x)
+        elif self.num_layers == 1:
+            x = tf.keras.layers.Dense(
+                self.hidden_dim, activation='relu')(inputs)
+        else:
+            x = inputs
+
+        outputs = tf.keras.layers.Dense(self.output_dim)(x)
+        self.fnn = tf.keras.Model(inputs, outputs)
+        super().build(input_shape)
+
+    def call(self, inputs, training=None, mask=None):
+        return self.fnn(inputs)
 
 
 class MtVae(tf.keras.Model):
@@ -717,10 +717,12 @@ class MtVae(tf.keras.Model):
                 decoder_inputs["measures"] = tf.keras.layers.Input(
                     shape=(conf.num_measures,), name="measures")
 
-        if conf.mha_decoder:
+        if conf.create_decoder_function == 'cnn':
+            self.decoder = create_mt_decoder(decoder_inputs, conf)
+        elif conf.create_decoder_function == 'mha':
             self.decoder = create_mt_mha_decoder(decoder_inputs, conf)
         else:
-            self.decoder = create_mt_decoder(decoder_inputs, conf)
+            self.decoder = conf.create_decoder_function(decoder_inputs, conf)
 
         if conf.print_model_summary:
             print(self.decoder.summary())
