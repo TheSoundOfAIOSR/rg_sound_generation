@@ -140,6 +140,7 @@ class SoundGenerator:
         velocity = data.get("velocity") or 75
         latent_sample = data.get("latent_sample") or np.random.rand(self._conf.latent_dim)
         heuristic_measures = data.get("heuristic_measures") or np.random.rand(self._conf.num_measures)
+        qualities = data.get("qualities") or []
 
         assert 40 <= input_note_number <= 88, "Conditioning note number must be between" \
                                               " 40 and 88"
@@ -167,7 +168,8 @@ class SoundGenerator:
             "pitch": 40,
             "velocity": 100,
             "heuristic_measures": np.random.rand(self._conf.num_measures).tolist(),
-            "latent_sample": np.random.rand(self._conf.latent_dim).tolist()
+            "latent_sample": np.random.rand(self._conf.latent_dim).tolist(),
+            "qualities": []
         })
         print("=" * 40)
         print("input_pitch: Note number to use in decoder input")
@@ -176,6 +178,7 @@ class SoundGenerator:
         print("heuristic_measures: List of values for following measures used in decoder in the sequence shown:")
         pprint(heuristic_names)
         print("latent_sample: Values for z input to decoder")
+        print("qualities: List of words detected from user speech")
         print("=" * 40)
 
     def get_prediction(self, data: Dict) -> Any:
