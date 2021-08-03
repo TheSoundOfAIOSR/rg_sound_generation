@@ -1,4 +1,5 @@
 import tensorflow as tf
+import json
 from .localconfig import LocalConfig
 
 
@@ -398,15 +399,26 @@ def conv_2d_encoder_block(inputs, filters, kernel, stride=1, use_act=True, name=
                                   strides=stride, name=name)(inputs)
 
 
-def ffn_block(inputs, num_repeats, hidden_dim):
-    x = tf.keras.layers.Dense(hidden_dim, activation="elu")(inputs)
-    x = tf.keras.layers.LayerNormalization()(x)
-
-    for i in range(0, num_repeats):
-        y = tf.keras.layers.Dense(hidden_dim, activation="elu")(x)
-        x = tf.keras.layers.Add()([x, y])
+def ffn_block(inputs, num_repeats, hidden_dim, save_names=False, k=None):
+    if not save_names:
+        x = tf.keras.layers.Dense(hidden_dim, activation="elu")(inputs)
         x = tf.keras.layers.LayerNormalization()(x)
-    return x
+
+        for i in range(0, num_repeats):
+            y = tf.keras.layers.Dense(hidden_dim, activation="elu")(x)
+            x = tf.keras.layers.Add()([x, y])
+            x = tf.keras.layers.LayerNormalization()(x)
+        return x
+    else:
+        assert k is not None, "Need a key name to save output layer names"
+        x = name(k, tf.keras.layers.Dense(hidden_dim, activation="elu"))(inputs)
+        x = name(k, tf.keras.layers.LayerNormalization())(x)
+
+        for i in range(0, num_repeats):
+            y = name(k, tf.keras.layers.Dense(hidden_dim, activation="elu"))(x)
+            x = name(k, tf.keras.layers.Add())([x, y])
+            x = name(k, tf.keras.layers.LayerNormalization())(x)
+        return x
 
 
 def get_encoder_inputs(inputs, conf: LocalConfig):
@@ -459,9 +471,31 @@ def create_mt_encoder(inputs, conf: LocalConfig):
     z = tf.keras.layers.Dense(conf.latent_dim, activation="sigmoid", name="z_output")(hidden)
 
     m = tf.keras.models.Model(inputs, z)
-    # # tf.keras.utils.plot_model(m, to_file="encoder.png", show_shapes=True,
-    #                           show_layer_names=False)
+    if conf.print_model_summary:
+        tf.keras.utils.plot_model(m, to_file="encoder.png", show_shapes=True,
+                                  show_layer_names=False)
     return m
+
+
+output_layers = {}
+
+
+def name(key, layer):
+    global output_layers
+
+    if key not in output_layers:
+        output_layers[key] = []
+
+    layer_name = str(layer.name).split("/")[0]
+    output_layers[key].append(layer_name)
+    return layer
+
+
+def save_output_layers():
+    global output_layers
+
+    with open("output_layers.json", "w") as f:
+        json.dump(output_layers, f)
 
 
 def create_mt_decoder(inputs, conf: LocalConfig):
@@ -528,44 +562,46 @@ def create_mt_decoder(inputs, conf: LocalConfig):
             kernels = [5] * repeats
             filters_kernels = iter(zip(filters, kernels))
 
-            task_in = tf.keras.layers.Permute(dims=(1, 3, 2))(shared_out)
-            task_in = tf.keras.layers.Dense(units=v["shape"][1])(task_in)
-            task_in = tf.keras.layers.Permute(dims=(1, 3, 2))(task_in)
-            task_in = tf.keras.layers.Dense(units=v["shape"][2])(task_in)
+            task_in = name(k, tf.keras.layers.Permute(dims=(1, 3, 2)))(shared_out)
+            task_in = name(k, tf.keras.layers.Dense(units=v["shape"][1]))(task_in)
+            task_in = name(k, tf.keras.layers.Permute(dims=(1, 3, 2)))(task_in)
+            task_in = name(k, tf.keras.layers.Dense(units=v["shape"][2]))(task_in)
 
             wrapper = {f"up_out_0": task_in}
 
             for i in range(0, len(filters)):
                 _f, _k = next(filters_kernels)
-                wrapper[f"conv_out_{i}"] = tf.keras.layers.Conv2D(
-                    _f, _k, padding=conf.padding, name=f"{k}_decoder_conv_{i}")(wrapper[f"up_out_{i}"])
-                wrapper[f"bn_out_{i}"] = tf.keras.layers.BatchNormalization(
-                    name=f"{k}_decoder_bn_{i}")(wrapper[f"conv_out_{i}"])
-                wrapper[f"act_{i}"] = tf.keras.layers.Activation(
-                    "elu", name=f"{k}_decoder_act_{i}")(wrapper[f"bn_out_{i}"])
+                wrapper[f"conv_out_{i}"] = name(k, tf.keras.layers.Conv2D(
+                    _f, _k, padding=conf.padding, name=f"{k}_decoder_conv_{i}"))(wrapper[f"up_out_{i}"])
+                wrapper[f"bn_out_{i}"] = name(k, tf.keras.layers.BatchNormalization(
+                    name=f"{k}_decoder_bn_{i}"))(wrapper[f"conv_out_{i}"])
+                wrapper[f"act_{i}"] = name(k, tf.keras.layers.Activation(
+                    "elu", name=f"{k}_decoder_act_{i}"))(wrapper[f"bn_out_{i}"])
                 # wrapper[f"up_out_{i}"] = tf.keras.layers.Dense(units=f)(wrapper[f"up_out_{i}"])
-                wrapper[f"up_out_{i + 1}"] = tf.keras.layers.Add()([
+                wrapper[f"up_out_{i + 1}"] = name(k, tf.keras.layers.Add()([
                     wrapper[f"act_{i}"], wrapper[f"up_out_{i}"]
-                ])
+                ]))
 
             conv2d_out = wrapper[f"up_out_{len(filters)}"]
             if conf.using_categorical:
-                task_out = tf.keras.layers.Permute(dims=(1, 3, 2))(conv2d_out)
-                task_out = tf.keras.layers.Dense(v["channels"], activation="elu")(task_out)
-                task_out = tf.keras.layers.Permute(dims=(1, 3, 2))(task_out)
-                task_out = tf.keras.layers.Conv2D(256, 1, padding="same")(task_out)
+                task_out = name(k, tf.keras.layers.Permute(dims=(1, 3, 2)))(conv2d_out)
+                task_out = name(k, tf.keras.layers.Dense(v["channels"], activation="elu"))(task_out)
+                task_out = name(k, tf.keras.layers.Permute(dims=(1, 3, 2)))(task_out)
+                task_out = name(k, tf.keras.layers.Conv2D(256, 1, padding="same"))(task_out)
             else:
-                conv2d_out = tf.keras.layers.Conv2D(1, 1, padding="same")(conv2d_out)
-                task_out = tf.keras.layers.Lambda(lambda y: tf.squeeze(y, axis=-1))(conv2d_out)
-                task_out = ffn_block(task_out, 2, v["shape"][1])
-                task_out = tf.keras.layers.Dense(units=v["channels"])(task_out)
+                conv2d_out = name(k, tf.keras.layers.Conv2D(1, 1, padding="same"))(conv2d_out)
+                task_out = name(k, tf.keras.layers.Lambda(lambda y: tf.squeeze(y, axis=-1)))(conv2d_out)
+                task_out = ffn_block(task_out, 2, v["shape"][1], save_names=True, k=k)
+                task_out = name(k, tf.keras.layers.Dense(units=v["channels"]))(task_out)
             outputs[k] = task_out
 
     m = tf.keras.models.Model(
         inputs, outputs
     )
-    # tf.keras.utils.plot_model(m, to_file="decoder.png", show_shapes=True,
-    #                           show_layer_names=False)
+    save_output_layers()
+    if conf.print_model_summary:
+        tf.keras.utils.plot_model(m, to_file="decoder.png", show_shapes=True,
+                                  show_layer_names=False)
     return m
 
 

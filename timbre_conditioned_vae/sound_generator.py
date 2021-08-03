@@ -99,6 +99,7 @@ class SoundGenerator:
         self._conf.load_config_from_file(self._config_path)
         # Prediction specific config
         self._conf.batch_size = 1
+        self._conf.print_model_summary = False
         logger.info("Config loaded")
 
     def load_model(self) -> None:
