@@ -211,6 +211,7 @@ class DataHandler:
                  fix_pitch=True,
                  normalize_mag=False,
                  use_phase=False,
+                 use_h_mag_mask=True,
                  weight_type='mag_max_pool',  # 'mag_max_pool', 'mag', 'none'
                  freq_loss_type='mse',  # 'cross_entropy', 'mse'
                  mag_loss_type='l2_db',  # 'cross_entropy', 'l2_db' 'l1_db', 'rms_db', 'mse'
@@ -226,6 +227,7 @@ class DataHandler:
         self._fix_pitch = fix_pitch
         self._normalize_mag = normalize_mag
         self._use_phase = use_phase
+        self._use_h_mag_mask = use_h_mag_mask
         self._weight_type = weight_type
         self._freq_loss_type = freq_loss_type
         self._mag_loss_type = mag_loss_type
@@ -263,6 +265,14 @@ class DataHandler:
     @use_phase.setter
     def use_phase(self, value: bool):
         self._use_phase = value
+
+    @property
+    def use_h_mag_mask(self):
+        return self._use_h_mag_mask
+
+    @use_h_mag_mask.setter
+    def use_h_mag_mask(self, value: bool):
+        self._use_h_mag_mask = value
 
     @property
     def weight_type(self):
@@ -523,34 +533,41 @@ class DataHandler:
         mag_env_loss = 0.0
         h_mag_dist_loss = 0.0
         h_mag_loss = 0.0
+        no_mask_h_mag_loss = 0.0
         h_phase_diff_loss = 0.0
 
         # compute frequencies loss
         if "f0_shifts" in normalized_data_pred:
             f0_shifts_pred = normalized_data_pred["f0_shifts"]
-            if self._freq_loss_type == 'mse':
-                f0_loss = tf.square(f0_shifts_true - f0_shifts_pred) * f0_shifts_w
-                f0_loss = tf.math.reduce_sum(f0_loss) / tf.math.reduce_sum(f0_shifts_w)
-            elif self._freq_loss_type == 'cross_entropy':
-                f0_shifts_true = mu_law_encode(f0_shifts_true, 256)
-                f0_loss = tf.nn.sparse_softmax_cross_entropy_with_logits(
-                    f0_shifts_true, f0_shifts_pred)
-                f0_loss = tf.math.reduce_sum(
-                    f0_loss * f0_shifts_w) / tf.math.reduce_sum(f0_shifts_w)
+            if self.losses_weights["f0_loss"] > 0.0:
+                if self._freq_loss_type == 'mse':
+                    f0_loss = tf.square(f0_shifts_true - f0_shifts_pred) * f0_shifts_w
+                    f0_loss = tf.math.reduce_sum(f0_loss) / tf.math.reduce_sum(f0_shifts_w)
+                elif self._freq_loss_type == 'cross_entropy':
+                    f0_shifts_true = mu_law_encode(f0_shifts_true, 256)
+                    f0_loss = tf.nn.sparse_softmax_cross_entropy_with_logits(
+                        f0_shifts_true, f0_shifts_pred)
+                    f0_loss = tf.math.reduce_sum(
+                        f0_loss * f0_shifts_w) / tf.math.reduce_sum(f0_shifts_w)
+
+                f0_loss *= self.losses_weights["f0_loss"]
 
         if "h_freq_shifts" in normalized_data_pred:
             h_freq_shifts_pred = normalized_data_pred["h_freq_shifts"]
-            if self._freq_loss_type == 'mse':
-                h_freq_shifts_loss = tf.square(
-                    h_freq_shifts_true - h_freq_shifts_pred) * h_freq_shifts_w
-                h_freq_shifts_loss = tf.math.reduce_sum(
-                    h_freq_shifts_loss) / tf.math.reduce_sum(h_freq_shifts_w)
-            elif self._freq_loss_type == 'cross_entropy':
-                h_freq_shifts_true = mu_law_encode(h_freq_shifts_true, 256)
-                h_freq_shifts_loss = tf.nn.sparse_softmax_cross_entropy_with_logits(
-                    h_freq_shifts_true, h_freq_shifts_pred)
-                h_freq_shifts_loss = tf.math.reduce_sum(
-                    h_freq_shifts_loss * h_freq_shifts_w) / tf.math.reduce_sum(h_freq_shifts_w)
+            if self.losses_weights["h_freq_shifts_loss"] > 0.0:
+                if self._freq_loss_type == 'mse':
+                    h_freq_shifts_loss = tf.square(
+                        h_freq_shifts_true - h_freq_shifts_pred) * h_freq_shifts_w
+                    h_freq_shifts_loss = tf.math.reduce_sum(
+                        h_freq_shifts_loss) / tf.math.reduce_sum(h_freq_shifts_w)
+                elif self._freq_loss_type == 'cross_entropy':
+                    h_freq_shifts_true = mu_law_encode(h_freq_shifts_true, 256)
+                    h_freq_shifts_loss = tf.nn.sparse_softmax_cross_entropy_with_logits(
+                        h_freq_shifts_true, h_freq_shifts_pred)
+                    h_freq_shifts_loss = tf.math.reduce_sum(
+                        h_freq_shifts_loss * h_freq_shifts_w) / tf.math.reduce_sum(h_freq_shifts_w)
+
+                h_freq_shifts_loss *= self.losses_weights["h_freq_shifts_loss"]
 
         # compute magnitudes loss
         if "mag_env" in normalized_data_pred and "h_mag_dist" in normalized_data_pred:
@@ -560,84 +577,121 @@ class DataHandler:
             h_mag_pred = h_mag_dist_pred * (mag_env_pred * self.global_max["mag_env"] + delta) / (1.0 + delta)
 
             if self._mag_loss_type == 'cross_entropy':
-                mag_env_true = mu_law_encode(mag_env_true, 256, range_0_1=True)
-                mag_env_loss = tf.nn.sparse_softmax_cross_entropy_with_logits(
-                    mag_env_true, mag_env_pred)
-                mag_env_loss = tf.math.reduce_sum(
-                    mag_env_loss * mag_env_w) / tf.math.reduce_sum(mag_env_w)
+                if self.losses_weights["mag_env_loss"] > 0.0:
+                    mag_env_true = mu_law_encode(mag_env_true, 256, range_0_1=True)
+                    mag_env_loss = tf.nn.sparse_softmax_cross_entropy_with_logits(
+                        mag_env_true, mag_env_pred)
+                    mag_env_loss = tf.math.reduce_sum(
+                        mag_env_loss * mag_env_w) / tf.math.reduce_sum(mag_env_w)
+                    mag_env_loss *= self.losses_weights["mag_env_loss"]
 
-                h_mag_dist_true = mu_law_encode(h_mag_dist_true, 256, range_0_1=True)
-                h_mag_dist_loss = tf.nn.sparse_softmax_cross_entropy_with_logits(
-                    h_mag_dist_true, h_mag_dist_pred)
-                h_mag_dist_loss = tf.math.reduce_sum(
-                    h_mag_dist_loss * h_mag_w) / tf.math.reduce_sum(h_mag_w)
+                if self.losses_weights["h_mag_dist_loss"] > 0.0:
+                    h_mag_dist_true = mu_law_encode(h_mag_dist_true, 256, range_0_1=True)
+                    h_mag_dist_loss = tf.nn.sparse_softmax_cross_entropy_with_logits(
+                        h_mag_dist_true, h_mag_dist_pred)
+                    h_mag_dist_loss = tf.math.reduce_sum(
+                        h_mag_dist_loss * h_mag_w) / tf.math.reduce_sum(h_mag_w)
+                    h_mag_dist_loss *= self.losses_weights["h_mag_dist_loss"]
             else:
                 if self._mag_loss_type == 'mse':
-                    mag_env_loss = tf.math.square(mag_env_true - mag_env_pred) * mag_env_w
-                    h_mag_dist_loss = tf.math.square(
-                        h_mag_dist_true - h_mag_dist_pred) * h_mag_dist_w
-                    h_mag_loss = tf.math.square(
-                        h_mag_true - h_mag_pred) * h_mag_w
+                    if self.losses_weights["mag_env_loss"] > 0.0:
+                        mag_env_loss = tf.math.square(mag_env_true - mag_env_pred) * mag_env_w
+                    if self.losses_weights["h_mag_dist_loss"] > 0.0:
+                        h_mag_dist_loss = tf.math.square(
+                            h_mag_dist_true - h_mag_dist_pred) * h_mag_dist_w
+                    if self.losses_weights["h_mag_loss"] > 0.0:
+                        h_mag_loss = tf.math.square(
+                            h_mag_true - h_mag_pred) * h_mag_w
+                        no_mask_h_mag_loss = tf.math.square(
+                            h_mag_true - h_mag_pred)
 
                 elif self._mag_loss_type == 'rms_db':
-                    mag_env_loss = linear_to_normalized_db(
-                        tf.math.abs(mag_env_true - mag_env_pred)) * mag_env_w
-                    h_mag_dist_loss = linear_to_normalized_db(tf.math.abs(
-                        h_mag_dist_true - h_mag_dist_pred)) * h_mag_dist_w
-                    h_mag_loss = linear_to_normalized_db(tf.math.abs(
-                        h_mag_true - h_mag_pred)) * h_mag_w
+                    if self.losses_weights["mag_env_loss"] > 0.0:
+                        mag_env_loss = linear_to_normalized_db(
+                            tf.math.abs(mag_env_true - mag_env_pred)) * mag_env_w
+                    if self.losses_weights["h_mag_dist_loss"] > 0.0:
+                        h_mag_dist_loss = linear_to_normalized_db(tf.math.abs(
+                            h_mag_dist_true - h_mag_dist_pred)) * h_mag_dist_w
+                    if self.losses_weights["h_mag_loss"] > 0.0:
+                        h_mag_loss = linear_to_normalized_db(tf.math.abs(
+                            h_mag_true - h_mag_pred)) * h_mag_w
+                        no_mask_h_mag_loss = linear_to_normalized_db(tf.math.abs(
+                            h_mag_true - h_mag_pred))
 
                 elif self._mag_loss_type == 'l1_db':
-                    mag_env_loss = tf.math.abs(
-                        linear_to_normalized_db(mag_env_true, self._db_limit) -
-                        linear_to_normalized_db(mag_env_pred, self._db_limit)) * mag_env_w
-                    h_mag_dist_loss = tf.math.abs(
-                        linear_to_normalized_db(h_mag_dist_true, self._db_limit) -
-                        linear_to_normalized_db(h_mag_dist_pred, self._db_limit)) * h_mag_dist_w
-                    h_mag_loss = tf.math.abs(
-                        linear_to_normalized_db(h_mag_true, self._db_limit) -
-                        linear_to_normalized_db(h_mag_pred, self._db_limit)) * h_mag_w
+                    if self.losses_weights["mag_env_loss"] > 0.0:
+                        mag_env_loss = tf.math.abs(
+                            linear_to_normalized_db(mag_env_true, self._db_limit) -
+                            linear_to_normalized_db(mag_env_pred, self._db_limit)) * mag_env_w
+                    if self.losses_weights["h_mag_dist_loss"] > 0.0:
+                        h_mag_dist_loss = tf.math.abs(
+                            linear_to_normalized_db(h_mag_dist_true, self._db_limit) -
+                            linear_to_normalized_db(h_mag_dist_pred, self._db_limit)) * h_mag_dist_w
+                    if self.losses_weights["h_mag_loss"] > 0.0:
+                        h_mag_loss = tf.math.abs(
+                            linear_to_normalized_db(h_mag_true, self._db_limit) -
+                            linear_to_normalized_db(h_mag_pred, self._db_limit)) * h_mag_w
+                        no_mask_h_mag_loss = tf.math.abs(
+                            linear_to_normalized_db(h_mag_true, self._db_limit) -
+                            linear_to_normalized_db(h_mag_pred, self._db_limit))
 
                 elif self._mag_loss_type == 'l2_db':
-                    mag_env_loss = tf.math.square(
-                        linear_to_normalized_db(mag_env_true, self._db_limit) -
-                        linear_to_normalized_db(mag_env_pred, self._db_limit)) * mag_env_w
-                    h_mag_dist_loss = tf.math.square(
-                        linear_to_normalized_db(h_mag_dist_true, self._db_limit) -
-                        linear_to_normalized_db(h_mag_dist_pred, self._db_limit)) * h_mag_dist_w
-                    h_mag_loss = tf.math.square(
-                        linear_to_normalized_db(h_mag_true, self._db_limit) -
-                        linear_to_normalized_db(h_mag_pred, self._db_limit)) * h_mag_w
+                    if self.losses_weights["mag_env_loss"] > 0.0:
+                        mag_env_loss = tf.math.square(
+                            linear_to_normalized_db(mag_env_true, self._db_limit) -
+                            linear_to_normalized_db(mag_env_pred, self._db_limit)) * mag_env_w
+                    if self.losses_weights["h_mag_dist_loss"] > 0.0:
+                        h_mag_dist_loss = tf.math.square(
+                            linear_to_normalized_db(h_mag_dist_true, self._db_limit) -
+                            linear_to_normalized_db(h_mag_dist_pred, self._db_limit)) * h_mag_dist_w
+                    if self.losses_weights["h_mag_loss"] > 0.0:
+                        h_mag_loss = tf.math.square(
+                            linear_to_normalized_db(h_mag_true, self._db_limit) -
+                            linear_to_normalized_db(h_mag_pred, self._db_limit)) * h_mag_w
+                        no_mask_h_mag_loss = tf.math.square(
+                            linear_to_normalized_db(h_mag_true, self._db_limit) -
+                            linear_to_normalized_db(h_mag_pred, self._db_limit))
 
-                mag_env_loss = tf.math.reduce_mean(
-                    mag_env_loss) / tf.math.reduce_sum(mag_env_w)
-                h_mag_dist_loss = tf.math.reduce_sum(
-                    h_mag_dist_loss) / tf.math.reduce_sum(h_mag_dist_w)
-                h_mag_loss = tf.math.reduce_sum(
-                    h_mag_loss) / tf.math.reduce_sum(h_mag_w)
+                if self.losses_weights["mag_env_loss"] > 0.0:
+                    mag_env_loss = tf.math.reduce_mean(
+                        mag_env_loss) / tf.math.reduce_sum(mag_env_w)
+                    mag_env_loss *= self.losses_weights["mag_env_loss"]
+
+                if self.losses_weights["h_mag_dist_loss"] > 0.0:
+                    h_mag_dist_loss = tf.math.reduce_sum(
+                        h_mag_dist_loss) / tf.math.reduce_sum(h_mag_dist_w)
+                    h_mag_dist_loss *= self.losses_weights["h_mag_dist_loss"]
+
+                if self.losses_weights["h_mag_loss"] > 0.0:
+                    h_mag_loss = tf.math.reduce_sum(
+                        h_mag_loss) / tf.math.reduce_sum(h_mag_w)
+
+                    no_mask_h_mag_loss = tf.math.reduce_mean(no_mask_h_mag_loss)
+
+                    h_mag_loss *= self.losses_weights["h_mag_loss"]
+                    no_mask_h_mag_loss *= self.losses_weights["h_mag_loss"]
 
         # compute phase loss
         if "h_phase_diff" in normalized_data_pred:
-            h_phase_diff_pred = normalized_data_pred["h_phase_diff"]
-            h_phase_diff_loss = tf.square(
-                h_phase_diff_true - h_phase_diff_pred) * phase_w
-            h_phase_diff_loss = tf.math.reduce_sum(
-                h_phase_diff_loss) / tf.math.reduce_sum(phase_w)
+            if self.losses_weights["h_phase_diff_loss"] > 0.0:
+                h_phase_diff_pred = normalized_data_pred["h_phase_diff"]
+                h_phase_diff_loss = tf.square(
+                    h_phase_diff_true - h_phase_diff_pred) * phase_w
+                h_phase_diff_loss = tf.math.reduce_sum(
+                    h_phase_diff_loss) / tf.math.reduce_sum(phase_w)
+                h_phase_diff_loss *= self.losses_weights["h_phase_diff_loss"]
 
-        # weight losses
-        f0_loss *= self.losses_weights["f0_loss"]
-        h_freq_shifts_loss *= self.losses_weights["h_freq_shifts_loss"]
-        mag_env_loss *= self.losses_weights["mag_env_loss"]
-        h_mag_dist_loss *= self.losses_weights["h_mag_dist_loss"]
-        h_mag_loss *= self.losses_weights["h_mag_loss"]
-        h_phase_diff_loss *= self.losses_weights["h_phase_diff_loss"]
+        if self._use_h_mag_mask:
+            used_h_mag_loss = h_mag_loss
+        else:
+            used_h_mag_loss = no_mask_h_mag_loss
 
         loss = \
             f0_loss + \
             mag_env_loss + \
             h_freq_shifts_loss + \
             h_mag_dist_loss + \
-            h_mag_loss + \
+            used_h_mag_loss + \
             h_phase_diff_loss
 
         losses = {
@@ -647,6 +701,7 @@ class DataHandler:
             "mag_env_loss": mag_env_loss,
             "h_mag_dist_loss": h_mag_dist_loss,
             "h_mag_loss": h_mag_loss,
+            "no_mask_h_mag_loss": no_mask_h_mag_loss,
             "h_phase_diff_loss": h_phase_diff_loss,
         }
 
