@@ -144,7 +144,10 @@ def set_kl_weight(epoch, conf: LocalConfig):
             print(f"KL Weight updated to {conf.kl_weight}")
 
 
-def train(conf: LocalConfig, unfrozen_layers = None):
+def train(conf: LocalConfig, unfrozen_layers=None):
+
+    tf.keras.backend.clear_session()
+
     print("Using configuration:")
     print("="*50)
     for key, value in vars(conf).items():

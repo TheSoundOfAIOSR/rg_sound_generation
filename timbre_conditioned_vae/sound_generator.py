@@ -1,4 +1,5 @@
 import os
+import tensorflow as tf
 import tsms
 import numpy as np
 from urllib.request import urlretrieve
@@ -12,6 +13,17 @@ from tcvae.compute_measures import heuristic_names
 
 warnings.simplefilter("ignore")
 
+
+# qualities = {
+#     "bright": {
+#         "high": [],
+#         "high_mid": []
+#     },
+#     "dark": {
+#
+#     }
+# }
+#
 
 class HeuristicMeasures:
     def __init__(self):
@@ -43,6 +55,9 @@ class SoundGenerator:
     def __init__(self, config_path: str = None,
                  checkpoint_path: str = None,
                  auto_download: bool = True):
+
+        tf.keras.backend.clear_session()
+
         self._config_path = config_path
         self._checkpoint_path = checkpoint_path
         self._conf = localconfig.LocalConfig()
@@ -140,13 +155,15 @@ class SoundGenerator:
         velocity = data.get("velocity") or 75
         latent_sample = data.get("latent_sample") or np.random.rand(self._conf.latent_dim)
         heuristic_measures = data.get("heuristic_measures") or np.random.rand(self._conf.num_measures)
-        qualities = data.get("qualities") or []
+        _ = data.get("qualities") or []
 
         assert 40 <= input_note_number <= 88, "Conditioning note number must be between" \
                                               " 40 and 88"
         assert 25 <= velocity <= 127, "Velocity must be between 25 and 127"
         assert np.shape(latent_sample) == (self._conf.latent_dim, )
         assert np.shape(heuristic_measures) == (self._conf.num_measures, )
+
+        # Heuristic measures will be updated according to qualities present
 
         mask = self._get_mask(output_note_number)
 
