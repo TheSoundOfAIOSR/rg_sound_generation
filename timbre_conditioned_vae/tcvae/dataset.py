@@ -36,10 +36,9 @@ def map_features(features):
     conf = LocalConfig()
 
     # name = features["sample_name"]
-    # instrument_id = tf.one_hot(features["instrument_id"], depth=conf.num_instruments)
     note_number = features["note_number"]
-    velocity = tf.cast(features["velocity"], dtype=tf.float32) / 25. - 1.
-    velocity = tf.one_hot(tf.cast(velocity, dtype=tf.uint8), depth=conf.num_velocities)
+    velocity = features["velocity"]
+    instrument_id = features["instrument_id"]
 
     h_freq = features["h_freq"]
     h_mag = features["h_mag"]
@@ -67,12 +66,25 @@ def map_features(features):
 
     measures = get_measures(h_freq, h_mag, conf)
 
-    note_number = tf.one_hot(note_number - conf.starting_midi_pitch, depth=conf.num_pitches)
+    if conf.use_one_hot_conditioning:
+        note_number = tf.one_hot(
+            note_number - conf.starting_midi_pitch, depth=conf.num_pitches)
+        velocity = tf.cast(velocity, dtype=tf.float32) / 25.0 - 1.0
+        velocity = tf.one_hot(
+            tf.cast(velocity, dtype=tf.uint8), depth=conf.num_velocities)
+        instrument_id = tf.one_hot(
+            instrument_id, depth=conf.num_instruments)
+    else:
+        note_number = tf.cast(note_number, dtype=tf.float32) / 127.0
+        velocity = tf.cast(velocity, dtype=tf.float32) / 127.0
+        num_instruments = float(conf.num_instruments)
+        instrument_id = tf.cast(instrument_id, tf.float32) / num_instruments
 
     data = {
         "mask": mask,
         "note_number": tf.squeeze(note_number),
         "velocity": tf.squeeze(velocity),
+        "instrument_id": tf.squeeze(instrument_id),
         "measures": measures,
     }
     data.update(normalized_data)
