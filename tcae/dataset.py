@@ -1,8 +1,121 @@
 import os
 import tensorflow as tf
-from .tfrecord_provider import CompleteTFRecordProvider
-from .compute_measures import get_measures
 from .localconfig import LocalConfig
+from . import heuristics
+
+
+class CompleteTFRecordProvider:
+    def __init__(self,
+                 file_pattern,
+                 example_secs=4,
+                 sample_rate=16000,
+                 frame_rate=250,
+                 map_func=None):
+        self._file_pattern = file_pattern
+        self._sample_rate = sample_rate
+        self._frame_rate = frame_rate
+        self._audio_length = example_secs * sample_rate
+        self._feature_length = example_secs * frame_rate
+        self._data_format_map_fn = tf.data.TFRecordDataset
+        self._map_func = map_func
+
+    def get_dataset(self, shuffle=True):
+        def parse_tfexample(record):
+            features = tf.io.parse_single_example(record, self.features_dict)
+            if self._map_func is not None:
+                return self._map_func(features)
+            else:
+                return features
+
+        filenames = tf.data.Dataset.list_files(self._file_pattern,
+                                               shuffle=shuffle)
+        dataset = filenames.interleave(
+            map_func=self._data_format_map_fn,
+            cycle_length=40,
+            num_parallel_calls=tf.data.experimental.AUTOTUNE,
+            deterministic=True)
+        dataset = dataset.map(parse_tfexample,
+                              num_parallel_calls=tf.data.experimental.AUTOTUNE,
+                              deterministic=True)
+        return dataset
+
+    def get_batch(self, batch_size, shuffle=True, repeats=-1):
+        dataset = self.get_dataset(shuffle)
+        dataset = dataset.repeat(repeats)
+        dataset = dataset.batch(batch_size, drop_remainder=True)
+        dataset = dataset.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
+        return dataset
+
+    @property
+    def features_dict(self):
+        return {
+            'sample_name': tf.io.FixedLenFeature([1], dtype=tf.string),
+            'instrument_id': tf.io.FixedLenFeature([1], dtype=tf.int64),
+            'note_number': tf.io.FixedLenFeature([1], dtype=tf.int64),
+            'velocity': tf.io.FixedLenFeature([1], dtype=tf.int64),
+            'instrument_source': tf.io.FixedLenFeature([1], dtype=tf.int64),
+            'qualities': tf.io.FixedLenFeature([10], dtype=tf.int64),
+            'audio': tf.io.FixedLenFeature([self._audio_length], dtype=tf.float32),
+            'f0_hz': tf.io.FixedLenFeature([self._feature_length], dtype=tf.float32),
+            'f0_confidence': tf.io.FixedLenFeature([self._feature_length], dtype=tf.float32),
+            'loudness_db': tf.io.FixedLenFeature([self._feature_length], dtype=tf.float32),
+            'f0_scaled': tf.io.FixedLenFeature([self._feature_length], dtype=tf.float32),
+            'ld_scaled': tf.io.FixedLenFeature([self._feature_length], dtype=tf.float32),
+            'z': tf.io.FixedLenFeature([self._feature_length * 16], dtype=tf.float32),
+            'f0_estimate': tf.io.FixedLenFeature([], dtype=tf.string),
+            'h_freq': tf.io.FixedLenFeature([], dtype=tf.string),
+            'h_mag': tf.io.FixedLenFeature([], dtype=tf.string),
+            'h_phase': tf.io.FixedLenFeature([], dtype=tf.string),
+        }
+
+
+heuristic_names = [
+    "inharmonicity", "even_odd", "sparse_rich", "attack_rms",
+    "decay_rms", "attack_time", "decay_time", "bass", "mid",
+    "high_mid", "high"
+]
+
+
+def get_measures(h_freq, h_mag, conf: LocalConfig):
+    inharmonic = heuristics.core.inharmonicity_measure(
+        h_freq, h_mag, None, None, None, None)
+    even_odd = heuristics.core.even_odd_measure(
+        h_freq, h_mag, None, None, None, None)
+    sparse_rich = heuristics.core.sparse_rich_measure(
+        h_freq, h_mag, None, None, None, None)
+    attack_rms = heuristics.core.attack_rms_measure(
+        h_freq, h_mag, None, None, None, None)
+    decay_rms = heuristics.core.decay_rms_measure(
+        h_freq, h_mag, None, None, None, None)
+    attack_time = heuristics.core.attack_time_measure(
+        h_freq, h_mag, None, None, None, None)
+    decay_time = heuristics.core.decay_time_measure(
+        h_freq, h_mag, None, None, None, None)
+
+    bass = heuristics.core.frequency_band_measure(
+            h_freq, h_mag, None, None, conf.sample_rate, None,
+            f_min=conf.freq_bands["bass"][0], f_max=conf.freq_bands["bass"][1]
+        )
+    mid = heuristics.core.frequency_band_measure(
+            h_freq, h_mag, None, None, conf.sample_rate, None,
+            f_min=conf.freq_bands["mid"][0], f_max=conf.freq_bands["mid"][1]
+        )
+    high_mid = heuristics.core.frequency_band_measure(
+            h_freq, h_mag, None, None, conf.sample_rate, None,
+            f_min=conf.freq_bands["high_mid"][0], f_max=conf.freq_bands["high_mid"][1]
+        )
+    high = heuristics.core.frequency_band_measure(
+            h_freq, h_mag, None, None, conf.sample_rate, None,
+            f_min=conf.freq_bands["high"][0], f_max=conf.freq_bands["high"][1]
+        )
+
+    measures = [inharmonic, even_odd, sparse_rich,
+                attack_rms, decay_rms, attack_time, decay_time,
+                bass, mid, high_mid, high]
+    measures = [tf.squeeze(m) for m in measures]
+    measures = tf.stack(measures, axis=-1)
+
+    return measures
 
 
 def create_dataset(
@@ -11,8 +124,7 @@ def create_dataset(
         example_secs=4,
         sample_rate=16000,
         frame_rate=250,
-        map_func=None
-):
+        map_func=None):
     assert os.path.isfile(dataset_path)
 
     train_data_provider = CompleteTFRecordProvider(

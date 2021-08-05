@@ -1,7 +1,7 @@
 import os
 import json
 from typing import Dict
-from .data_handler import DataHandler, SimpleDataHandler
+from .data_handler import DataHandler
 
 
 class LocalConfig:
@@ -128,8 +128,6 @@ class LocalConfig:
                 "mag_scale_fn",
                 "freq_loss_type"
             ]
-        elif data_handler_type == "simple_data_handler":
-            self.data_handler = SimpleDataHandler()
 
     def set_config(self, params: Dict):
         params_conf = dict((k, v) for k, v in params.items()

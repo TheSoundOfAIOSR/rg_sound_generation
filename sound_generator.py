@@ -8,7 +8,7 @@ from pprint import pprint
 import warnings
 from typing import Dict, Any
 from tcae import model, localconfig, train
-from tcae.compute_measures import heuristic_names
+from tcae.dataset import heuristic_names
 
 
 warnings.simplefilter("ignore")

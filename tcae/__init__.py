@@ -1,1 +1,1 @@
-from . import localconfig, dataset, model, train, predict
+from . import localconfig, dataset, model, train
