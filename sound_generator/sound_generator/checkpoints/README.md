@@ -1,1 +1,0 @@
-This is the directory where model checkpoints are to be copied

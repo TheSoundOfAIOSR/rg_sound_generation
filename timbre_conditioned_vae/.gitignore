@@ -1,8 +1,0 @@
-*.h5
-*.png
-*_logs.csv
-complete_dataset
-predictions
-checkpoints
-plots
-*.wav

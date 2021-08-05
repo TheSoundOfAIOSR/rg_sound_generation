@@ -1,17 +1,60 @@
-# Research Group - Sound Generation
+# Timbre Conditioned (Variational) Auto Encoder
 
-This is a repo of all the various scripts and tools we are creating or forking within the group.
+## Training
 
-|Title|Description|Link|
-|---|---|---|
-|NSynth Guitar Statistics|Basic stats of the guitar subset of the NSynth dataset|[Link](https://github.com/TheSoundOfAIOSR/rg_sound_generation/blob/main/members/amit/NSynth%20Guitar%20Subset%20Stats.ipynb)|
-|Create Guitar Subset|Extract the guitar subset of the NSynth dataset|[Link](https://github.com/TheSoundOfAIOSR/rg_sound_generation/blob/main/members/amit/create_subset.py)|
-|Audio Annotator|Tool to tag or label audio samples|[Link](members/amit/AudioAnnotator)|
-|Training DDSP|Script to train DDSP|[Link](https://github.com/TheSoundOfAIOSR/rg_sound_generation/blob/main/members/fabio/train_ddsp_nsynth_guitar.ipynb)|
-|Download Preprocessed|NSynth Guitar Subset Preprocessed in `tfrecord` format|[Link](https://github.com/TheSoundOfAIOSR/rg_sound_generation/blob/main/members/amit/Download%20Preprocessed.ipynb)|
-|Training DDSP starting with preprocessed dataset|Script to train DDSP starting with preprocessed dataset|[Link](https://github.com/TheSoundOfAIOSR/rg_sound_generation/blob/main/members/fabio/train_ddsp_nsynth_guitar.ipynb)|
-|Pretrained DDSP AE Checkpoint|Checkpoint for model trained on 30000 steps and 4.33 total loss|[Link](https://drive.google.com/drive/folders/1OALSV41sMOULW4zQ-r7qO5aBIbDV_wd3?usp=sharing)|
-|Prepare Partial and Complete TFRecords|Complete dataset for experimenting with mapping networks or heuristics|[Link](https://github.com/TheSoundOfAIOSR/rg_sound_generation/blob/main/members/fabio/prepare_partial_complete_tfrecord.ipynb)|
-|Audio Annotator Web|Flask app to tag or label audio samples|[Link](https://github.com/TheSoundOfAIOSR/rg_sound_generation/tree/main/audio_annotator)|
-|Mapping Models|Installable Mapping Models package for training and inference|[Link](https://github.com/TheSoundOfAIOSR/rg_sound_generation/tree/main/mapping_models)|
-|Sound Generator|End to end inference pipeline for sound generation|[Link](https://github.com/TheSoundOfAIOSR/rg_sound_generation/tree/main/sound_generator)|
+TBD
+
+## Dataset
+
+TBD
+
+## Sound Generator
+
+Get audio prediction
+
+```python
+from sound_generator import SoundGenerator
+
+
+sg = SoundGenerator()
+
+success, audio = sg.get_prediction({
+    "input_pitch": 40,
+    "pitch": 40,
+    "velocity": 100,
+    # A list of sg.conf.num_measures values between 0 and 1
+    "heuristic_measures": [0.1] * sg.conf.num_measures,
+    # A list of sg.conf.latent_dim values between 0 and 1
+    "latent_sample": [0.5] * sg.conf.latent_dim
+})
+
+```
+
+Required keys in the input dictionary:
+
+**input_pitch**: Note number to use in decoder input
+
+**pitch**: Note number to use in audio synthesis
+
+**velocity**: Velocity of the note between 25 and 127
+
+**latent_sample**: Values for z input to decoder
+
+**heuristic_measures**: List of values for following measures used in decoder in the sequence shown:
+```python
+['inharmonicity',
+ 'even_odd',
+ 'sparse_rich',
+ 'attack_rms',
+ 'decay_rms',
+ 'attack_time',
+ 'decay_time',
+ 'bass',
+ 'mid',
+ 'high_mid',
+ 'high']
+```
+
+## Sound Generator App
+
+Sound generator can also be used via a web app - [follow these instructions](SOUND_GENERATOR.md) to get it running
