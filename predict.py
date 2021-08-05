@@ -1,6 +1,6 @@
 import os
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
-from tcvae import predict, dataset, localconfig
+from tcae import predict, dataset, localconfig
 from matplotlib import pyplot as plt
 
 conf = localconfig.LocalConfig()

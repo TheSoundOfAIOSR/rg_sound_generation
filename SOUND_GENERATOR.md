@@ -4,19 +4,17 @@ Requires python >= 3.6
 
 Clone repository
 
-`git clone https://github.com/TheSoundOfAIOSR/rg_sound_generation.git`
-
-Go to the right directory
-
-`cd rg_sound_generation\timbre_conditioned_vae`
+```
+git clone https://github.com/TheSoundOfAIOSR/rg_sound_generation.git
+cd rg_sound_generation
+```
 
 Create virtual environment
 
-`python -m venv env`
-
-Activate the environment
-
-`env\Scripts\activate`
+```
+python -m venv env
+env\Scripts\activate
+```
 
 Install required packages
 

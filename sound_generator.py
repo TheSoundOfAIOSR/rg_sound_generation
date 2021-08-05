@@ -7,8 +7,8 @@ from loguru import logger
 from pprint import pprint
 import warnings
 from typing import Dict, Any
-from tcvae import model, localconfig, train
-from tcvae.compute_measures import heuristic_names
+from tcae import model, localconfig, train
+from tcae.compute_measures import heuristic_names
 
 
 warnings.simplefilter("ignore")

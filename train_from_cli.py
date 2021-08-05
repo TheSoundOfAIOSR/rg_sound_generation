@@ -1,4 +1,4 @@
-from tcvae import localconfig, train
+from tcae import localconfig, train
 
 
 if __name__ == "__main__":
