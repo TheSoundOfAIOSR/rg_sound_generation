@@ -84,15 +84,16 @@ def train(conf: LocalConfig):
         filepath=os.path.join(conf.checkpoints_dir, conf.model_name + "_{epoch}_{val_loss:.5f}.h5"),
         monitor='val_loss',
         save_weights_only=True,
-        verbose=True,
+        verbose=1,
         save_best_only=True,
         save_freq='epoch')
 
     early_stop = tf.keras.callbacks.EarlyStopping(
-        monitor='val_loss', patience=conf.early_stopping)
+        monitor='val_loss', patience=conf.early_stopping, verbose=1)
 
     reduce_lr = tf.keras.callbacks.ReduceLROnPlateau(
-        monitor='val_loss', factor=conf.lr_factor, patience=conf.lr_plateau)
+        monitor='val_loss', factor=conf.lr_factor, patience=conf.lr_plateau,
+        verbose=1)
 
     # train model
     model.fit(
