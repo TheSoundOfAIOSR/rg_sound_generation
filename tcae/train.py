@@ -63,7 +63,7 @@ def train(conf: LocalConfig):
 
     model.compile(
         optimizer=tf.keras.optimizers.Adam(learning_rate=conf.learning_rate),
-        run_eagerly=True)
+        run_eagerly=False)
 
     # build model
     x, y = next(iter(train_dataset))
