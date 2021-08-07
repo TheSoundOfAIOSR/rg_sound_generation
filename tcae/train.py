@@ -81,7 +81,7 @@ def train(conf: LocalConfig):
 
     # create training callbacks
     checkpoint = tf.keras.callbacks.ModelCheckpoint(
-        filepath=os.path.join(conf.checkpoints_dir, conf.model_name + "_{epoch}_{val_loss:.5f}.h5"),
+        filepath=os.path.join(conf.checkpoints_dir, conf.model_name + "_{epoch}_{val_loss:.5f}.ckpt"),
         monitor='val_loss',
         save_weights_only=True,
         verbose=1,
