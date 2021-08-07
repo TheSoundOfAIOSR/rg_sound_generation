@@ -37,7 +37,7 @@ class ModelWrapper(tf.keras.Model):
         inputs, targets, sample_weight = \
             data_adapter.unpack_x_y_sample_weight(data)
 
-        outputs = self(inputs, training=True)
+        outputs = self(inputs, training=False)
         losses = self.loss_fn(targets, outputs)
 
         return losses
