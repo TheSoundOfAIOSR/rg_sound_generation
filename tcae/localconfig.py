@@ -36,7 +36,7 @@ class LocalConfig:
     num_velocities = 5
     max_num_harmonics = 110
     frame_size = 64
-    harmonic_frame_steps = 1024
+    harmonic_frame_steps = 1001
     row_dim = 1024
     padding = "same"
     epochs = 500

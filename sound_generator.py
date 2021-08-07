@@ -15,9 +15,6 @@ from tcae.dataset import heuristic_names
 warnings.simplefilter("ignore")
 
 
-# Todo: Sound Generation prediction / output transform needs to be fixed
-
-
 def get_zero_batch(conf: localconfig.LocalConfig):
     mask = TensorShape([conf.batch_size, conf.harmonic_frame_steps, conf.max_num_harmonics])
     note_number = TensorShape([conf.batch_size, conf.num_pitches])
@@ -210,11 +207,11 @@ class SoundGenerator:
             logger.info("Getting prediction")
             prediction = self._model.decoder(decoder_inputs)
             logger.info("Transforming prediction")
-            transformed = self._conf.data_handler.output_transform(prediction)
+            transformed = self._conf.data_handler.output_transform({}, prediction)
             logger.info("De-normalizing prediction")
+            transformed["mask"] = decoder_inputs["mask"]
             freq, mag, phase = self._conf.data_handler.denormalize(
-                transformed, decoder_inputs["mask"],
-                output_note_number
+                transformed, output_note_number
             )
             logger.info("Synthesising audio")
             audio = tsms.core.harmonic_synthesis(
