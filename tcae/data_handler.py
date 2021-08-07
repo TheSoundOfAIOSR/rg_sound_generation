@@ -113,7 +113,7 @@ class DataHandler:
         self._lin_limit = tsms.core.db_to_lin(db_limit)
         self._h_mag_delta = h_mag_delta
         self._max_pool_length = max_pool_length
-        self._quantization_channels = quantization_channels
+        self.quantization_channels = quantization_channels
 
         # obtained computing the max of the whole datasets
         self._mag_env_max = 6.461806774139404
@@ -338,11 +338,16 @@ class DataHandler:
                     normalized_data[k] = exp_sigmoid(normalized_data[k])
 
             if self._mag_loss_type == 'cross_entropy' and not loss_data:
+                if k == "mag_env" or k == "h_mag_dist":
+                    range_0_1 = True
+                else:
+                    range_0_1 = False
+
                 normalized_data[k] = tf.nn.softmax(normalized_data[k])
                 normalized_data[k] = tf.math.argmax(
                     normalized_data[k], axis=-1, output_type=tf.int32)
                 normalized_data[k] = mu_law_decode(
-                    normalized_data[k], 256, range_0_1=False)
+                    normalized_data[k], self.quantization_channels, range_0_1)
 
         return normalized_data
 
@@ -353,7 +358,7 @@ class DataHandler:
             loss = tf.square(y_true - y_pred)
         elif self._freq_loss_type == 'cross_entropy':
             loss = tf.nn.sparse_softmax_cross_entropy_with_logits(
-                mu_law_encode(y_true, self._quantization_channels),
+                mu_law_encode(y_true, self.quantization_channels, False),
                 y_pred)
 
         loss = tf.math.reduce_sum(loss * weights) / tf.math.reduce_sum(weights)
@@ -376,7 +381,7 @@ class DataHandler:
                 linear_to_normalized_db(y_pred, self._db_limit))
         elif self._mag_loss_type == 'cross_entropy':
             loss = tf.nn.sparse_softmax_cross_entropy_with_logits(
-                mu_law_encode(y_true, self._quantization_channels, True),
+                mu_law_encode(y_true, self.quantization_channels, True),
                 y_pred)
 
         loss = tf.math.reduce_sum(loss * weights) / tf.math.reduce_sum(weights)
