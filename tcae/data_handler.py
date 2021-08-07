@@ -326,16 +326,21 @@ class DataHandler:
 
         return h_freq, h_mag, h_phase
 
-    def output_transform(self, normalized_data, loss_data=False):
+    def output_transform(self,
+                         normalized_data_true,
+                         normalized_data_pred,
+                         loss_data=False):
         frames = self._frames
 
         for k, v in self._outputs.items():
-            normalized_data[k] = normalized_data[k][:, :frames, :v["size"], ...]
+            normalized_data_pred[k] = \
+                normalized_data_pred[k][:, :frames, :v["size"], ...]
 
             if k == "mag_env" or k == "h_mag_dist":
                 if self._mag_scale_fn is not None and \
                         self._mag_loss_type != 'cross_entropy':
-                    normalized_data[k] = exp_sigmoid(normalized_data[k])
+                    normalized_data_pred[k] = exp_sigmoid(
+                        normalized_data_pred[k])
 
             if self._mag_loss_type == 'cross_entropy' and not loss_data:
                 if k == "mag_env" or k == "h_mag_dist":
@@ -343,13 +348,20 @@ class DataHandler:
                 else:
                     range_0_1 = False
 
-                normalized_data[k] = tf.nn.softmax(normalized_data[k])
-                normalized_data[k] = tf.math.argmax(
-                    normalized_data[k], axis=-1, output_type=tf.int32)
-                normalized_data[k] = mu_law_decode(
-                    normalized_data[k], self.quantization_channels, range_0_1)
+                normalized_data_pred[k] = tf.nn.softmax(normalized_data_pred[k])
+                normalized_data_pred[k] = tf.math.argmax(
+                    normalized_data_pred[k], axis=-1, output_type=tf.int32)
+                normalized_data_pred[k] = mu_law_decode(
+                    normalized_data_pred[k],
+                    self.quantization_channels,
+                    range_0_1)
 
-        return normalized_data
+        # merge dictionary to use true values where pred output is not available
+        for k, v in normalized_data_true.items():
+            if k not in normalized_data_pred:
+                normalized_data_pred[k] = v
+
+        return normalized_data_pred
 
     def freq_loss(self, y_true, y_pred, weights):
         loss = 0.0
@@ -405,7 +417,7 @@ class DataHandler:
         mask = normalized_data_true["mask"]
 
         normalized_data_pred = self.output_transform(
-            normalized_data_pred, loss_data=True)
+            normalized_data_true, normalized_data_pred, loss_data=True)
 
         # compute weights
         mag_env_true = normalized_data_true["mag_env"]
