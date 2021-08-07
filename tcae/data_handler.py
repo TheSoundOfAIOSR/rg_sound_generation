@@ -316,6 +316,7 @@ class DataHandler:
         if use_phase and ("h_phase_diff" in normalized_data):
             h_phase_diff = normalized_data["h_phase_diff"]
             h_phase_diff *= mask
+            h_phase_diff *= (2.0 * np.pi)
             h_phase = (h_phase + h_phase_diff) % (2.0 * np.pi)
 
         # remove zero-padding
