@@ -12,8 +12,8 @@ class LocalConfig:
     simple_decoder = False
     create_decoder_function = 'cnn'
     pretrained_model_path = None
-    model_name = "VAE"
-    run_name = "Default"
+    model_name = "tcae"
+    run_name = "default"
     best_model_path = None
     use_encoder = True
     use_phase = False

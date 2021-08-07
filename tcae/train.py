@@ -95,12 +95,20 @@ def train(conf: LocalConfig):
         monitor='val_loss', factor=conf.lr_factor, patience=conf.lr_plateau,
         verbose=1)
 
+    csv_logger = tf.keras.callbacks.CSVLogger(
+        os.path.join(conf.checkpoints_dir, f"{conf.model_name}_{conf.csv_log_file}"),
+
+    )
+
     # train model
     model.fit(
         train_dataset,
         epochs=conf.epochs,
         validation_data=valid_dataset,
-        callbacks=[checkpoint, early_stop, reduce_lr])
+        callbacks=[
+            checkpoint, early_stop,
+            reduce_lr, csv_logger
+        ])
 
     # model.fit(
     #     train_dataset,
