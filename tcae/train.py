@@ -74,7 +74,7 @@ def train(conf: LocalConfig):
 
     # load model checkpoint
     if conf.pretrained_model_path is not None:
-        if os.path.isfile(conf.pretrained_model_path):
+        if os.path.isfile(conf.pretrained_model_path + ".index"):
             model.load_weights(conf.pretrained_model_path)
         else:
             print(f"No pretrained model found at {conf.pretrained_model_path}")
