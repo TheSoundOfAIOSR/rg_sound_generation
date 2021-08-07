@@ -227,12 +227,12 @@ def get_dataset(conf: LocalConfig):
     test_dataset = create_dataset(
         test_path, map_func=map_features, batch_size=conf.batch_size)
 
-    train_dataset = train_dataset.apply(
-        tf.data.experimental.assert_cardinality(10542))
-    valid_dataset = valid_dataset.apply(
-        tf.data.experimental.assert_cardinality(2906))
-    test_dataset = test_dataset.apply(
-        tf.data.experimental.assert_cardinality(1588))
+    # train_dataset = train_dataset.apply(
+    #     tf.data.experimental.assert_cardinality(10542))
+    # valid_dataset = valid_dataset.apply(
+    #     tf.data.experimental.assert_cardinality(2906))
+    # test_dataset = test_dataset.apply(
+    #     tf.data.experimental.assert_cardinality(1588))
 
     if conf.dataset_modifier is not None:
         train_dataset, valid_dataset, test_dataset = conf.dataset_modifier(
