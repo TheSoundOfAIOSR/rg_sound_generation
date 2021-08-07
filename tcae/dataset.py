@@ -1,7 +1,14 @@
 import os
 import tensorflow as tf
-from .localconfig import LocalConfig
-from . import heuristics
+from tcae.localconfig import LocalConfig
+from tcae import heuristics
+
+
+heuristic_names = [
+    "inharmonicity", "even_odd", "sparse_rich", "attack_rms",
+    "decay_rms", "attack_time", "decay_time", "bass", "mid",
+    "high_mid", "high"
+]
 
 
 class CompleteTFRecordProvider:
@@ -67,13 +74,6 @@ class CompleteTFRecordProvider:
             'h_mag': tf.io.FixedLenFeature([], dtype=tf.string),
             'h_phase': tf.io.FixedLenFeature([], dtype=tf.string),
         }
-
-
-heuristic_names = [
-    "inharmonicity", "even_odd", "sparse_rich", "attack_rms",
-    "decay_rms", "attack_time", "decay_time", "bass", "mid",
-    "high_mid", "high"
-]
 
 
 def get_measures(h_freq, h_mag, conf: LocalConfig):
@@ -227,12 +227,12 @@ def get_dataset(conf: LocalConfig):
     test_dataset = create_dataset(
         test_path, map_func=map_features, batch_size=conf.batch_size)
 
-    train_dataset = train_dataset.apply(
-        tf.data.experimental.assert_cardinality(10542))
-    valid_dataset = valid_dataset.apply(
-        tf.data.experimental.assert_cardinality(2906))
-    test_dataset = test_dataset.apply(
-        tf.data.experimental.assert_cardinality(1588))
+    # train_dataset = train_dataset.apply(
+    #     tf.data.experimental.assert_cardinality(num_train_steps))
+    # valid_dataset = valid_dataset.apply(
+    #     tf.data.experimental.assert_cardinality(num_valid_steps))
+    # test_dataset = test_dataset.apply(
+    #     tf.data.experimental.assert_cardinality(num_test_steps))
 
     if conf.dataset_modifier is not None:
         train_dataset, valid_dataset, test_dataset = conf.dataset_modifier(

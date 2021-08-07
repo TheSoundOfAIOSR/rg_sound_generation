@@ -1,5 +1,6 @@
 import os
 import tensorflow as tf
+from tensorflow import TensorShape
 import tsms
 import numpy as np
 from urllib.request import urlretrieve
@@ -7,41 +8,45 @@ from loguru import logger
 from pprint import pprint
 import warnings
 from typing import Dict, Any
-from tcae import model, localconfig, train
+from tcae import model, localconfig
 from tcae.dataset import heuristic_names
 
 
 warnings.simplefilter("ignore")
 
 
-# qualities = {
-#     "bright": {
-#         "high": [],
-#         "high_mid": []
-#     },
-#     "dark": {
-#
-#     }
-# }
-#
+# Todo: Sound Generation prediction / output transform needs to be fixed
 
-class HeuristicMeasures:
-    def __init__(self):
-        self.names = heuristic_names
 
-        for name in heuristic_names:
-            vars(self)[name] = 0.
+def get_zero_batch(conf: localconfig.LocalConfig):
+    mask = TensorShape([conf.batch_size, conf.harmonic_frame_steps, conf.max_num_harmonics])
+    note_number = TensorShape([conf.batch_size, conf.num_pitches])
+    velocity = TensorShape([conf.batch_size, conf.num_velocities])
+    measures = TensorShape([conf.batch_size, conf.num_measures])
+    f0_shifts = TensorShape([conf.batch_size, conf.harmonic_frame_steps, 1])
+    mag_env = TensorShape([conf.batch_size, conf.harmonic_frame_steps, 1])
+    h_freq_shifts = TensorShape([conf.batch_size, conf.harmonic_frame_steps, conf.max_num_harmonics])
+    h_mag_dist = TensorShape([conf.batch_size, conf.harmonic_frame_steps, conf.max_num_harmonics])
+    h_phase_diff = TensorShape([conf.batch_size, conf.harmonic_frame_steps, conf.max_num_harmonics])
 
-    def __call__(self, **kwargs):
-        outputs = []
+    _shapes = {}
 
-        for k, v in kwargs.items():
-            if k in vars(self):
-                vars(self)[k] = v
+    _shapes.update({
+        "mask": tf.zeros(mask),
+        "f0_shifts": tf.zeros(f0_shifts),
+        "mag_env": tf.zeros(mag_env),
+        "h_freq_shifts": tf.zeros(h_freq_shifts),
+        "h_mag_dist": tf.zeros(h_mag_dist),
+        "h_phase_diff": tf.zeros(h_phase_diff)
+    })
 
-        for name in heuristic_names:
-            outputs.append(vars(self)[name])
-        return outputs
+    if conf.use_note_number:
+        _shapes.update({"note_number": tf.zeros(note_number)})
+    if conf.use_velocity:
+        _shapes.update({"velocity": tf.zeros(velocity)})
+    if conf.use_heuristics:
+        _shapes.update({"measures": tf.zeros(measures)})
+    return _shapes
 
 
 class SoundGenerator:
@@ -119,8 +124,8 @@ class SoundGenerator:
 
     def load_model(self) -> None:
         assert os.path.isfile(self._checkpoint_path), f"No checkpoint at {self._checkpoint_path}"
-        self._model = model.MtVae(self._conf)
-        _ = self._model(train.get_zero_batch(self._conf))
+        self._model = model.TCAEModel(self._conf)
+        _ = self._model(get_zero_batch(self._conf))
         self._model.load_weights(self._checkpoint_path)
         logger.info("Model loaded")
 
@@ -131,7 +136,7 @@ class SoundGenerator:
         )
         harmonics = tsms.core.get_number_harmonics(f0, self._conf.sample_rate)
         harmonics = np.squeeze(harmonics)
-        mask = np.zeros((1, self._conf.harmonic_frame_steps, 110))
+        mask = np.zeros((1, self._conf.harmonic_frame_steps, self._conf.max_num_harmonics))
         mask[:, :, :harmonics] = np.ones((1, self._conf.harmonic_frame_steps, harmonics))
         return mask
 
@@ -205,7 +210,7 @@ class SoundGenerator:
             logger.info("Getting prediction")
             prediction = self._model.decoder(decoder_inputs)
             logger.info("Transforming prediction")
-            transformed = self._conf.data_handler.prediction_transform(prediction)
+            transformed = self._conf.data_handler.output_transform(prediction)
             logger.info("De-normalizing prediction")
             freq, mag, phase = self._conf.data_handler.denormalize(
                 transformed, decoder_inputs["mask"],

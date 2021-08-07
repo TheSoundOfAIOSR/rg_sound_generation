@@ -2,9 +2,9 @@ import tensorflow as tf
 from tensorflow.python.keras.engine import data_adapter
 import os
 import warnings
-from .dataset import get_dataset
-from .model import get_model_from_config
-from .localconfig import LocalConfig
+from tcae.dataset import get_dataset
+from tcae.model import TCAEModel
+from tcae.localconfig import LocalConfig
 
 warnings.simplefilter("ignore")
 
@@ -58,7 +58,7 @@ def train(conf: LocalConfig):
 
     # create and compile model
     model = ModelWrapper(
-        get_model_from_config(conf),
+        TCAEModel(conf),
         conf.data_handler.loss)
 
     model.compile(
@@ -67,23 +67,24 @@ def train(conf: LocalConfig):
 
     # build model
     x, y = next(iter(train_dataset))
-    y_pred = model(x)
+    _ = model(x)
 
     if conf.print_model_summary:
         print(model.summary())
 
     # load model checkpoint
-    checkpoint_file = os.path.join(conf.checkpoints_dir, "cp.ckpt")
-
-    if os.path.isdir(conf.checkpoints_dir) and os.listdir(conf.checkpoints_dir):
-        model.load_weights(checkpoint_file)
+    if conf.pretrained_model_path is not None:
+        if os.path.isfile(conf.pretrained_model_path):
+            model.load_weights(conf.pretrained_model_path)
+        else:
+            print(f"No pretrained model found at {conf.pretrained_model_path}")
 
     # create training callbacks
     checkpoint = tf.keras.callbacks.ModelCheckpoint(
-        filepath=checkpoint_file,
+        filepath=os.path.join(conf.checkpoints_dir, conf.model_name + "_{epoch}_{val_loss:.5f}.h5"),
         monitor='val_loss',
         save_weights_only=True,
-        verbose=1,
+        verbose=True,
         save_best_only=True,
         save_freq='epoch')
 
@@ -110,10 +111,3 @@ def train(conf: LocalConfig):
 
     # evaluate model
     model.evaluate(test_dataset)
-
-
-# ------------------------------------------------------------------------------
-
-if __name__ == "__main__":
-    conf = LocalConfig()
-    train(conf)
