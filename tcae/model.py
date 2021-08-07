@@ -555,45 +555,47 @@ def create_mt_decoder(inputs, conf: LocalConfig):
 
     outputs = {}
 
-    for k, v in conf.mt_outputs.items():
-        if v["enabled"]:
-            repeats = 4
-            filters = [v["shape"][2]] * repeats
-            kernels = [5] * repeats
-            filters_kernels = iter(zip(filters, kernels))
+    for k, v in conf.data_handler.outputs.items():
+        cols = conf.mt_outputs[k]["shape"][1]
+        channels = conf.mt_outputs[k]["shape"][2]
 
-            task_in = name(k, tf.keras.layers.Permute(dims=(1, 3, 2)))(shared_out)
-            task_in = name(k, tf.keras.layers.Dense(units=v["shape"][1]))(task_in)
-            task_in = name(k, tf.keras.layers.Permute(dims=(1, 3, 2)))(task_in)
-            task_in = name(k, tf.keras.layers.Dense(units=v["shape"][2]))(task_in)
+        task_in = name(k, tf.keras.layers.Permute(dims=(1, 3, 2)))(shared_out)
+        task_in = name(k, tf.keras.layers.Dense(units=cols))(task_in)
+        task_in = name(k, tf.keras.layers.Permute(dims=(1, 3, 2)))(task_in)
+        task_in = name(k, tf.keras.layers.Dense(units=channels))(task_in)
 
-            wrapper = {f"up_out_0": task_in}
+        repeats = 4
+        filters = [channels] * repeats
+        kernels = [5] * repeats
+        filters_kernels = iter(zip(filters, kernels))
 
-            for i in range(0, len(filters)):
-                _f, _k = next(filters_kernels)
-                wrapper[f"conv_out_{i}"] = name(k, tf.keras.layers.Conv2D(
-                    _f, _k, padding=conf.padding, name=f"{k}_decoder_conv_{i}"))(wrapper[f"up_out_{i}"])
-                wrapper[f"bn_out_{i}"] = name(k, tf.keras.layers.BatchNormalization(
-                    name=f"{k}_decoder_bn_{i}"))(wrapper[f"conv_out_{i}"])
-                wrapper[f"act_{i}"] = name(k, tf.keras.layers.Activation(
-                    "elu", name=f"{k}_decoder_act_{i}"))(wrapper[f"bn_out_{i}"])
-                # wrapper[f"up_out_{i}"] = tf.keras.layers.Dense(units=f)(wrapper[f"up_out_{i}"])
-                wrapper[f"up_out_{i + 1}"] = name(k, tf.keras.layers.Add()([
-                    wrapper[f"act_{i}"], wrapper[f"up_out_{i}"]
-                ]))
+        wrapper = {f"up_out_0": task_in}
 
-            conv2d_out = wrapper[f"up_out_{len(filters)}"]
-            if conf.using_categorical:
-                task_out = name(k, tf.keras.layers.Permute(dims=(1, 3, 2)))(conv2d_out)
-                task_out = name(k, tf.keras.layers.Dense(v["channels"], activation="elu"))(task_out)
-                task_out = name(k, tf.keras.layers.Permute(dims=(1, 3, 2)))(task_out)
-                task_out = name(k, tf.keras.layers.Conv2D(256, 1, padding="same"))(task_out)
-            else:
-                conv2d_out = name(k, tf.keras.layers.Conv2D(1, 1, padding="same"))(conv2d_out)
-                task_out = name(k, tf.keras.layers.Lambda(lambda y: tf.squeeze(y, axis=-1)))(conv2d_out)
-                task_out = ffn_block(task_out, 2, v["shape"][1], save_names=True, k=k)
-                task_out = name(k, tf.keras.layers.Dense(units=v["channels"]))(task_out)
-            outputs[k] = task_out
+        for i in range(0, len(filters)):
+            _f, _k = next(filters_kernels)
+            wrapper[f"conv_out_{i}"] = name(k, tf.keras.layers.Conv2D(
+                _f, _k, padding=conf.padding, name=f"{k}_decoder_conv_{i}"))(wrapper[f"up_out_{i}"])
+            wrapper[f"bn_out_{i}"] = name(k, tf.keras.layers.BatchNormalization(
+                name=f"{k}_decoder_bn_{i}"))(wrapper[f"conv_out_{i}"])
+            wrapper[f"act_{i}"] = name(k, tf.keras.layers.Activation(
+                "elu", name=f"{k}_decoder_act_{i}"))(wrapper[f"bn_out_{i}"])
+            # wrapper[f"up_out_{i}"] = tf.keras.layers.Dense(units=f)(wrapper[f"up_out_{i}"])
+            wrapper[f"up_out_{i + 1}"] = name(k, tf.keras.layers.Add()([
+                wrapper[f"act_{i}"], wrapper[f"up_out_{i}"]
+            ]))
+
+        conv2d_out = wrapper[f"up_out_{len(filters)}"]
+        if conf.using_categorical:
+            task_out = name(k, tf.keras.layers.Permute(dims=(1, 3, 2)))(conv2d_out)
+            task_out = name(k, tf.keras.layers.Dense(v["size"], activation="elu"))(task_out)
+            task_out = name(k, tf.keras.layers.Permute(dims=(1, 3, 2)))(task_out)
+            task_out = name(k, tf.keras.layers.Conv2D(256, 1, padding="same"))(task_out)
+        else:
+            conv2d_out = name(k, tf.keras.layers.Conv2D(1, 1, padding="same"))(conv2d_out)
+            task_out = name(k, tf.keras.layers.Lambda(lambda y: tf.squeeze(y, axis=-1)))(conv2d_out)
+            task_out = ffn_block(task_out, 2, cols, save_names=True, k=k)
+            task_out = name(k, tf.keras.layers.Dense(units=v["size"]))(task_out)
+        outputs[k] = task_out
 
     m = tf.keras.models.Model(
         inputs, outputs

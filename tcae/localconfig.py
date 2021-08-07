@@ -7,6 +7,7 @@ from .data_handler import DataHandler
 class LocalConfig:
     dataset_dir = os.path.join(os.getcwd(), "complete_dataset")
     checkpoints_dir = os.path.join(os.getcwd(), "checkpoints")
+    dataset_modifier = None
     simple_encoder = False
     simple_decoder = False
     create_decoder_function = 'cnn'
@@ -78,11 +79,11 @@ class LocalConfig:
         "h_phase_diff": {"shape": (row_dim, 64)},
     }
     mt_outputs = {
-        "f0_shifts": {"enabled": True, "shape": (row_dim, 64, 16), "channels": 1},
-        "h_freq_shifts": {"enabled": True, "shape": (row_dim, 110, 16), "channels": 110},
-        "mag_env": {"enabled": True, "shape": (row_dim, 64, 16), "channels": 1},
-        "h_mag_dist": {"enabled": True, "shape": (row_dim, 110, 16), "channels": 110},
-        "h_phase_diff": {"enabled": False, "shape": (row_dim, 110, 16), "channels": 110},
+        "f0_shifts": {"shape": (row_dim, 64, 16)},
+        "h_freq_shifts": {"shape": (row_dim, 110, 16)},
+        "mag_env": {"shape": (row_dim, 64, 16)},
+        "h_mag_dist": {"shape": (row_dim, 110, 16)},
+        "h_phase_diff": {"shape": (row_dim, 110, 16)},
     }
 
     use_kl_anneal = False

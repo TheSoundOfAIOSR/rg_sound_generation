@@ -147,7 +147,7 @@ def create_dataset(
 def map_features(features):
     conf = LocalConfig()
 
-    # name = features["sample_name"]
+    name = features["sample_name"]
     note_number = features["note_number"]
     velocity = features["velocity"]
     instrument_id = features["instrument_id"]
@@ -168,13 +168,11 @@ def map_features(features):
     h_mag = tf.expand_dims(h_mag, axis=0)
     h_phase = tf.expand_dims(h_phase, axis=0)
 
-    normalized_data, mask = \
-        conf.data_handler.normalize(h_freq, h_mag, h_phase, note_number)
+    normalized_data = conf.data_handler.normalize(
+        h_freq, h_mag, h_phase, note_number)
 
     for k, v in normalized_data.items():
         normalized_data[k] = tf.squeeze(v, axis=0)
-
-    mask = tf.squeeze(mask, axis=0)
 
     measures = get_measures(h_freq, h_mag, conf)
 
@@ -192,15 +190,18 @@ def map_features(features):
         num_instruments = float(conf.num_instruments)
         instrument_id = tf.cast(instrument_id, tf.float32) / num_instruments
 
-    data = {
-        "mask": mask,
+    inputs = {
+        "name:": name,
         "note_number": tf.squeeze(note_number),
         "velocity": tf.squeeze(velocity),
         "instrument_id": tf.squeeze(instrument_id),
         "measures": measures,
     }
-    data.update(normalized_data)
-    return data
+    inputs.update(normalized_data)
+
+    targets = normalized_data
+
+    return inputs, targets
 
 
 def get_dataset(conf: LocalConfig):
@@ -219,8 +220,22 @@ def get_dataset(conf: LocalConfig):
     #         d[k] = tf.squeeze(v, axis=0)
     #     ne = map_features(d)
 
-    train_dataset = create_dataset(train_path, map_func=map_features, batch_size=conf.batch_size)
-    valid_dataset = create_dataset(valid_path, map_func=map_features, batch_size=conf.batch_size)
-    test_dataset = create_dataset(test_path, map_func=map_features, batch_size=conf.batch_size)
+    train_dataset = create_dataset(
+        train_path, map_func=map_features, batch_size=conf.batch_size)
+    valid_dataset = create_dataset(
+        valid_path, map_func=map_features, batch_size=conf.batch_size)
+    test_dataset = create_dataset(
+        test_path, map_func=map_features, batch_size=conf.batch_size)
+
+    train_dataset = train_dataset.apply(
+        tf.data.experimental.assert_cardinality(10542))
+    valid_dataset = valid_dataset.apply(
+        tf.data.experimental.assert_cardinality(2906))
+    test_dataset = test_dataset.apply(
+        tf.data.experimental.assert_cardinality(1588))
+
+    if conf.dataset_modifier is not None:
+        train_dataset, valid_dataset, test_dataset = conf.dataset_modifier(
+            train_dataset, valid_dataset, test_dataset)
 
     return train_dataset, valid_dataset, test_dataset
