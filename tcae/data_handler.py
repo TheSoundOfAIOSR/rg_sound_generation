@@ -1,6 +1,7 @@
 import tensorflow as tf
 import numpy as np
 import tsms
+from tcae import heuristics
 
 
 def linear_to_normalized_db(x, db_limit=-120.0):
@@ -36,7 +37,7 @@ def mu_law_encode(signal, quantization_channels, range_0_1=False):
         # Map signal from [-1, +1] to [0, mu-1]
         signal = (signal + 1.0) / 2.0
 
-    signal *= mu
+    signal = signal * mu
     signal = tf.math.round(signal)
     quantized_signal = tf.cast(signal, dtype=tf.int32)
 
@@ -49,7 +50,7 @@ def mu_law_decode(signal, quantization_channels, range_0_1=False):
     mu = tf.cast(mu, dtype=tf.float32)
     y = tf.cast(signal, dtype=tf.float32)
 
-    y /= mu
+    y = y / mu
 
     if not range_0_1:
         y = 2.0 * y - 1.0
@@ -57,19 +58,6 @@ def mu_law_decode(signal, quantization_channels, range_0_1=False):
     x = tf.math.sign(y) * (1.0 / mu) * ((1.0 + mu) ** tf.math.abs(y) - 1.0)
 
     return x
-
-
-def split_mag(h_mag, mag_env_max, delta):
-    mag_env = tf.math.reduce_sum(h_mag, axis=2, keepdims=True)
-    h_mag_dist = h_mag * (1.0 + delta) / (mag_env + delta)
-    mag_env /= mag_env_max
-    return mag_env, h_mag_dist
-
-
-def combine_mag(mag_env, h_mag_dist, mag_env_max, delta):
-    mag_env *= mag_env_max
-    h_mag = h_mag_dist * (mag_env + delta) / (1.0 + delta)
-    return h_mag
 
 
 class DataHandler:
@@ -87,7 +75,9 @@ class DataHandler:
                  weight_type='mag_max_pool',  # 'mag_max_pool', 'mag', 'none'
                  freq_loss_type='mse',  # 'cross_entropy', 'mse'
                  mag_loss_type='l2_db',  # 'cross_entropy', 'l2_db' 'l1_db', 'rms_db', 'mse'
+                 freq_scale_fn=tf.math.tanh,
                  mag_scale_fn=exp_sigmoid,
+                 phase_scale_fn=tf.math.tanh,
                  max_harmonics=110,
                  sample_rate=16000,
                  frame_step=64,
@@ -96,7 +86,8 @@ class DataHandler:
                  db_limit=-120.0,
                  h_mag_delta=1e-6,
                  max_pool_length=5,
-                 quantization_channels=256):
+                 quantization_channels=256,
+                 freq_bands=None):
         self._fix_pitch = fix_pitch
         self._normalize_mag = normalize_mag
         self._use_h_mag_mask = use_h_mag_mask
@@ -115,8 +106,18 @@ class DataHandler:
         self._max_pool_length = max_pool_length
         self.quantization_channels = quantization_channels
 
+        if freq_bands is None:
+            self.freq_bands = {
+                "bass": [60, 270],
+                "mid": [270, 2000],
+                "high_mid": [2000, 6000],
+                "high": [6000, 20000]
+            }
+        else:
+            self.freq_bands = freq_bands
+
         # obtained computing the max of the whole datasets
-        self._mag_env_max = 6.461806774139404
+        self._mag_env_max = 6.4551239013671875
 
         self._losses_weights = None
         self._outputs = None
@@ -138,7 +139,8 @@ class DataHandler:
             mag_env=1.0,
             h_mag_dist=1.0,
             h_mag=1.0,
-            h_phase_diff=0.0):
+            h_phase_diff=0.0,
+            measures=0.0):
 
         self._losses_weights = {
             "f0_shifts": f0_shifts,
@@ -146,19 +148,25 @@ class DataHandler:
             "mag_env": mag_env,
             "h_mag_dist": h_mag_dist,
             "h_mag": h_mag,
-            "h_phase_diff": h_phase_diff
+            "h_phase_diff": h_phase_diff,
+            "measures": measures,
         }
 
         self._outputs = {}
         for k, v in self._losses_weights.items():
             if v > 0.0:
-                if k == "h_mag":
+                if k == "f0_shifts" or k == "mag_env":
+                    self._outputs[k] = {"size": 1}
+                elif k == "h_freq_shifts" or k == "h_mag_dist" or k == "h_phase_diff":
+                    self._outputs[k] = {"size": self.max_harmonics}
+                elif k == "h_mag":
                     self._outputs["mag_env"] = {"size": 1}
                     self._outputs["h_mag_dist"] = {"size": self.max_harmonics}
-                elif k == "f0_shifts" or k == "mag_env":
-                    self._outputs[k] = {"size": 1}
-                else:
-                    self._outputs[k] = {"size": self.max_harmonics}
+                elif k == "measures":
+                    self._outputs["f0_shifts"] = {"size": 1}
+                    self._outputs["h_freq_shifts"] = {"size": self.max_harmonics}
+                    self._outputs["mag_env"] = {"size": 1}
+                    self._outputs["h_mag_dist"] = {"size": self.max_harmonics}
 
     @property
     def weight_type(self):
@@ -202,10 +210,23 @@ class DataHandler:
         else:
             self._mag_scale_fn = exp_sigmoid
 
+    def split_mag(self, h_mag):
+        mag_env_max = self._mag_env_max
+        mag_env = tf.math.reduce_sum(h_mag, axis=2, keepdims=True)
+        h_mag_dist = h_mag / (mag_env + self._h_mag_delta)
+        mag_env = mag_env / mag_env_max
+        return mag_env, h_mag_dist
+
+    def combine_mag(self, mag_env, h_mag_dist):
+        mag_env_max = self._mag_env_max
+        mag_env = mag_env * mag_env_max
+        h_mag = h_mag_dist * (mag_env + self._h_mag_delta)
+        return h_mag
+
     def normalize(self, h_freq, h_mag, h_phase, note_number):
-        note_number = tf.cast(note_number, dtype=tf.float32)
         f0 = tsms.core.harmonic_analysis_to_f0(h_freq, h_mag)[:, :, tf.newaxis]
-        f0_note = tsms.core.midi_to_hz(note_number)
+        note_number = tf.reshape(note_number, shape=(-1, 1, 1))
+        f0_note = tsms.core.midi_to_hz(tf.cast(note_number, dtype=tf.float32))
         max_f0_displ = f0_note * self._f0_st_factor
 
         batches = tf.shape(h_freq)[0]
@@ -224,7 +245,7 @@ class DataHandler:
             f0_shifts = (f0 - f0_note) / max_f0_displ
             fixed_harmonics = harmonics
 
-        h_freq_shifts = (h_freq / harmonic_numbers - f0) / max_f0_displ
+        h_freq_shifts = ((h_freq / harmonic_numbers) - f0) / max_f0_displ
 
         f0_shifts = tf.clip_by_value(f0_shifts, -1.0, 1.0)
         h_freq_shifts = tf.clip_by_value(h_freq_shifts, -1.0, 1.0)
@@ -233,20 +254,20 @@ class DataHandler:
         if self._normalize_mag:
             h_mag = h_mag / tf.math.reduce_max(h_mag)
 
-        mag_env, h_mag_dist = split_mag(
-            h_mag, self._mag_env_max, self._h_mag_delta)
+        mag_env, h_mag_dist = self.split_mag(h_mag)
 
         # compute h_phase_diff
         h_phase_gen = tsms.core.generate_phase(
             h_freq,
             sample_rate=self._sample_rate,
             frame_step=self._frame_step)
+
         h_phase_diff = tsms.core.phase_diff(h_phase, h_phase_gen)
         # unwrap d_phase from +/- pi to +/- 2*pi
         h_phase_diff = tsms.core.phase_unwrap(h_phase_diff, axis=1)
-        h_phase_diff = (h_phase_diff + 2.0 * np.pi) % \
-                       (4.0 * np.pi) - 2.0 * np.pi
-        h_phase_diff /= (2.0 * np.pi)  # [-1, +1] range
+        h_phase_diff = tf.where(
+            tf.math.abs(h_phase_diff) > 2.0 * np.pi, 0.0, h_phase_diff)
+        h_phase_diff = h_phase_diff / (2.0 * np.pi)  # [-1, +1] range
 
         # zero-padding to max_harmonics
         h_freq_shifts = tf.pad(
@@ -267,12 +288,13 @@ class DataHandler:
             tf.zeros((batches, frames, self.max_harmonics - fixed_harmonics))],
             axis=2)
 
-        h_freq_shifts *= mask
-        h_mag_dist *= mask
-        h_phase_diff *= mask
+        h_freq_shifts = h_freq_shifts * mask
+        h_mag_dist = h_mag_dist * mask
+        h_phase_diff = h_phase_diff * mask
 
         normalized_data = {
             "mask": mask,
+            "note_number": note_number,
             "f0_shifts": f0_shifts,
             "h_freq_shifts": h_freq_shifts,
             "mag_env": mag_env,
@@ -282,13 +304,17 @@ class DataHandler:
 
         return normalized_data
 
-    def denormalize(self, normalized_data, note_number, use_phase=False):
+    def denormalize(self, normalized_data, phase_mode='generated'):
+        assert phase_mode in ["none", "generated", "complete"]
+
         mask = normalized_data["mask"]
+        note_number = normalized_data["note_number"]
         f0_shifts = normalized_data["f0_shifts"]
         h_freq_shifts = normalized_data["h_freq_shifts"]
         mag_env = normalized_data["mag_env"]
         h_mag_dist = normalized_data["h_mag_dist"]
 
+        note_number = tf.reshape(note_number, shape=(-1, 1, 1))
         note_number = tf.cast(note_number, dtype=tf.float32)
         f0_note = tsms.core.midi_to_hz(note_number)
         max_f0_displ = f0_note * self._f0_st_factor
@@ -298,34 +324,76 @@ class DataHandler:
         harmonic_numbers = harmonic_numbers[tf.newaxis, tf.newaxis, :]
 
         # compute h_freq
-        h_freq_shifts *= mask
+        h_freq_shifts = h_freq_shifts * mask
         f0 = f0_note + f0_shifts * max_f0_displ
         h_freq = harmonic_numbers * (f0 + h_freq_shifts * max_f0_displ)
 
         # compute h_mag
-        h_mag_dist *= mask
-        h_mag = combine_mag(
-            mag_env, h_mag_dist, self._mag_env_max, self._h_mag_delta)
+        h_mag_dist = h_mag_dist * mask
+        h_mag = self.combine_mag(mag_env, h_mag_dist)
 
         # compute h_phase
-        h_phase = tsms.core.generate_phase(
-            h_freq,
-            sample_rate=self._sample_rate,
-            frame_step=self._frame_step)
+        h_phase = None
 
-        if use_phase and ("h_phase_diff" in normalized_data):
+        if phase_mode == 'generated' or phase_mode == 'complete':
+            h_phase = tsms.core.generate_phase(
+                h_freq,
+                sample_rate=self._sample_rate,
+                frame_step=self._frame_step)
+
+        if phase_mode == 'complete':
             h_phase_diff = normalized_data["h_phase_diff"]
-            h_phase_diff *= mask
-            h_phase_diff *= (2.0 * np.pi)
+            h_phase_diff = h_phase_diff * 2.0 * np.pi * mask
             h_phase = (h_phase + h_phase_diff) % (2.0 * np.pi)
 
         # remove zero-padding
         harmonics = tf.cast(tf.math.reduce_sum(mask[0, 0, :]), dtype=tf.int64)
         h_freq = h_freq[:, :, :harmonics]
         h_mag = h_mag[:, :, :harmonics]
-        h_phase = h_phase[:, :, :harmonics]
+        h_phase = h_phase[:, :, :harmonics] if h_phase is not None else h_phase
 
         return h_freq, h_mag, h_phase
+
+    def compute_measures(self, h_freq, h_mag):
+        inharmonic = heuristics.core.inharmonicity_measure(
+            h_freq, h_mag, None, None, None, None)
+        even_odd = heuristics.core.even_odd_measure(
+            h_freq, h_mag, None, None, None, None)
+        sparse_rich = heuristics.core.sparse_rich_measure(
+            h_freq, h_mag, None, None, None, None)
+        attack_rms = heuristics.core.attack_rms_measure(
+            h_freq, h_mag, None, None, None, None)
+        decay_rms = heuristics.core.decay_rms_measure(
+            h_freq, h_mag, None, None, None, None)
+        attack_time = heuristics.core.attack_time_measure(
+            h_freq, h_mag, None, None, None, None)
+        decay_time = heuristics.core.decay_time_measure(
+            h_freq, h_mag, None, None, None, None)
+
+        bass = heuristics.core.frequency_band_measure(
+            h_freq, h_mag, None, None, self._sample_rate, None,
+            f_min=self.freq_bands["bass"][0], f_max=self.freq_bands["bass"][1]
+        )
+        mid = heuristics.core.frequency_band_measure(
+            h_freq, h_mag, None, None, self._sample_rate, None,
+            f_min=self.freq_bands["mid"][0], f_max=self.freq_bands["mid"][1]
+        )
+        high_mid = heuristics.core.frequency_band_measure(
+            h_freq, h_mag, None, None, self._sample_rate, None,
+            f_min=self.freq_bands["high_mid"][0], f_max=self.freq_bands["high_mid"][1]
+        )
+        high = heuristics.core.frequency_band_measure(
+            h_freq, h_mag, None, None, self._sample_rate, None,
+            f_min=self.freq_bands["high"][0], f_max=self.freq_bands["high"][1]
+        )
+
+        measures = [inharmonic, even_odd, sparse_rich,
+                    attack_rms, decay_rms, attack_time, decay_time,
+                    bass, mid, high_mid, high]
+        # measures = [tf.squeeze(m) for m in measures]
+        measures = tf.stack(measures, axis=-1)
+
+        return measures
 
     def output_transform(self,
                          normalized_data_true,
@@ -405,12 +473,17 @@ class DataHandler:
         loss = tf.math.reduce_sum(loss * weights) / tf.math.reduce_sum(weights)
         return loss
 
+    def measures_loss(self, y_true, y_pred):
+        loss = tf.square(y_true - y_pred)
+        loss = tf.math.reduce_mean(loss)
+        return loss
+
     def compute_mag_weight(self, mag, mask):
         weight = mask
         if self._weight_type == 'mag':
-            weight *= mag
+            weight = weight * mag
         elif self._weight_type == 'mag_max_pool':
-            weight *= tf.nn.max_pool1d(
+            weight = weight * tf.nn.max_pool1d(
                 mag, [1, self._max_pool_length, 1], 1, padding='SAME')
         return weight
 
@@ -424,8 +497,7 @@ class DataHandler:
         mag_env_true = normalized_data_true["mag_env"]
         h_mag_dist_true = normalized_data_true["h_mag_dist"]
 
-        h_mag_true = combine_mag(
-            mag_env_true, h_mag_dist_true, self._mag_env_max, self._h_mag_delta)
+        h_mag_true = self.combine_mag(mag_env_true, h_mag_dist_true)
 
         env_mask = tf.ones_like(mag_env_true)
         mag_env_weight = self.compute_mag_weight(mag_env_true, env_mask)
@@ -437,7 +509,7 @@ class DataHandler:
             "mag_env": env_mask,
             "h_mag_dist": h_mag_weight,
             "h_mag": mask,
-            "h_phase_diff": h_mag_weight
+            "h_phase_diff": h_mag_weight,
         }
 
         losses = {"loss": 0.0}
@@ -456,17 +528,23 @@ class DataHandler:
                         normalized_data_pred[k],
                         weights[k])
                 elif k == "h_mag" and self._mag_loss_type != 'cross_entropy':
-                    h_mag_pred = combine_mag(
+                    h_mag_pred = self.combine_mag(
                         normalized_data_pred["mag_env"],
-                        normalized_data_pred["h_mag_dist"],
-                        self._mag_env_max,
-                        self._h_mag_delta)
+                        normalized_data_pred["h_mag_dist"])
                     loss = self.mag_loss(h_mag_true, h_mag_pred, mask)
                 elif k == "h_phase_diff":
                     loss = self.phase_loss(
                         normalized_data_true[k],
                         normalized_data_pred[k],
                         weights[k])
+                elif k == "measures":
+                    measures_true = normalized_data_true[k]
+                    h_freq, h_mag, _ = self.denormalize(
+                        normalized_data_pred, phase_mode='none')
+                    measures_pred = self.compute_measures(h_freq, h_mag)
+                    loss = self.measures_loss(
+                        measures_true,
+                        measures_pred)
 
                 losses["loss"] += loss
                 losses[k + "_loss"] = loss

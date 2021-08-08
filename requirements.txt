@@ -4,5 +4,5 @@ SoundFile==0.10.3.post1
 streamlit==0.85.1
 tensorflow==2.5.0
 tensorflow-addons==0.13.0
-tsms @ git+https://github.com/fabiodimarco/tf-spectral-modeling-synthesis.git@b81438676b90e34ecf45a33d8c439dcc3a16549d
+tsms @ git+https://github.com/fabiodimarco/tf-spectral-modeling-synthesis.git@c090cf50916285500df0c96348dbfd8e01b73b9b
 loguru

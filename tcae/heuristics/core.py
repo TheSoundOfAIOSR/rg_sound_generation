@@ -85,7 +85,7 @@ def generate_h_freq(f0_envelope, sample_rate, frame_step,
 
     inharmonicity_envelope = inharmonicity_envelope[tf.newaxis, tf.newaxis, :]
 
-    h_freq *= 1.0 + inharmonicity_envelope
+    h_freq = h_freq * (1.0 + inharmonicity_envelope)
 
     return h_freq
 

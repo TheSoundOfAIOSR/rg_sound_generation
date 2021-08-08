@@ -41,7 +41,7 @@ class LocalConfig:
     padding = "same"
     epochs = 500
     early_stopping = 7
-    learning_rate = 2e-4
+    learning_rate = 3e-4
     lr_plateau = 4
     lr_factor = 0.5
     csv_log_file = "logs.csv"
@@ -66,13 +66,6 @@ class LocalConfig:
         "mag_env": {"shape": (row_dim, 64, 16)},
         "h_mag_dist": {"shape": (row_dim, 110, 16)},
         "h_phase_diff": {"shape": (row_dim, 110, 16)},
-    }
-
-    freq_bands = {
-        "bass": [60, 270],
-        "mid": [270, 2000],
-        "high_mid": [2000, 6000],
-        "high": [6000, 20000]
     }
 
     data_handler = None
