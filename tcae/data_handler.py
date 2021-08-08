@@ -468,12 +468,14 @@ class DataHandler:
         loss = tf.math.reduce_sum(loss * weights) / tf.math.reduce_sum(weights)
         return loss
 
-    def phase_loss(self, y_true, y_pred, weights):
+    @staticmethod
+    def phase_loss(y_true, y_pred, weights):
         loss = tf.square(y_true - y_pred)
         loss = tf.math.reduce_sum(loss * weights) / tf.math.reduce_sum(weights)
         return loss
 
-    def measures_loss(self, y_true, y_pred):
+    @staticmethod
+    def measures_loss(y_true, y_pred):
         loss = tf.square(y_true - y_pred)
         loss = tf.math.reduce_mean(loss)
         return loss
