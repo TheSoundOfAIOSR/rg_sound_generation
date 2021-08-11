@@ -200,7 +200,7 @@ def map_features(features):
         "measures": measures,
     }
     data.update(normalized_data)
-    return data
+    return data, data
 
 
 def get_dataset(conf: LocalConfig):
