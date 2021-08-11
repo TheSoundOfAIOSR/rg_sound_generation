@@ -46,31 +46,16 @@ def get_zero_batch(conf: LocalConfig):
     return _zero_batch(conf)
 
 
-def _step(_model, inputs):
-    # model_input = [note_number, velocity]
-    # if conf.use_heuristics:
-    #     model_input += [measures]
-    # if conf.use_encoder:
-    #     model_input = [h] + model_input
-    # if conf.use_encoder and conf.is_variational:
-    #     reconstruction, z_mean, z_log_var = _model(model_input)
-    #     # Note this is weighted kl loss as kl_loss function applies the weight
-    #     _kl_loss = kl_loss(z_mean, z_log_var, conf)
-    # else:
-    #     reconstruction = _model(model_input)
-    #     _kl_loss = 0.0
-
-    outputs = _model(inputs)
+def _step(_model, inputs, training=False):
+    outputs = _model(inputs, training=training)
     losses = reconstruction_loss(inputs, outputs)
-    # losses["kl_loss"] = _kl_loss
-    # losses["loss"] += _kl_loss
 
     return losses
 
 
 @tf.function
 def validation_step(_model, batch):
-    losses = _step(_model, batch)
+    losses = _step(_model, batch, training=False)
     return losses
 
 
@@ -78,7 +63,7 @@ def validation_step(_model, batch):
 def training_step(_model, optimizer, batch):
 
     with tf.GradientTape() as tape:
-        losses = _step(_model, batch)
+        losses = _step(_model, batch, training=True)
 
     _model_grads = tape.gradient(losses["loss"], _model.trainable_weights)
     optimizer.apply_gradients(zip(_model_grads, _model.trainable_weights))
