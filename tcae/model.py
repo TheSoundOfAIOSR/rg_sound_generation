@@ -386,7 +386,7 @@ def bn_act(inputs, name=None):
 def conv_1d_encoder_block(inputs, filters, kernel, stride=1, use_act=True, name=None):
     if use_act:
         x = tf.keras.layers.Conv1D(filters, kernel, padding="same", strides=stride)(inputs)
-        return bn_act(x, name=name)
+        return tf.keras.layers.Activation("elu", name=name)(x)
     return tf.keras.layers.Conv1D(filters, kernel, padding="same",
                                   strides=stride, name=name)(inputs)
 
@@ -394,7 +394,7 @@ def conv_1d_encoder_block(inputs, filters, kernel, stride=1, use_act=True, name=
 def conv_2d_encoder_block(inputs, filters, kernel, stride=1, use_act=True, name=None):
     if use_act:
         x = tf.keras.layers.Conv2D(filters, kernel, padding="same", strides=stride)(inputs)
-        return bn_act(x, name)
+        return tf.keras.layers.Activation("elu", name=name)(x)
     return tf.keras.layers.Conv2D(filters, kernel, padding="same",
                                   strides=stride, name=name)(inputs)
 
@@ -541,8 +541,8 @@ def create_mt_decoder(inputs, conf: LocalConfig):
         wrapper[f"conv_out_{i}"] = tf.keras.layers.Conv2D(
             f, k, padding=conf.padding, name=f"decoder_conv_{i}",
             kernel_initializer=tf.initializers.glorot_uniform())(wrapper[f"up_out_{i}"])
-        wrapper[f"bn_out_{i}"] = tf.keras.layers.BatchNormalization(name=f"decoder_bn_{i}")(wrapper[f"conv_out_{i}"])
-        wrapper[f"act_{i}"] = tf.keras.layers.Activation("elu", name=f"decoder_act_{i}")(wrapper[f"bn_out_{i}"])
+        # wrapper[f"bn_out_{i}"] = tf.keras.layers.BatchNormalization(name=f"decoder_bn_{i}")(wrapper[f"conv_out_{i}"])
+        wrapper[f"act_{i}"] = tf.keras.layers.Activation("elu", name=f"decoder_act_{i}")(wrapper[f"conv_out_{i}"])
         if conf.simple_decoder:
             wrapper[f"up_out_{i}"] = tf.keras.layers.Conv2D(f, 1, padding="same")(wrapper[f"up_out_{i}"])
         else:
@@ -573,10 +573,10 @@ def create_mt_decoder(inputs, conf: LocalConfig):
                 _f, _k = next(filters_kernels)
                 wrapper[f"conv_out_{i}"] = name(k, tf.keras.layers.Conv2D(
                     _f, _k, padding=conf.padding, name=f"{k}_decoder_conv_{i}"))(wrapper[f"up_out_{i}"])
-                wrapper[f"bn_out_{i}"] = name(k, tf.keras.layers.BatchNormalization(
-                    name=f"{k}_decoder_bn_{i}"))(wrapper[f"conv_out_{i}"])
+                # wrapper[f"bn_out_{i}"] = name(k, tf.keras.layers.BatchNormalization(
+                # name=f"{k}_decoder_bn_{i}"))(wrapper[f"conv_out_{i}"])
                 wrapper[f"act_{i}"] = name(k, tf.keras.layers.Activation(
-                    "elu", name=f"{k}_decoder_act_{i}"))(wrapper[f"bn_out_{i}"])
+                    "elu", name=f"{k}_decoder_act_{i}"))(wrapper[f"conv_out_{i}"])
                 # wrapper[f"up_out_{i}"] = tf.keras.layers.Dense(units=f)(wrapper[f"up_out_{i}"])
                 wrapper[f"up_out_{i + 1}"] = name(k, tf.keras.layers.Add()([
                     wrapper[f"act_{i}"], wrapper[f"up_out_{i}"]

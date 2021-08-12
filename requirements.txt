@@ -6,3 +6,4 @@ tensorflow==2.5.0
 tensorflow-addons==0.13.0
 tsms @ git+https://github.com/fabiodimarco/tf-spectral-modeling-synthesis.git@b81438676b90e34ecf45a33d8c439dcc3a16549d
 loguru
+pydot
