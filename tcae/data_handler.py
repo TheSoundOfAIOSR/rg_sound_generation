@@ -548,7 +548,7 @@ class DataHandler:
                         measures_true,
                         measures_pred)
 
-                losses["loss"] += loss
+                losses["loss"] += v * loss
                 losses[k + "_loss"] = loss
 
         return losses
