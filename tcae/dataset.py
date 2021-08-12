@@ -147,7 +147,7 @@ def create_dataset(
 def map_features(features):
     conf = LocalConfig()
 
-    # name = features["sample_name"]
+    name = features["sample_name"]
     note_number = features["note_number"]
     velocity = features["velocity"]
     instrument_id = features["instrument_id"]
@@ -193,6 +193,7 @@ def map_features(features):
         instrument_id = tf.cast(instrument_id, tf.float32) / num_instruments
 
     data = {
+        "name": name,
         "mask": mask,
         "note_number": tf.squeeze(note_number),
         "velocity": tf.squeeze(velocity),
