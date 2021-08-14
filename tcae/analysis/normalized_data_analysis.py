@@ -11,6 +11,7 @@ def main():
     base_path = os.path.dirname(base_path)
     conf.dataset_dir = os.path.join(base_path, "complete_dataset")
     conf.checkpoints_dir = os.path.join(base_path, "checkpoints")
+    conf.batch_size = 1
     train_dataset, valid_dataset, test_dataset = get_dataset(conf)
 
     dataset = train_dataset.concatenate(valid_dataset).concatenate(test_dataset)
@@ -70,7 +71,7 @@ def main():
     train_iterator = iter(train_dataset)
     for step, batch in enumerate(train_iterator):
         x, y = batch
-        f0_shifts = x["f0_shifts"].numpy()
+        f0_shifts = y["f0_shifts"].numpy()
         mag_env = y["mag_env"].numpy()
         h_freq_shifts = y["h_freq_shifts"].numpy()
         h_mag_dist = y["h_mag_dist"].numpy()
