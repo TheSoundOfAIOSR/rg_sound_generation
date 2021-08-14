@@ -212,18 +212,29 @@ def peak_iir_frequency_response(w, wc, bw, g_db):
 
 def compute_pos_max(mag):
     pos_max = tf.math.argmax(mag, axis=1, output_type=tf.int32)
-    pad_mag = tf.pad(mag, paddings=((0, 0), (1, 1)))
-    pad_mag = tf.expand_dims(pad_mag, axis=1)
-    pos, pos_shift, pos_value = tsms.core.parabolic_interp(pad_mag)
-    pos = tf.squeeze(pos, axis=1)
 
     indices = tf.range(tf.shape(pos_max)[0])
-    max_indices = tf.concat([
-        tf.expand_dims(indices, axis=-1),
-        tf.expand_dims(pos_max, axis=-1),
-    ], axis=1)
+    indices = tf.expand_dims(indices, axis=-1)
+    m = tf.expand_dims(pos_max + 1, axis=-1)
+    m0 = m - 1
+    m1 = m
+    m2 = m + 1
 
-    pos_max_interp = tf.gather_nd(pos, max_indices) - 1.0
+    m0 = tf.concat([indices, m0], axis=1)
+    m1 = tf.concat([indices, m1], axis=1)
+    m2 = tf.concat([indices, m2], axis=1)
+
+    pad_mag = tf.pad(mag, paddings=((0, 0), (1, 1)))
+    mag0 = tf.gather_nd(pad_mag, m0)
+    mag1 = tf.gather_nd(pad_mag, m1)
+    mag2 = tf.gather_nd(pad_mag, m2)
+
+    mag_peak = tf.stack([mag0, mag1, mag2], axis=-1)
+    mag_peak = tf.expand_dims(mag_peak, axis=1)
+    pos, pos_shift, pos_value = tsms.core.parabolic_interp(mag_peak)
+    pos_shift = tf.squeeze(pos_shift, axis=[1, 2])
+    pos_max_interp = tf.cast(pos_max, dtype=tf.float32)
+    pos_max_interp = pos_max_interp + pos_shift
 
     return pos_max, pos_max_interp
 
