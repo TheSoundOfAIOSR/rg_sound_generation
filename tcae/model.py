@@ -211,6 +211,95 @@ def create_mt_decoder(inputs, conf: LocalConfig):
     return m
 
 
+class Tables(tf.keras.layers.Layer):
+    def __init__(self, num_tables, rows, cols, dropout_rate=0.1):
+        super(Tables, self).__init__()
+        self.num_tables = tf.constant(num_tables, dtype=tf.int32)
+        self.rows = rows
+        self.cols = cols
+
+        self.tables = self.add_weight(name='tables',
+                                      shape=(num_tables, rows, cols, 1))
+        self.dropout = tf.keras.layers.Dropout(rate=dropout_rate)
+
+    def call(self, x, training=None, mask=None):
+        x = tf.expand_dims(x, axis=1)
+        tables = tf.expand_dims(self.tables, axis=0)
+        tables = self.dropout(tables)
+        y = tf.linalg.matmul(x, tables)
+        batches = tf.shape(y)[0]
+        y = tf.reshape(
+            y, shape=(batches, self.num_tables * self.rows, self.cols))
+
+        return y
+
+
+def base_lc_decoder(dropout_rate=0.1):
+    inputs = tf.keras.layers.Input(shape=(128, 70))
+    x = tf.keras.layers.LocallyConnected1D(16 * 2, 1, 1)(inputs)
+    x = tf.keras.layers.Reshape((128, 16, 2))(x)
+
+    def product(z):
+        q, k = tf.unstack(z, axis=-1)
+        q = tf.expand_dims(q, axis=-1)
+        k = tf.expand_dims(k, axis=-2)
+        return tf.linalg.matmul(q, k)
+
+    x = tf.keras.layers.Lambda(lambda z: product(z))(x)
+    x = tf.keras.layers.Permute(dims=(2, 3, 1))(x)
+    x = tf.keras.layers.Dropout(rate=dropout_rate)(x)
+
+    steps = 128
+    for i in range(0, 3):
+        steps //= 2
+        x = tf.keras.layers.UpSampling2D(2)(x)
+        y = tf.keras.layers.Conv2D(steps, 4, padding="same")(x)
+        y = tf.keras.layers.Activation("relu")(y)
+        y = tf.keras.layers.Dropout(rate=dropout_rate)(y)
+        x = tf.keras.layers.Conv2D(steps, 1, padding="same")(x)
+        x = tf.keras.layers.Add()([x, y])
+        # x = tf.keras.layers.BatchNormalization()(x)
+
+    x = tf.keras.layers.Permute(dims=(3, 1, 2))(x)
+
+    outputs = Tables(64, 16, 128, dropout_rate)(x)
+
+    m = tf.keras.models.Model(
+        inputs, outputs
+    )
+    return m
+
+
+def create_mt_lc_decoder(inputs, conf: LocalConfig):
+    if conf is None:
+        conf = LocalConfig()
+
+    concat_inputs = []
+    for k, v in inputs.items():
+        concat_inputs += [v]
+
+    x = tf.keras.layers.concatenate(concat_inputs)
+    x = tf.keras.layers.RepeatVector(128)(x)
+
+    x0 = base_lc_decoder(conf.lc_dropout_rate)(x)
+    x1 = base_lc_decoder(conf.lc_dropout_rate)(x)
+    x2 = base_lc_decoder(conf.lc_dropout_rate)(x)
+    x3 = base_lc_decoder(conf.lc_dropout_rate)(x)
+
+    x = tf.keras.layers.Concatenate(axis=-1)([x0, x1, x2, x3])
+    outputs = {}
+
+    for k, v in conf.data_handler.outputs.items():
+        outputs[k] = tf.keras.layers.Dense(v["size"])(x)
+
+    m = tf.keras.models.Model(
+        inputs, outputs
+    )
+    tf.keras.utils.plot_model(m, to_file="decoder.png", show_shapes=True,
+                              show_layer_names=False)
+    return m
+
+
 class TCAEModel(tf.keras.Model):
     def __init__(self, conf: LocalConfig):
         super(TCAEModel, self).__init__()
@@ -258,6 +347,8 @@ class TCAEModel(tf.keras.Model):
 
         if conf.create_decoder_function == 'cnn':
             self.decoder = create_mt_decoder(decoder_inputs, conf)
+        elif conf.create_decoder_function == 'lc':
+            self.decoder = create_mt_lc_decoder(decoder_inputs, conf)
         else:
             self.decoder = conf.create_decoder_function(decoder_inputs, conf)
 

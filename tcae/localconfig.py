@@ -11,6 +11,7 @@ class LocalConfig:
     simple_encoder = False
     simple_decoder = False
     create_decoder_function = 'cnn'
+    lc_dropout_rate = 0.1
     pretrained_model_path = None
     model_name = "tcae"
     run_name = "default"
