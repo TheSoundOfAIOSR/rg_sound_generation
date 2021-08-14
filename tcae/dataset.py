@@ -1,7 +1,6 @@
-import os
 import tensorflow as tf
-from .localconfig import LocalConfig
-from . import heuristics
+import os
+from tcae.localconfig import LocalConfig
 
 
 class CompleteTFRecordProvider:
@@ -69,55 +68,6 @@ class CompleteTFRecordProvider:
         }
 
 
-heuristic_names = [
-    "inharmonicity", "even_odd", "sparse_rich", "attack_rms",
-    "decay_rms", "attack_time", "decay_time", "bass", "mid",
-    "high_mid", "high"
-]
-
-
-def get_measures(h_freq, h_mag, conf: LocalConfig):
-    inharmonic = heuristics.core.inharmonicity_measure(
-        h_freq, h_mag, None, None, None, None)
-    even_odd = heuristics.core.even_odd_measure(
-        h_freq, h_mag, None, None, None, None)
-    sparse_rich = heuristics.core.sparse_rich_measure(
-        h_freq, h_mag, None, None, None, None)
-    attack_rms = heuristics.core.attack_rms_measure(
-        h_freq, h_mag, None, None, None, None)
-    decay_rms = heuristics.core.decay_rms_measure(
-        h_freq, h_mag, None, None, None, None)
-    attack_time = heuristics.core.attack_time_measure(
-        h_freq, h_mag, None, None, None, None)
-    decay_time = heuristics.core.decay_time_measure(
-        h_freq, h_mag, None, None, None, None)
-
-    bass = heuristics.core.frequency_band_measure(
-            h_freq, h_mag, None, None, conf.sample_rate, None,
-            f_min=conf.freq_bands["bass"][0], f_max=conf.freq_bands["bass"][1]
-        )
-    mid = heuristics.core.frequency_band_measure(
-            h_freq, h_mag, None, None, conf.sample_rate, None,
-            f_min=conf.freq_bands["mid"][0], f_max=conf.freq_bands["mid"][1]
-        )
-    high_mid = heuristics.core.frequency_band_measure(
-            h_freq, h_mag, None, None, conf.sample_rate, None,
-            f_min=conf.freq_bands["high_mid"][0], f_max=conf.freq_bands["high_mid"][1]
-        )
-    high = heuristics.core.frequency_band_measure(
-            h_freq, h_mag, None, None, conf.sample_rate, None,
-            f_min=conf.freq_bands["high"][0], f_max=conf.freq_bands["high"][1]
-        )
-
-    measures = [inharmonic, even_odd, sparse_rich,
-                attack_rms, decay_rms, attack_time, decay_time,
-                bass, mid, high_mid, high]
-    measures = [tf.squeeze(m) for m in measures]
-    measures = tf.stack(measures, axis=-1)
-
-    return measures
-
-
 def create_dataset(
         dataset_path,
         batch_size=16,
@@ -168,15 +118,23 @@ def map_features(features):
     h_mag = tf.expand_dims(h_mag, axis=0)
     h_phase = tf.expand_dims(h_phase, axis=0)
 
-    normalized_data, mask = \
-        conf.data_handler.normalize(h_freq, h_mag, h_phase, note_number)
+    harmonics = tf.shape(h_freq)[-1] - 2
+    h_freq = h_freq[:, :, :harmonics]
+    h_mag = h_mag[:, :, :harmonics]
+    h_phase = h_phase[:, :, :harmonics] if h_phase is not None else h_phase
+
+    normalized_data = conf.data_handler.normalize(
+        h_freq, h_mag, h_phase, note_number)
+
+    h_freq, h_mag, _ = conf.data_handler.denormalize(
+        normalized_data, phase_mode='none')
+    measures = conf.data_handler.compute_measures(h_freq, h_mag)
 
     for k, v in normalized_data.items():
         normalized_data[k] = tf.squeeze(v, axis=0)
 
-    mask = tf.squeeze(mask, axis=0)
-
-    measures = get_measures(h_freq, h_mag, conf)
+    for k, v in measures.items():
+        measures[k] = tf.squeeze(v, axis=0)
 
     if conf.use_one_hot_conditioning:
         note_number = tf.one_hot(
@@ -192,16 +150,19 @@ def map_features(features):
         num_instruments = float(conf.num_instruments)
         instrument_id = tf.cast(instrument_id, tf.float32) / num_instruments
 
-    data = {
-        "name": name,
-        "mask": mask,
+    inputs = normalized_data.copy()
+    inputs.update({
+        "name:": name,
         "note_number": tf.squeeze(note_number),
         "velocity": tf.squeeze(velocity),
         "instrument_id": tf.squeeze(instrument_id),
-        "measures": measures,
-    }
-    data.update(normalized_data)
-    return data
+        "measures": tf.stack(tf.nest.flatten(measures), axis=-1),
+    })
+
+    targets = normalized_data.copy()
+    targets.update(measures)
+
+    return inputs, targets
 
 
 def get_dataset(conf: LocalConfig):
@@ -220,8 +181,15 @@ def get_dataset(conf: LocalConfig):
     #         d[k] = tf.squeeze(v, axis=0)
     #     ne = map_features(d)
 
-    train_dataset = create_dataset(train_path, map_func=map_features, batch_size=conf.batch_size)
-    valid_dataset = create_dataset(valid_path, map_func=map_features, batch_size=conf.batch_size)
-    test_dataset = create_dataset(test_path, map_func=map_features, batch_size=conf.batch_size)
+    train_dataset = create_dataset(
+        train_path, map_func=map_features, batch_size=conf.batch_size)
+    valid_dataset = create_dataset(
+        valid_path, map_func=map_features, batch_size=conf.batch_size)
+    test_dataset = create_dataset(
+        test_path, map_func=map_features, batch_size=conf.batch_size)
+
+    if conf.dataset_modifier is not None:
+        train_dataset, valid_dataset, test_dataset = conf.dataset_modifier(
+            train_dataset, valid_dataset, test_dataset)
 
     return train_dataset, valid_dataset, test_dataset

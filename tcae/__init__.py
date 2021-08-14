@@ -1,1 +1,1 @@
-from . import localconfig, dataset, model, train
+from tcae import localconfig, dataset, model, train
