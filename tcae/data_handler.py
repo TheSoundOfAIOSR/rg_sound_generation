@@ -1,7 +1,7 @@
 import tensorflow as tf
 import numpy as np
 import tsms
-from tcae import heuristics
+from tcae import measures
 
 
 def linear_to_normalized_db(x, db_limit=-120.0):
@@ -417,39 +417,39 @@ class DataHandler:
         return h_freq, h_mag, h_phase
 
     def compute_measures(self, h_freq, h_mag):
-        inharmonic = heuristics.core.inharmonicity_measure(
+        inharmonic = measures.core.inharmonicity_measure(
             h_freq, h_mag, None, None, None, None)
-        even_odd = heuristics.core.even_odd_measure(
+        even_odd = measures.core.even_odd_measure(
             h_freq, h_mag, None, None, None, None)
-        sparse_rich = heuristics.core.sparse_rich_measure(
+        sparse_rich = measures.core.sparse_rich_measure(
             h_freq, h_mag, None, None, None, None)
-        attack_rms = heuristics.core.attack_rms_measure(
+        attack_rms = measures.core.attack_rms_measure(
             h_freq, h_mag, None, None, None, None)
-        decay_rms = heuristics.core.decay_rms_measure(
+        decay_rms = measures.core.decay_rms_measure(
             h_freq, h_mag, None, None, None, None)
-        attack_time = heuristics.core.attack_time_measure(
+        attack_time = measures.core.attack_time_measure(
             h_freq, h_mag, None, None, None, None)
-        decay_time = heuristics.core.decay_time_measure(
+        decay_time = measures.core.decay_time_measure(
             h_freq, h_mag, None, None, None, None)
 
-        bass = heuristics.core.frequency_band_measure(
+        bass = measures.core.frequency_band_measure(
             h_freq, h_mag, None, None, self._sample_rate, None,
             f_min=self.freq_bands["bass"][0], f_max=self.freq_bands["bass"][1]
         )
-        mid = heuristics.core.frequency_band_measure(
+        mid = measures.core.frequency_band_measure(
             h_freq, h_mag, None, None, self._sample_rate, None,
             f_min=self.freq_bands["mid"][0], f_max=self.freq_bands["mid"][1]
         )
-        high_mid = heuristics.core.frequency_band_measure(
+        high_mid = measures.core.frequency_band_measure(
             h_freq, h_mag, None, None, self._sample_rate, None,
             f_min=self.freq_bands["high_mid"][0], f_max=self.freq_bands["high_mid"][1]
         )
-        high = heuristics.core.frequency_band_measure(
+        high = measures.core.frequency_band_measure(
             h_freq, h_mag, None, None, self._sample_rate, None,
             f_min=self.freq_bands["high"][0], f_max=self.freq_bands["high"][1]
         )
 
-        measures = {
+        m = {
             "inharmonic": inharmonic,
             "even_odd": even_odd,
             "sparse_rich": sparse_rich,
@@ -463,7 +463,7 @@ class DataHandler:
             "high": high,
         }
 
-        return measures
+        return m
 
     def output_transform(self,
                          normalized_data_true,

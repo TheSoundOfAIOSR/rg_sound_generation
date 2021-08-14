@@ -231,8 +231,8 @@ def inharmonicity_measure(h_freq, h_mag, h_phase, residual,
     f_variance = tfa.image.median_filter2d(f_variance, filter_shape=(1, 50))
     f_variance = tf.math.reduce_mean(f_variance, axis=(1, 2))
 
-    inharmonic = f_variance ** 2
-    inharmonic = inharmonic / (inharmonic + 1.0)
+    inharmonic = f_variance  # ** 2
+    inharmonic = inharmonic / (inharmonic + 1.0)  # 0-1 range
 
     return inharmonic
 
@@ -298,6 +298,8 @@ def attack_rms_measure(h_freq, h_mag, h_phase, residual,
     rms = tf.math.reduce_sum(rms, axis=1) / att_size
     rms = tf.math.sqrt(rms + 1e-6)
 
+    rms = rms / (rms + 1.0)  # 0-1 range
+
     return rms
 
 
@@ -330,6 +332,8 @@ def decay_rms_measure(h_freq, h_mag, h_phase, residual,
     dec_size = tf.math.maximum(dec_size, 1.0)
     rms = tf.math.reduce_sum(rms, axis=1) / dec_size
     rms = tf.math.sqrt(rms + 1e-6)
+
+    rms = rms / (rms + 1.0)  # 0-1 range
 
     return rms
 
