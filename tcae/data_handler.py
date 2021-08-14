@@ -185,6 +185,13 @@ class DataHandler:
                     self._outputs["h_mag_dist"] = {"size": self.max_harmonics}
 
     @property
+    def measures_names(self):
+        measures_names = []
+        for k, v in self.measures_losses_weights.items():
+            measures_names.append(k)
+        return measures_names
+
+    @property
     def weight_type(self):
         return self._weight_type
 

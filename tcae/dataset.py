@@ -3,13 +3,6 @@ import os
 from tcae.localconfig import LocalConfig
 
 
-heuristic_names = [
-    "inharmonicity", "even_odd", "sparse_rich", "attack_rms",
-    "decay_rms", "attack_time", "decay_time", "bass", "mid",
-    "high_mid", "high"
-]
-
-
 class CompleteTFRecordProvider:
     def __init__(self,
                  file_pattern,
