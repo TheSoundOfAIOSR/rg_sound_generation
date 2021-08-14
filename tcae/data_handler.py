@@ -75,9 +75,10 @@ class DataHandler:
                  weight_type='mag_max_pool',  # 'mag_max_pool', 'mag', 'none'
                  freq_loss_type='mse',  # 'cross_entropy', 'mse'
                  mag_loss_type='l2_db',  # 'cross_entropy', 'l2_db' 'l1_db', 'rms_db', 'mse'
-                 freq_scale_fn=tf.math.tanh,
-                 mag_scale_fn=exp_sigmoid,
-                 phase_scale_fn=tf.math.tanh,
+                 phase_loss_type='mse',  # 'cross_entropy', 'mse'
+                 freq_scale_fn='none',  # 'none', 'tanh'
+                 mag_scale_fn='exp_sigmoid',  # 'none', 'exp_sigmoid'
+                 phase_scale_fn='none',  # 'none', 'tanh'
                  max_harmonics=110,
                  sample_rate=16000,
                  frame_step=64,
@@ -94,7 +95,10 @@ class DataHandler:
         self._weight_type = weight_type
         self._freq_loss_type = freq_loss_type
         self._mag_loss_type = mag_loss_type
-        self._mag_scale_fn = mag_scale_fn
+        self._phase_loss_type = phase_loss_type
+        self.freq_scale_fn = freq_scale_fn
+        self.mag_scale_fn = mag_scale_fn
+        self.phase_scale_fn = phase_scale_fn
         self.max_harmonics = max_harmonics
         self._sample_rate = sample_rate
         self._frame_step = frame_step
@@ -208,6 +212,30 @@ class DataHandler:
         self._mag_loss_type = value
 
     @property
+    def phase_loss_type(self):
+        return self._phase_loss_type
+
+    @phase_loss_type.setter
+    def phase_loss_type(self, value: str):
+        assert value in ['cross_entropy', 'mse']
+        self._phase_loss_type = value
+
+    @property
+    def freq_scale_fn(self):
+        if self._freq_scale_fn is None:
+            return "none"
+        else:
+            return "tanh"
+
+    @freq_scale_fn.setter
+    def freq_scale_fn(self, value: str):
+        assert value in ["none", "tanh"]
+        if value == "none":
+            self._freq_scale_fn = None
+        else:
+            self._freq_scale_fn = tf.math.tanh
+
+    @property
     def mag_scale_fn(self):
         if self._mag_scale_fn is None:
             return "none"
@@ -221,6 +249,21 @@ class DataHandler:
             self._mag_scale_fn = None
         else:
             self._mag_scale_fn = exp_sigmoid
+
+    @property
+    def phase_scale_fn(self):
+        if self._phase_scale_fn is None:
+            return "none"
+        else:
+            return "tanh"
+
+    @phase_scale_fn.setter
+    def phase_scale_fn(self, value: str):
+        assert value in ["none", "tanh"]
+        if value == "none":
+            self._phase_scale_fn = None
+        else:
+            self._phase_scale_fn = tf.math.tanh
 
     def split_mag(self, h_mag):
         mag_env_max = self._mag_env_max
@@ -425,10 +468,22 @@ class DataHandler:
             normalized_data_pred[k] = \
                 normalized_data_pred[k][:, :frames, :v["size"], ...]
 
+            if k == "f0_shifts" or k == "h_freq_shifts":
+                if self._freq_scale_fn is not None and \
+                        self._freq_loss_type != 'cross_entropy':
+                    normalized_data_pred[k] = tf.math.tanh(
+                        normalized_data_pred[k])
+
             if k == "mag_env" or k == "h_mag_dist":
                 if self._mag_scale_fn is not None and \
                         self._mag_loss_type != 'cross_entropy':
                     normalized_data_pred[k] = exp_sigmoid(
+                        normalized_data_pred[k])
+
+            if k == "h_phase_diff":
+                if self._phase_scale_fn is not None and \
+                        self._phase_loss_type != 'cross_entropy':
+                    normalized_data_pred[k] = tf.math.tanh(
                         normalized_data_pred[k])
 
             if self._mag_loss_type == 'cross_entropy' and not loss_data:
@@ -488,9 +543,16 @@ class DataHandler:
         loss = tf.math.reduce_sum(loss * weights) / tf.math.reduce_sum(weights)
         return loss
 
-    @staticmethod
-    def phase_loss(y_true, y_pred, weights):
-        loss = tf.square(y_true - y_pred)
+    def phase_loss(self, y_true, y_pred, weights):
+        loss = 0.0
+
+        if self._phase_loss_type == 'mse':
+            loss = tf.square(y_true - y_pred)
+        elif self._phase_loss_type == 'cross_entropy':
+            loss = tf.nn.sparse_softmax_cross_entropy_with_logits(
+                mu_law_encode(y_true, self.quantization_channels, False),
+                y_pred)
+
         loss = tf.math.reduce_sum(loss * weights) / tf.math.reduce_sum(weights)
         return loss
 
