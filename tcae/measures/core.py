@@ -210,6 +210,18 @@ def peak_iir_frequency_response(w, wc, bw, g_db):
     return h
 
 
+def compute_pos_max(mag):
+    pos_max = tf.math.argmax(mag, axis=1, output_type=tf.int32)
+    pad_mag = tf.pad(mag, paddings=((0, 0), (1, 1)))
+    pad_mag = tf.expand_dims(pad_mag, axis=1)
+    pos, pos_shift, pos_value = tsms.core.parabolic_interp(pad_mag)
+    pos = tf.squeeze(pos, axis=1)
+    pos_max_interp = tf.gather(pos, pos_max, axis=-1) - 1.0
+    pos_max_interp = tf.squeeze(pos_max_interp, axis=1)
+
+    return pos_max, pos_max_interp
+
+
 def inharmonicity_measure(h_freq, h_mag, h_phase, residual,
                           sample_rate, frame_step):
     h_mag = tf.math.abs(h_mag)
@@ -281,7 +293,6 @@ def attack_rms_measure(h_freq, h_mag, h_phase, residual,
 
     mag = tf.math.reduce_mean(h_mag, axis=2)
     attack_size = tf.math.argmax(mag, axis=1, output_type=tf.int32)
-    attack_size = tf.math.minimum(attack_size, tf.shape(mag)[1])
 
     sample_size = tf.shape(mag)[1]
 
@@ -309,7 +320,6 @@ def decay_rms_measure(h_freq, h_mag, h_phase, residual,
 
     mag = tf.math.reduce_mean(h_mag, axis=2)
     attack_size = tf.math.argmax(mag, axis=1, output_type=tf.int32)
-    attack_size = tf.math.minimum(attack_size, tf.shape(mag)[1])
 
     sample_size = tf.shape(mag)[1]
 
@@ -343,8 +353,8 @@ def attack_time_measure(h_freq, h_mag, h_phase, residual,
     h_mag = tf.math.abs(h_mag)
 
     mag = tf.math.reduce_mean(h_mag, axis=2)
-    attack_size = tf.argmax(mag, axis=1, output_type=tf.int32)
-    attack_size = tf.cast(attack_size, dtype=tf.float32)
+    pos_max, pos_max_interp = compute_pos_max(mag)
+    attack_size = pos_max_interp
 
     sample_size = tf.shape(h_mag)[1]
     sample_size = tf.cast(sample_size, dtype=tf.float32)
@@ -359,25 +369,19 @@ def decay_time_measure(h_freq, h_mag, h_phase, residual,
     h_mag = tf.math.abs(h_mag)
 
     mag = tf.math.reduce_mean(h_mag, axis=2)
-    attack_size = tf.argmax(mag, axis=1, output_type=tf.int32)
+    pos_max, pos_max_interp = compute_pos_max(mag)
+    attack_size = pos_max_interp
 
     sample_size = tf.shape(mag)[1]
-
-    def fn(size):
-        return tf.concat([
-            tf.ones(shape=(size,)),
-            tf.zeros(shape=(sample_size - size,))], axis=0)
-
-    attack_mask = tf.map_fn(fn, attack_size, fn_output_signature=tf.float32)
 
     db_limit = -80
     mag_db = tsms.core.lin_to_db(mag)
     mag_db = tf.maximum(mag_db, db_limit)
     mag_db = mag_db / (-db_limit) + 1.0
     decay_mask = tf.where(tf.cumsum(mag_db[:, ::-1], axis=1) > 0.0, 1.0, 0.0)
-    decay_mask = decay_mask[:, ::-1] - attack_mask
+    decay_mask = decay_mask[:, ::-1]
 
-    decay_size = tf.math.reduce_sum(decay_mask, axis=1)
+    decay_size = tf.math.reduce_sum(decay_mask, axis=1) - attack_size
     sample_size = tf.cast(sample_size, dtype=tf.float32)
     sample_size = tf.where(sample_size > 0.0, sample_size, 1.0)
     decay_time = decay_size / sample_size
