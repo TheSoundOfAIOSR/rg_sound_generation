@@ -216,8 +216,14 @@ def compute_pos_max(mag):
     pad_mag = tf.expand_dims(pad_mag, axis=1)
     pos, pos_shift, pos_value = tsms.core.parabolic_interp(pad_mag)
     pos = tf.squeeze(pos, axis=1)
-    pos_max_interp = tf.gather(pos, pos_max, axis=-1) - 1.0
-    pos_max_interp = tf.squeeze(pos_max_interp, axis=1)
+
+    indices = tf.range(tf.shape(pos_max)[0])
+    max_indices = tf.concat([
+        tf.expand_dims(indices, axis=-1),
+        tf.expand_dims(pos_max, axis=-1),
+    ], axis=1)
+
+    pos_max_interp = tf.gather_nd(pos, max_indices) - 1.0
 
     return pos_max, pos_max_interp
 
