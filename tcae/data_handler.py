@@ -71,7 +71,7 @@ class DataHandler:
     def __init__(self,
                  fix_pitch=True,
                  normalize_mag=False,
-                 use_h_mag_mask=True,
+                 compact_measures_logs=True,
                  weight_type='mag_max_pool',  # 'mag_max_pool', 'mag', 'none'
                  freq_loss_type='mse',  # 'cross_entropy', 'mse'
                  mag_loss_type='l2_db',  # 'cross_entropy', 'l2_db' 'l1_db', 'rms_db', 'mse'
@@ -88,9 +88,9 @@ class DataHandler:
                  max_pool_length=5,
                  quantization_channels=256,
                  freq_bands=None):
-        self._fix_pitch = fix_pitch
-        self._normalize_mag = normalize_mag
-        self._use_h_mag_mask = use_h_mag_mask
+        self.fix_pitch = fix_pitch
+        self.normalize_mag = normalize_mag
+        self.compact_measures_logs = compact_measures_logs
         self._weight_type = weight_type
         self._freq_loss_type = freq_loss_type
         self._mag_loss_type = mag_loss_type
@@ -121,6 +121,19 @@ class DataHandler:
 
         self._losses_weights = None
         self._outputs = None
+        self.measures_losses_weights = {
+            "inharmonic": 0.1,
+            "even_odd": 0.1,
+            "sparse_rich": 0.1,
+            "attack_rms": 0.1,
+            "decay_rms": 0.1,
+            "attack_time": 0.1,
+            "decay_time": 0.1,
+            "bass": 0.1,
+            "mid": 0.1,
+            "high_mid": 0.1,
+            "high": 0.1,
+        }
 
         self.update_losses_weights()
 
@@ -149,9 +162,8 @@ class DataHandler:
             "h_mag_dist": h_mag_dist,
             "h_mag": h_mag,
             "h_phase_diff": h_phase_diff,
-            "measures": measures,
+            "measures": measures
         }
-
         self._outputs = {}
         for k, v in self._losses_weights.items():
             if v > 0.0:
@@ -236,7 +248,7 @@ class DataHandler:
         harmonic_numbers = harmonic_numbers[tf.newaxis, tf.newaxis, :]
 
         # compute f0_shifts and h_freq_shifts
-        if self._fix_pitch:
+        if self.fix_pitch:
             f0_mean = tf.math.reduce_mean(f0)
             f0_shifts = (f0 - f0_mean) / max_f0_displ
             fixed_harmonics = tsms.core.get_number_harmonics(
@@ -251,7 +263,7 @@ class DataHandler:
         h_freq_shifts = tf.clip_by_value(h_freq_shifts, -1.0, 1.0)
 
         # compute mag_env and h_mag_dist
-        if self._normalize_mag:
+        if self.normalize_mag:
             h_mag = h_mag / tf.math.reduce_max(h_mag)
 
         mag_env, h_mag_dist = self.split_mag(h_mag)
@@ -387,11 +399,19 @@ class DataHandler:
             f_min=self.freq_bands["high"][0], f_max=self.freq_bands["high"][1]
         )
 
-        measures = [inharmonic, even_odd, sparse_rich,
-                    attack_rms, decay_rms, attack_time, decay_time,
-                    bass, mid, high_mid, high]
-        # measures = [tf.squeeze(m) for m in measures]
-        measures = tf.stack(measures, axis=-1)
+        measures = {
+            "inharmonic": inharmonic,
+            "even_odd": even_odd,
+            "sparse_rich": sparse_rich,
+            "attack_rms": attack_rms,
+            "decay_rms": decay_rms,
+            "attack_time": attack_time,
+            "decay_time": decay_time,
+            "bass": bass,
+            "mid": mid,
+            "high_mid": high_mid,
+            "high": high,
+        }
 
         return measures
 
@@ -489,15 +509,15 @@ class DataHandler:
                 mag, [1, self._max_pool_length, 1], 1, padding='SAME')
         return weight
 
-    def loss(self, normalized_data_true, normalized_data_pred):
-        mask = normalized_data_true["mask"]
+    def loss(self, data_true, data_pred):
+        mask = data_true["mask"]
 
-        normalized_data_pred = self.output_transform(
-            normalized_data_true, normalized_data_pred, loss_data=True)
+        data_pred = self.output_transform(
+            data_true, data_pred, loss_data=True)
 
         # compute weights
-        mag_env_true = normalized_data_true["mag_env"]
-        h_mag_dist_true = normalized_data_true["h_mag_dist"]
+        mag_env_true = data_true["mag_env"]
+        h_mag_dist_true = data_true["h_mag_dist"]
 
         h_mag_true = self.combine_mag(mag_env_true, h_mag_dist_true)
 
@@ -521,32 +541,39 @@ class DataHandler:
                 loss = 0.0
                 if k == "f0_shifts" or k == "h_freq_shifts":
                     loss = self.freq_loss(
-                        normalized_data_true[k],
-                        normalized_data_pred[k],
+                        data_true[k],
+                        data_pred[k],
                         weights[k])
                 elif k == "mag_env" or k == "h_mag_dist":
                     loss = self.mag_loss(
-                        normalized_data_true[k],
-                        normalized_data_pred[k],
+                        data_true[k],
+                        data_pred[k],
                         weights[k])
                 elif k == "h_mag" and self._mag_loss_type != 'cross_entropy':
                     h_mag_pred = self.combine_mag(
-                        normalized_data_pred["mag_env"],
-                        normalized_data_pred["h_mag_dist"])
+                        data_pred["mag_env"],
+                        data_pred["h_mag_dist"])
                     loss = self.mag_loss(h_mag_true, h_mag_pred, mask)
                 elif k == "h_phase_diff":
                     loss = self.phase_loss(
-                        normalized_data_true[k],
-                        normalized_data_pred[k],
+                        data_true[k],
+                        data_pred[k],
                         weights[k])
                 elif k == "measures":
-                    measures_true = normalized_data_true[k]
                     h_freq, h_mag, _ = self.denormalize(
-                        normalized_data_pred, phase_mode='none')
+                        data_pred, phase_mode='none')
                     measures_pred = self.compute_measures(h_freq, h_mag)
-                    loss = self.measures_loss(
-                        measures_true,
-                        measures_pred)
+
+                    losses[k + "_loss"] = 0.0  # initialize to set position
+                    for km, vm in self.measures_losses_weights.items():
+                        measure_loss = vm * self.measures_loss(
+                            data_true[km],
+                            measures_pred[km])
+
+                        if not self.compact_measures_logs:
+                            losses[km + "_loss"] = measure_loss
+
+                        loss += measure_loss
 
                 loss *= v
                 losses["loss"] += loss
