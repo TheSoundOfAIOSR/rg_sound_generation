@@ -6,7 +6,9 @@ from tcae.dataset import get_dataset
 
 def main():
     conf = LocalConfig()
-    base_path = os.path.dirname(os.getcwd())
+    base_path = os.getcwd()
+    base_path = os.path.dirname(base_path)
+    base_path = os.path.dirname(base_path)
     conf.dataset_dir = os.path.join(base_path, "complete_dataset")
     conf.checkpoints_dir = os.path.join(base_path, "checkpoints")
     train_dataset, valid_dataset, test_dataset = get_dataset(conf)
@@ -36,11 +38,12 @@ def main():
 
     iterator = iter(dataset)
     for step, batch in enumerate(iterator):
-        f0_shifts = batch["f0_shifts"].numpy()
-        mag_env = batch["mag_env"].numpy()
-        h_freq_shifts = batch["h_freq_shifts"].numpy()
-        h_mag_dist = batch["h_mag_dist"].numpy()
-        h_phase_diff = batch["h_phase_diff"].numpy()
+        x, y = batch
+        f0_shifts = y["f0_shifts"].numpy()
+        mag_env = y["mag_env"].numpy()
+        h_freq_shifts = y["h_freq_shifts"].numpy()
+        h_mag_dist = y["h_mag_dist"].numpy()
+        h_phase_diff = y["h_phase_diff"].numpy()
         h_mag = conf.data_handler.combine_mag(mag_env, h_mag_dist)
 
         f0_shifts_max = np.maximum(f0_shifts_max, np.amax(np.abs(f0_shifts)))
@@ -66,11 +69,12 @@ def main():
 
     train_iterator = iter(train_dataset)
     for step, batch in enumerate(train_iterator):
-        f0_shifts = batch["f0_shifts"].numpy()
-        mag_env = batch["mag_env"].numpy()
-        h_freq_shifts = batch["h_freq_shifts"].numpy()
-        h_mag_dist = batch["h_mag_dist"].numpy()
-        h_phase_diff = batch["h_phase_diff"].numpy()
+        x, y = batch
+        f0_shifts = x["f0_shifts"].numpy()
+        mag_env = y["mag_env"].numpy()
+        h_freq_shifts = y["h_freq_shifts"].numpy()
+        h_mag_dist = y["h_mag_dist"].numpy()
+        h_phase_diff = y["h_phase_diff"].numpy()
         h_mag = conf.data_handler.combine_mag(mag_env, h_mag_dist)
 
         f0_shifts_variances.append(np.mean((f0_shifts - f0_shifts_mean) ** 2))
