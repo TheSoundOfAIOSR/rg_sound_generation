@@ -2,6 +2,7 @@ import tensorflow as tf
 import numpy as np
 import tsms
 from tcae import measures
+from tcae.localconfig import LocalConfig
 
 
 def linear_to_normalized_db(x, db_limit=-120.0):
@@ -376,8 +377,9 @@ class DataHandler:
         mag_env = normalized_data["mag_env"]
         h_mag_dist = normalized_data["h_mag_dist"]
 
-        note_number = tf.reshape(note_number, shape=(-1, 1, 1))
-        note_number = tf.cast(note_number, dtype=tf.float32)
+        # note_number = tf.reshape(note_number, shape=(-1, 1, 1))
+        # note_number = tf.cast(note_number, dtype=tf.float32)
+        note_number = tf.argmax(note_number, axis=-1) + LocalConfig().starting_midi_pitch
         f0_note = tsms.core.midi_to_hz(note_number)
         max_f0_displ = f0_note * self._f0_st_factor
 

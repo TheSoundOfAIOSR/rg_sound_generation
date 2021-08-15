@@ -152,7 +152,7 @@ def map_features(features):
 
     inputs = normalized_data.copy()
     inputs.update({
-        "name:": name,
+        "name": name,
         "note_number": tf.squeeze(note_number),
         "velocity": tf.squeeze(velocity),
         "instrument_id": tf.squeeze(instrument_id),
