@@ -9,7 +9,6 @@ from pprint import pprint
 import warnings
 from typing import Dict, Any
 from tcae import model, localconfig
-from tcae.dataset import heuristic_names
 
 
 warnings.simplefilter("ignore")
@@ -195,7 +194,7 @@ class SoundGenerator:
         print("pitch: Note number to use in audio synthesis")
         print("velocity: Velocity of the note between 25 and 127")
         print("heuristic_measures: List of values for following measures used in decoder in the sequence shown:")
-        pprint(heuristic_names)
+        pprint(self._conf.data_handler.measures_names)
         print("latent_sample: Values for z input to decoder")
         print("qualities: List of words detected from user speech")
         print("=" * 40)
@@ -210,9 +209,8 @@ class SoundGenerator:
             transformed = self._conf.data_handler.output_transform({}, prediction)
             logger.info("De-normalizing prediction")
             transformed["mask"] = decoder_inputs["mask"]
-            freq, mag, phase = self._conf.data_handler.denormalize(
-                transformed, output_note_number
-            )
+            transformed["note_number"] = output_note_number
+            freq, mag, phase = self._conf.data_handler.denormalize(transformed)
             logger.info("Synthesising audio")
             audio = tsms.core.harmonic_synthesis(
                 freq, mag, phase,
