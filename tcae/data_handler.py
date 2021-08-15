@@ -1,8 +1,11 @@
 import tensorflow as tf
+import tensorflow_probability as tfp
 import numpy as np
+import os
+import pickle
 import tsms
-from tcae import measures
 from tcae.localconfig import LocalConfig
+from tcae import measures as m
 
 
 def linear_to_normalized_db(x, db_limit=-120.0):
@@ -73,6 +76,7 @@ class DataHandler:
                  fix_pitch=True,
                  normalize_mag=False,
                  compact_measures_logs=True,
+                 remap_measures=False,
                  weight_type='mag_max_pool',  # 'mag_max_pool', 'mag', 'none'
                  freq_loss_type='mse',  # 'cross_entropy', 'mse'
                  mag_loss_type='l2_db',  # 'cross_entropy', 'l2_db' 'l1_db', 'rms_db', 'mse'
@@ -140,6 +144,9 @@ class DataHandler:
             "high": 0.1,
         }
 
+        self._measures_map = None
+        self.remap_measures = remap_measures
+
         self.update_losses_weights()
 
     @property
@@ -191,6 +198,19 @@ class DataHandler:
         for k, v in self.measures_losses_weights.items():
             measures_names.append(k)
         return measures_names
+
+    @property
+    def remap_measures(self):
+        return self._measures_map is not None
+
+    @remap_measures.setter
+    def remap_measures(self, value: bool):
+        if value:
+            path = "analysis/measures_map.pickle"
+            with open(os.path.join(os.path.dirname(__file__), path), 'rb') as h:
+                self._measures_map = pickle.load(h)
+        else:
+            self._measures_map = None
 
     @property
     def weight_type(self):
@@ -419,39 +439,39 @@ class DataHandler:
         return h_freq, h_mag, h_phase
 
     def compute_measures(self, h_freq, h_mag):
-        inharmonic = measures.core.inharmonicity_measure(
+        inharmonic = m.core.inharmonicity_measure(
             h_freq, h_mag, None, None, None, None)
-        even_odd = measures.core.even_odd_measure(
+        even_odd = m.core.even_odd_measure(
             h_freq, h_mag, None, None, None, None)
-        sparse_rich = measures.core.sparse_rich_measure(
+        sparse_rich = m.core.sparse_rich_measure(
             h_freq, h_mag, None, None, None, None)
-        attack_rms = measures.core.attack_rms_measure(
+        attack_rms = m.core.attack_rms_measure(
             h_freq, h_mag, None, None, None, None)
-        decay_rms = measures.core.decay_rms_measure(
+        decay_rms = m.core.decay_rms_measure(
             h_freq, h_mag, None, None, None, None)
-        attack_time = measures.core.attack_time_measure(
+        attack_time = m.core.attack_time_measure(
             h_freq, h_mag, None, None, None, None)
-        decay_time = measures.core.decay_time_measure(
+        decay_time = m.core.decay_time_measure(
             h_freq, h_mag, None, None, None, None)
 
-        bass = measures.core.frequency_band_measure(
+        bass = m.core.frequency_band_measure(
             h_freq, h_mag, None, None, self._sample_rate, None,
             f_min=self.freq_bands["bass"][0], f_max=self.freq_bands["bass"][1]
         )
-        mid = measures.core.frequency_band_measure(
+        mid = m.core.frequency_band_measure(
             h_freq, h_mag, None, None, self._sample_rate, None,
             f_min=self.freq_bands["mid"][0], f_max=self.freq_bands["mid"][1]
         )
-        high_mid = measures.core.frequency_band_measure(
+        high_mid = m.core.frequency_band_measure(
             h_freq, h_mag, None, None, self._sample_rate, None,
             f_min=self.freq_bands["high_mid"][0], f_max=self.freq_bands["high_mid"][1]
         )
-        high = measures.core.frequency_band_measure(
+        high = m.core.frequency_band_measure(
             h_freq, h_mag, None, None, self._sample_rate, None,
             f_min=self.freq_bands["high"][0], f_max=self.freq_bands["high"][1]
         )
 
-        m = {
+        measures = {
             "inharmonic": inharmonic,
             "even_odd": even_odd,
             "sparse_rich": sparse_rich,
@@ -465,7 +485,21 @@ class DataHandler:
             "high": high,
         }
 
-        return m
+        measures = self.measures_mapping(measures)
+
+        return measures
+
+    def measures_mapping(self, measures):
+        if self._measures_map is not None:
+            for k, y in measures.items():
+                y_min = self._measures_map[k]["y_min"]
+                y_max = self._measures_map[k]["y_max"]
+                y_inv = self._measures_map[k]["y_inv"]
+                y = (y - y_min) / (y_max - y_min)
+                y = tfp.math.interp_regular_1d_grid(y, 0.0, 1.0, y_inv, axis=-1)
+                measures[k] = y
+
+        return measures
 
     def output_transform(self,
                          normalized_data_true,
