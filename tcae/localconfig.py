@@ -83,6 +83,7 @@ class LocalConfig:
     def __init__(self, data_handler_type="data_handler"):
         if self.data_handler is None:
             self.set_data_handler_by_type(data_handler_type)
+        self.data_handler.starting_midi_pitch = self.starting_midi_pitch
 
     def set_data_handler_by_type(self, data_handler_type: str):
         assert data_handler_type in ["data_handler", "simple_data_handler"]

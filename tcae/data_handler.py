@@ -4,7 +4,6 @@ import numpy as np
 import os
 import pickle
 import tsms
-from tcae.localconfig import LocalConfig
 from tcae import measures as m
 
 
@@ -148,6 +147,8 @@ class DataHandler:
         self.remap_measures = remap_measures
 
         self.update_losses_weights()
+
+        self.starting_midi_pitch = 40
 
     @property
     def losses_weights(self):
@@ -398,8 +399,8 @@ class DataHandler:
         h_mag_dist = normalized_data["h_mag_dist"]
 
         # note_number = tf.reshape(note_number, shape=(-1, 1, 1))
-        # note_number = tf.cast(note_number, dtype=tf.float32)
-        note_number = tf.argmax(note_number, axis=-1) + LocalConfig().starting_midi_pitch
+        note_number = tf.argmax(note_number, axis=-1) + self.starting_midi_pitch
+        note_number = tf.cast(note_number, dtype=tf.float32)
         f0_note = tsms.core.midi_to_hz(note_number)
         max_f0_displ = f0_note * self._f0_st_factor
 

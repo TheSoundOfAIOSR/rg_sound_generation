@@ -209,7 +209,7 @@ class SoundGenerator:
             transformed = self._conf.data_handler.output_transform({}, prediction)
             logger.info("De-normalizing prediction")
             transformed["mask"] = decoder_inputs["mask"]
-            transformed["note_number"] = output_note_number
+            transformed["note_number"] = tf.expand_dims(self._prepare_note_number(output_note_number), axis=0)
             freq, mag, phase = self._conf.data_handler.denormalize(transformed)
             logger.info("Synthesising audio")
             audio = tsms.core.harmonic_synthesis(
