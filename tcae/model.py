@@ -234,8 +234,8 @@ class Tables(tf.keras.layers.Layer):
         return y
 
 
-def base_lc_decoder(dropout_rate=0.1):
-    inputs = tf.keras.layers.Input(shape=(128, 70))
+def base_lc_decoder(input_shape, dropout_rate=0.1):
+    inputs = tf.keras.layers.Input(shape=input_shape)
     x = tf.keras.layers.LocallyConnected1D(16 * 2, 1, 1)(inputs)
     x = tf.keras.layers.Reshape((128, 16, 2))(x)
 
@@ -280,11 +280,12 @@ def create_mt_lc_decoder(inputs, conf: LocalConfig):
 
     x = tf.keras.layers.concatenate(concat_inputs)
     x = tf.keras.layers.RepeatVector(128)(x)
+    input_shape = x.shape[1:]
 
-    x0 = base_lc_decoder(conf.lc_dropout_rate)(x)
-    x1 = base_lc_decoder(conf.lc_dropout_rate)(x)
-    x2 = base_lc_decoder(conf.lc_dropout_rate)(x)
-    x3 = base_lc_decoder(conf.lc_dropout_rate)(x)
+    x0 = base_lc_decoder(input_shape, conf.lc_dropout_rate)(x)
+    x1 = base_lc_decoder(input_shape, conf.lc_dropout_rate)(x)
+    x2 = base_lc_decoder(input_shape, conf.lc_dropout_rate)(x)
+    x3 = base_lc_decoder(input_shape, conf.lc_dropout_rate)(x)
 
     x = tf.keras.layers.Concatenate(axis=-1)([x0, x1, x2, x3])
     outputs = {}
