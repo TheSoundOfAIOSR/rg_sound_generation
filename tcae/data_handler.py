@@ -398,8 +398,7 @@ class DataHandler:
         mag_env = normalized_data["mag_env"]
         h_mag_dist = normalized_data["h_mag_dist"]
 
-        # note_number = tf.reshape(note_number, shape=(-1, 1, 1))
-        note_number = tf.argmax(note_number, axis=-1) + self.starting_midi_pitch
+        note_number = tf.reshape(note_number, shape=(-1, 1, 1))
         note_number = tf.cast(note_number, dtype=tf.float32)
         f0_note = tsms.core.midi_to_hz(note_number)
         max_f0_displ = f0_note * self._f0_st_factor
