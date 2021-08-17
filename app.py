@@ -48,14 +48,14 @@ output_pitch = col1.slider("output_pitch", min_value=40, max_value=88, value=60)
 velocity = col1.slider("velocity", min_value=25, max_value=125, value=75, step=25)
 
 
-if col2.button("Reset Z"):
-    st.session_state.clear()
-    default_z = [50] * 2
-
-if col2.button("Get Suggested Z"):
-    default_z = random.choice(known_zs)
-    logger.info("Got suggested Z, updating session state")
-    st.session_state["latent_sample"] = default_z
+# if col2.button("Reset Z"):
+#     st.session_state.clear()
+#     default_z = [50] * 2
+#
+# if col2.button("Get Suggested Z"):
+#     default_z = random.choice(known_zs)
+#     logger.info("Got suggested Z, updating session state")
+#     st.session_state["latent_sample"] = default_z
 
 z1 = col2.slider("z1", min_value=0, max_value=z_max_val, value=default_z[0])
 z2 = col2.slider("z2", min_value=0, max_value=z_max_val, value=default_z[1])
