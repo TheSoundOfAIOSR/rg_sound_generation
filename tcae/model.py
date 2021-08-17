@@ -296,8 +296,9 @@ def create_mt_lc_decoder(inputs, conf: LocalConfig):
     m = tf.keras.models.Model(
         inputs, outputs
     )
-    tf.keras.utils.plot_model(m, to_file="decoder.png", show_shapes=True,
-                              show_layer_names=False)
+    if conf.print_model_summary:
+        tf.keras.utils.plot_model(m, to_file="decoder.png",
+                                  show_shapes=True, show_layer_names=False)
     return m
 
 

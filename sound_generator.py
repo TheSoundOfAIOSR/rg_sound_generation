@@ -8,7 +8,7 @@ from loguru import logger
 from pprint import pprint
 import warnings
 from typing import Dict, Any
-from tcae import model, localconfig
+from tcae import model, train, localconfig
 
 
 warnings.simplefilter("ignore")
@@ -33,7 +33,9 @@ def get_zero_batch(conf: localconfig.LocalConfig):
         "mag_env": tf.zeros(mag_env),
         "h_freq_shifts": tf.zeros(h_freq_shifts),
         "h_mag_dist": tf.zeros(h_mag_dist),
-        "h_phase_diff": tf.zeros(h_phase_diff)
+        "h_phase_diff": tf.zeros(h_phase_diff),
+        "instrument_id": tf.zeros([conf.batch_size, conf.num_instruments]),
+        "name": tf.convert_to_tensor([b"a"] * conf.batch_size, dtype=tf.string)
     })
 
     if conf.use_note_number:
@@ -72,13 +74,13 @@ class SoundGenerator:
                 self._config_path = default_config_path
 
         if self._checkpoint_path is None:
-            default_checkpoint_path = os.path.join(os.getcwd(), "deployed", "model.h5")
-            if not os.path.isfile(default_checkpoint_path) and auto_download:
-                logger.info("Downloading default model checkpoint")
-                _ = urlretrieve("https://osr-tsoai.s3.amazonaws.com/mt_5/model.h5", "deployed/model.h5")
-            if os.path.isfile(default_checkpoint_path):
-                logger.info("Using default model checkpoint")
-                self._checkpoint_path = default_checkpoint_path
+            self._checkpoint_path = os.path.join(os.getcwd(), "deployed", "lc_2_104_0.00633.ckpt")
+            # if not os.path.isfile(default_checkpoint_path) and auto_download:
+            #     logger.info("Downloading default model checkpoint")
+            #     _ = urlretrieve("https://osr-tsoai.s3.amazonaws.com/mt_5/model.h5", "deployed/model.h5")
+            # if os.path.isfile(default_checkpoint_path):
+            #     logger.info("Using default model checkpoint")
+            #     self._checkpoint_path = default_checkpoint_path
 
         if self._config_path is not None:
             self.load_config()
@@ -116,13 +118,15 @@ class SoundGenerator:
         # Prediction specific config
         self._conf.batch_size = 1
         self._conf.print_model_summary = False
+        self._conf.data_handler.remap_measures = True
         logger.info("Config loaded")
 
     def load_model(self) -> None:
-        assert os.path.isfile(self._checkpoint_path), f"No checkpoint at {self._checkpoint_path}"
-        self._model = model.TCAEModel(self._conf)
-        _ = self._model(get_zero_batch(self._conf))
-        self._model.load_weights(self._checkpoint_path)
+        # assert os.path.isfile(self._checkpoint_path), f"No checkpoint at {self._checkpoint_path}"
+        model_wrapper = train.ModelWrapper(model.TCAEModel(self._conf), self._conf.data_handler.loss)
+        _ = model_wrapper(get_zero_batch(self._conf))
+        model_wrapper.load_weights(self._checkpoint_path)
+        self._model = model_wrapper.model
         logger.info("Model loaded")
 
     def _get_mask(self, note_number: int) -> np.ndarray:
@@ -161,7 +165,7 @@ class SoundGenerator:
         assert 40 <= input_note_number <= 88, "Conditioning note number must be between" \
                                               " 40 and 88"
         assert 25 <= velocity <= 127, "Velocity must be between 25 and 127"
-        assert np.shape(latent_sample) == (self._conf.latent_dim, )
+        assert np.shape(latent_sample) == (self._conf.latent_dim, ), f"Latent dim is wrong {np.shape(latent_sample)}"
         assert np.shape(heuristic_measures) == (self._conf.num_measures, )
 
         # Heuristic measures will be updated according to qualities present
@@ -177,46 +181,24 @@ class SoundGenerator:
         }
         return decoder_inputs
 
-    def info(self) -> None:
-        print("=" * 40)
-        print("Expected input dictionary:")
-        print("=" * 40)
-        pprint({
-            "input_pitch": 40,
-            "pitch": 40,
-            "velocity": 100,
-            "heuristic_measures": np.random.rand(self._conf.num_measures).tolist(),
-            "latent_sample": np.random.rand(self._conf.latent_dim).tolist(),
-            "qualities": []
-        })
-        print("=" * 40)
-        print("input_pitch: Note number to use in decoder input")
-        print("pitch: Note number to use in audio synthesis")
-        print("velocity: Velocity of the note between 25 and 127")
-        print("heuristic_measures: List of values for following measures used in decoder in the sequence shown:")
-        pprint(self._conf.data_handler.measures_names)
-        print("latent_sample: Values for z input to decoder")
-        print("qualities: List of words detected from user speech")
-        print("=" * 40)
-
     def get_prediction(self, data: Dict) -> Any:
-        try:
-            output_note_number = data.get("pitch") or 60
-            decoder_inputs = self._prepare_inputs(data)
-            logger.info("Getting prediction")
-            prediction = self._model.decoder(decoder_inputs)
-            logger.info("Transforming prediction")
-            transformed = self._conf.data_handler.output_transform({}, prediction)
-            logger.info("De-normalizing prediction")
-            transformed["mask"] = decoder_inputs["mask"]
-            transformed["note_number"] = output_note_number
-            freq, mag, phase = self._conf.data_handler.denormalize(transformed)
-            logger.info("Synthesising audio")
-            audio = tsms.core.harmonic_synthesis(
-                freq, mag, phase,
-                self._conf.sample_rate,  self._conf.frame_size
-            )
-            return True, np.squeeze(audio).tolist()
-        except Exception as e:
-            logger.error(e)
-        return False, []
+        # try:
+        output_note_number = data.get("pitch") or 60
+        decoder_inputs = self._prepare_inputs(data)
+        logger.info("Getting prediction")
+        prediction = self._model.decoder(decoder_inputs)
+        logger.info("Transforming prediction")
+        transformed = self._conf.data_handler.output_transform({}, prediction)
+        logger.info("De-normalizing prediction")
+        transformed["mask"] = decoder_inputs["mask"]
+        transformed["note_number"] = output_note_number
+        freq, mag, phase = self._conf.data_handler.denormalize(transformed)
+        logger.info("Synthesising audio")
+        audio = tsms.core.harmonic_synthesis(
+            freq, mag, phase,
+            self._conf.sample_rate,  self._conf.frame_size
+        )
+        return True, np.squeeze(audio).tolist()
+        # except Exception as e:
+        #     logger.error(e)
+        # return False, []

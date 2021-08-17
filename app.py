@@ -24,9 +24,9 @@ def get_known_zs():
 
 
 known_zs = get_known_zs()
-measure_max_val = 149
+measure_max_val = 99
 z_max_val = 99
-default_z = [50] * 5
+default_z = [50] * 2
 default_m = [0] * 11
 
 if "latent_sample" not in st.session_state:
@@ -50,7 +50,7 @@ velocity = col1.slider("velocity", min_value=25, max_value=125, value=75, step=2
 
 if col2.button("Reset Z"):
     st.session_state.clear()
-    default_z = [50] * 5
+    default_z = [50] * 2
 
 if col2.button("Get Suggested Z"):
     default_z = random.choice(known_zs)
@@ -59,12 +59,9 @@ if col2.button("Get Suggested Z"):
 
 z1 = col2.slider("z1", min_value=0, max_value=z_max_val, value=default_z[0])
 z2 = col2.slider("z2", min_value=0, max_value=z_max_val, value=default_z[1])
-z3 = col2.slider("z3", min_value=0, max_value=z_max_val, value=default_z[2])
-z4 = col2.slider("z4", min_value=0, max_value=z_max_val, value=default_z[3])
-z5 = col2.slider("z5", min_value=0, max_value=z_max_val, value=default_z[4])
 
 
-inharmonicity = col3.slider("inharmonicity", min_value=0, max_value=measure_max_val, value=default_m[0])
+inharmonic = col3.slider("inharmonic", min_value=0, max_value=measure_max_val, value=default_m[0])
 even_odd = col3.slider("even_odd", min_value=0, max_value=measure_max_val, value=default_m[1])
 sparse_rich = col3.slider("sparse_rich", min_value=0, max_value=measure_max_val, value=default_m[2])
 attack_rms = col3.slider("attack_rms", min_value=0, max_value=measure_max_val, value=default_m[3])
@@ -78,12 +75,15 @@ high = col3.slider("high", min_value=0, max_value=measure_max_val, value=default
 
 
 if col1.button("Generate"):
-    z = [z / 100 for z in [z1, z2, z3, z4, z5]]
-    measures = [m / 100 for m in [
-        inharmonicity, even_odd, sparse_rich, attack_rms,
-        decay_rms, attack_time, decay_time, bass, mid,
-        high_mid, high
-    ]]
+    sg = load_sound_generator()
+
+    z = [z / 100 for z in [z1, z2]]
+    measures = dict((m, eval(m) / 100) for m in sg.conf.data_handler.measures_names)
+    print(measures)
+    measures = sg.conf.data_handler.measures_mapping(measures)
+    print(measures)
+    measures = [measures[m] for m in sg.conf.data_handler.measures_names]
+
     data = {
         "input_pitch": input_pitch,
         "pitch": output_pitch,
@@ -92,7 +92,6 @@ if col1.button("Generate"):
         "latent_sample": z
     }
 
-    sg = load_sound_generator()
     start = time()
     success, audio = sg.get_prediction(data)
     logger.info(f"Time taken for prediction + generation: {time() - start: .3} seconds")
