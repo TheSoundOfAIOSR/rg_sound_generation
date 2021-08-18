@@ -80,15 +80,14 @@ if col1.button("Generate"):
     z = [z / 100 for z in [z1, z2]]
     measures = dict((m, eval(m) / 100) for m in sg.conf.data_handler.measures_names)
     print(measures)
-    measures = sg.conf.data_handler.measures_mapping(measures)
-    print(measures)
-    measures = [measures[m] for m in sg.conf.data_handler.measures_names]
+    # measures = sg.conf.data_handler.measures_mapping(measures)
+    # print(measures)
 
     data = {
         "input_pitch": input_pitch,
         "pitch": output_pitch,
         "velocity": 100,
-        "heuristic_measures": measures,
+        "heuristic_measures": list(measures.values()),
         "latent_sample": z
     }
 
