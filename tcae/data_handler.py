@@ -5,6 +5,7 @@ import os
 import pickle
 import tsms
 from tcae import measures as m
+from collections import OrderedDict
 
 
 def linear_to_normalized_db(x, db_limit=-120.0):
@@ -471,19 +472,19 @@ class DataHandler:
             f_min=self.freq_bands["high"][0], f_max=self.freq_bands["high"][1]
         )
 
-        measures = {
-            "inharmonic": inharmonic,
-            "even_odd": even_odd,
-            "sparse_rich": sparse_rich,
-            "attack_rms": attack_rms,
-            "decay_rms": decay_rms,
-            "attack_time": attack_time,
-            "decay_time": decay_time,
-            "bass": bass,
-            "mid": mid,
-            "high_mid": high_mid,
-            "high": high,
-        }
+        measures = OrderedDict()
+
+        measures["inharmonic"] = inharmonic
+        measures["even_odd"] = even_odd
+        measures["sparse_rich"] = sparse_rich
+        measures["attack_rms"] = attack_rms
+        measures["decay_rms"] = decay_rms
+        measures["attack_time"] = attack_time
+        measures["decay_time"] = decay_time
+        measures["bass"] = bass
+        measures["mid"] = mid
+        measures["high_mid"] = high_mid
+        measures["high"] = high
 
         measures = self.measures_mapping(measures)
 
