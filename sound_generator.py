@@ -74,7 +74,8 @@ class SoundGenerator:
                 self._config_path = default_config_path
 
         if self._checkpoint_path is None:
-            self._checkpoint_path = os.path.join(os.getcwd(), "deployed", "lc_2_no_remap_84_0.00663.ckpt")
+            self._checkpoint_path = os.path.join(os.getcwd(), "deployed", "lc_2_fabio",
+                                                 "lc_2_85_0.00659.ckpt")
             # if not os.path.isfile(default_checkpoint_path) and auto_download:
             #     logger.info("Downloading default model checkpoint")
             #     _ = urlretrieve("https://osr-tsoai.s3.amazonaws.com/mt_5/model.h5", "deployed/model.h5")
