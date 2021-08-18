@@ -128,6 +128,7 @@ class SoundGenerator:
         _ = model_wrapper(get_zero_batch(self._conf))
         model_wrapper.load_weights(self._checkpoint_path)
         self._model = model_wrapper.model
+        self._model.trainable = False
         logger.info("Model loaded")
 
     def _get_mask(self, note_number: int) -> np.ndarray:
