@@ -360,10 +360,12 @@ class TCAEModel(tf.keras.Model):
     def call(self, inputs, training=None, mask=None):
         decoder_inputs = inputs.copy()
         if self.encoder is not None:
-            encoder_outputs = self.encoder(inputs)
+            encoder_outputs = self.encoder(
+                inputs, training=training, mask=mask)
             decoder_inputs["z"] = encoder_outputs
 
-        decoder_outputs = self.decoder(decoder_inputs)
+        decoder_outputs = self.decoder(
+            decoder_inputs, training=training, mask=mask)
 
         return decoder_outputs
 
