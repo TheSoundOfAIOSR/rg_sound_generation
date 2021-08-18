@@ -130,19 +130,20 @@ class DataHandler:
 
         self._losses_weights = None
         self._outputs = None
-        self.measures_losses_weights = {
-            "inharmonic": 0.1,
-            "even_odd": 0.1,
-            "sparse_rich": 0.1,
-            "attack_rms": 0.1,
-            "decay_rms": 0.1,
-            "attack_time": 0.1,
-            "decay_time": 0.1,
-            "bass": 0.1,
-            "mid": 0.1,
-            "high_mid": 0.1,
-            "high": 0.1,
-        }
+        self.measure_names = (
+            "inharmonic",
+            "even_odd",
+            "sparse_rich",
+            "attack_rms",
+            "decay_rms",
+            "attack_time",
+            "decay_time",
+            "bass",
+            "mid",
+            "high_mid",
+            "high",
+        )
+        self.measures_losses_weights = dict((x, 0.1) for x in self.measure_names)
 
         self._measures_map = None
         self.remap_measures = remap_measures
@@ -193,13 +194,6 @@ class DataHandler:
                     self._outputs["h_freq_shifts"] = {"size": self.max_harmonics}
                     self._outputs["mag_env"] = {"size": 1}
                     self._outputs["h_mag_dist"] = {"size": self.max_harmonics}
-
-    @property
-    def measures_names(self):
-        measures_names = []
-        for k, v in self.measures_losses_weights.items():
-            measures_names.append(k)
-        return measures_names
 
     @property
     def remap_measures(self):

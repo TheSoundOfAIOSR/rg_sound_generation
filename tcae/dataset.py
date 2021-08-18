@@ -133,8 +133,7 @@ def map_features(features):
     for k, v in normalized_data.items():
         normalized_data[k] = tf.squeeze(v, axis=0)
 
-    for k, v in measures.items():
-        measures[k] = tf.squeeze(v, axis=0)
+    measures = dict((k, tf.squeeze(v, axis=0)) for k, v in measures.items())
 
     if conf.use_one_hot_conditioning:
         note_number = tf.one_hot(
@@ -156,7 +155,7 @@ def map_features(features):
         "note_number": tf.squeeze(note_number),
         "velocity": tf.squeeze(velocity),
         "instrument_id": tf.squeeze(instrument_id),
-        "measures": tf.stack(tf.nest.flatten(measures), axis=-1),
+        "measures": [measures[k] for k in conf.data_handler.measure_names],
     })
 
     targets = normalized_data.copy()
