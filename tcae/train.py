@@ -21,7 +21,7 @@ class ModelWrapper(tf.keras.Model):
             data_adapter.unpack_x_y_sample_weight(data)
 
         with tf.GradientTape() as tape:
-            outputs = self(inputs)
+            outputs = self(inputs, training=True)
 
             losses = self.loss_fn(targets, outputs)
             loss = losses["loss"]
@@ -37,7 +37,7 @@ class ModelWrapper(tf.keras.Model):
         inputs, targets, sample_weight = \
             data_adapter.unpack_x_y_sample_weight(data)
 
-        outputs = self(inputs)
+        outputs = self(inputs, training=False)
         losses = self.loss_fn(targets, outputs)
 
         return losses
