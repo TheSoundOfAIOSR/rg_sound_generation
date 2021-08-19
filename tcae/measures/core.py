@@ -210,8 +210,39 @@ def peak_iir_frequency_response(w, wc, bw, g_db):
     return h
 
 
+def compute_pos_max(mag):
+    pos_max = tf.math.argmax(mag, axis=1, output_type=tf.int32)
+
+    indices = tf.range(tf.shape(pos_max)[0])
+    indices = tf.expand_dims(indices, axis=-1)
+    m = tf.expand_dims(pos_max + 1, axis=-1)
+    m0 = m - 1
+    m1 = m
+    m2 = m + 1
+
+    m0 = tf.concat([indices, m0], axis=1)
+    m1 = tf.concat([indices, m1], axis=1)
+    m2 = tf.concat([indices, m2], axis=1)
+
+    pad_mag = tf.pad(mag, paddings=((0, 0), (1, 1)))
+    mag0 = tf.gather_nd(pad_mag, m0)
+    mag1 = tf.gather_nd(pad_mag, m1)
+    mag2 = tf.gather_nd(pad_mag, m2)
+
+    mag_peak = tf.stack([mag0, mag1, mag2], axis=-1)
+    mag_peak = tf.expand_dims(mag_peak, axis=1)
+    pos, pos_shift, pos_value = tsms.core.parabolic_interp(mag_peak)
+    pos_shift = tf.squeeze(pos_shift, axis=[1, 2])
+    pos_max_interp = tf.cast(pos_max, dtype=tf.float32)
+    pos_max_interp = pos_max_interp + pos_shift
+
+    return pos_max, pos_max_interp
+
+
 def inharmonicity_measure(h_freq, h_mag, h_phase, residual,
                           sample_rate, frame_step):
+    h_mag = tf.math.abs(h_mag)
+
     harmonics = tf.shape(h_freq)[-1]
     harmonic_numbers = tf.range(1, harmonics + 1, dtype=tf.float32)
     harmonic_numbers = harmonic_numbers[tf.newaxis, tf.newaxis, :]
@@ -221,26 +252,30 @@ def inharmonicity_measure(h_freq, h_mag, h_phase, residual,
 
     h_mag_mean = tf.math.reduce_mean(h_mag, axis=(1, 2), keepdims=True)
     f_variance = tf.math.reduce_mean(
-        h_mag * tf.square(f - f0), axis=2, keepdims=True) / h_mag_mean
+        h_mag * tf.square(f - f0), axis=2, keepdims=True)
+
+    f_variance = tf.where(h_mag_mean > 0.0, f_variance / h_mag_mean, 0.0)
 
     # remove huge spikes, generally the attack part
     f_variance = tfa.image.median_filter2d(f_variance, filter_shape=(1, 50))
     f_variance = tf.math.reduce_mean(f_variance, axis=(1, 2))
 
-    inharmonic = f_variance ** 2
-    inharmonic = inharmonic / (inharmonic + 1.0)
+    inharmonic = f_variance  # ** 2
+    inharmonic = inharmonic / (inharmonic + 1.0)  # 0-1 range
 
     return inharmonic
 
 
 def even_odd_measure(h_freq, h_mag, h_phase, residual,
                      sample_rate, frame_step):
+    h_mag = tf.math.abs(h_mag)
+
     even_mean = tf.math.reduce_mean(h_mag[:, :, 1::2], axis=(1, 2))
     odd_mean = tf.math.reduce_mean(h_mag[:, :, 2::2], axis=(1, 2))
 
     den = even_mean + odd_mean
-    even = even_mean / den
-    odd = odd_mean / den
+    even = tf.where(den > 0.0, even_mean / den, 0.0)
+    odd = tf.where(den > 0.0, odd_mean / den, 0.0)
 
     even_odd = 0.5*((1.0 - even) + odd)
 
@@ -249,6 +284,8 @@ def even_odd_measure(h_freq, h_mag, h_phase, residual,
 
 def sparse_rich_measure(h_freq, h_mag, h_phase, residual,
                         sample_rate, frame_step):
+    h_mag = tf.math.abs(h_mag)
+
     db_limit = -60
     h_mag = tsms.core.lin_to_db(h_mag)
     h_mag = h_mag - tf.math.reduce_max(h_mag)
@@ -257,6 +294,7 @@ def sparse_rich_measure(h_freq, h_mag, h_phase, residual,
     num_nonzero = tf.math.count_nonzero(
         tf.math.reduce_sum(h_mag, axis=2, keepdims=True),
         axis=1, keepdims=True, dtype=tf.float32)
+    num_nonzero = tf.where(num_nonzero == 0.0, 1.0, num_nonzero)
 
     h_mag_mean = tf.math.reduce_sum(h_mag, axis=1, keepdims=True) / num_nonzero
     h_mag_mean = tf.math.reduce_mean(h_mag_mean, axis=(1, 2))
@@ -268,65 +306,76 @@ def sparse_rich_measure(h_freq, h_mag, h_phase, residual,
 
 def attack_rms_measure(h_freq, h_mag, h_phase, residual,
                        sample_rate, frame_step):
+    h_mag = tf.math.abs(h_mag)
+
     mag = tf.math.reduce_mean(h_mag, axis=2)
-    attack_size = tf.argmax(mag, axis=1, output_type=tf.int32)
+    attack_size = tf.math.argmax(mag, axis=1, output_type=tf.int32)
 
-    def fn(elems):
-        mag, attack_size = elems
-        mag = mag[:attack_size]
-        rms = tf.math.reduce_mean(tf.math.square(mag))
-        rms = tf.where(rms > 0.0, tf.math.sqrt(rms), 0.0)
-        return rms
+    sample_size = tf.shape(mag)[1]
 
-    rms = tf.map_fn(fn, (mag, attack_size), fn_output_signature=tf.float32)
+    def fn(size):
+        return tf.concat([
+            tf.ones(shape=(size,)),
+            tf.zeros(shape=(sample_size - size,))], axis=0)
 
-    # db_limit = -120
-    # rms = 0.5 * tsms.core.lin_to_db(rms)
-    # rms = (tf.maximum(rms, db_limit) - db_limit) / (-db_limit)
+    attack_mask = tf.map_fn(fn, attack_size, fn_output_signature=tf.float32)
+
+    rms = tf.math.square(attack_mask * mag)
+    att_size = tf.math.reduce_sum(attack_mask, axis=1)
+    att_size = tf.math.maximum(att_size, 1.0)
+    rms = tf.math.reduce_sum(rms, axis=1) / att_size
+    rms = tf.math.sqrt(rms + 1e-6)
+
+    rms = rms / (rms + 1.0)  # 0-1 range
 
     return rms
 
 
 def decay_rms_measure(h_freq, h_mag, h_phase, residual,
                       sample_rate, frame_step):
+    h_mag = tf.math.abs(h_mag)
+
     mag = tf.math.reduce_mean(h_mag, axis=2)
-    attack_size = tf.argmax(mag, axis=1, output_type=tf.int32)
+    attack_size = tf.math.argmax(mag, axis=1, output_type=tf.int32)
 
-    def fn(elems):
-        mag, attack_size = elems
-        mag = mag[attack_size + 1:]
-        db_limit = -80
-        mag_db = tsms.core.lin_to_db(mag)
-        mag_db = tf.maximum(mag_db, db_limit)
-        decay_size = tf.squeeze(tf.argmin(mag_db, axis=0, output_type=tf.int32))
-        decay_size = tf.where(mag_db[decay_size] == db_limit,
-                              decay_size, tf.shape(mag_db)[0])
-        decay_size = tf.squeeze(decay_size)
+    sample_size = tf.shape(mag)[1]
 
-        mag = mag[:decay_size]
-        rms = tf.math.reduce_mean(tf.math.square(mag))
+    def fn(size):
+        return tf.concat([
+            tf.ones(shape=(size,)),
+            tf.zeros(shape=(sample_size - size,))], axis=0)
 
-        rms = tf.where(rms > 0.0, tf.math.sqrt(rms), 0.0)
-        return rms
+    attack_mask = tf.map_fn(fn, attack_size, fn_output_signature=tf.float32)
 
-    rms = tf.map_fn(fn, (mag, attack_size), fn_output_signature=tf.float32)
+    db_limit = -80
+    mag_db = tsms.core.lin_to_db(mag)
+    mag_db = tf.maximum(mag_db, db_limit)
+    mag_db = mag_db / (-db_limit) + 1.0
+    decay_mask = tf.where(tf.cumsum(mag_db[:, ::-1], axis=1) > 0.0, 1.0, 0.0)
+    decay_mask = decay_mask[:, ::-1] - attack_mask
 
-    # db_limit = -120
-    # rms = 0.5 * tsms.core.lin_to_db(rms)
-    # rms = (tf.maximum(rms, db_limit) - db_limit) / (-db_limit)
+    rms = tf.math.square(decay_mask * mag)
+    dec_size = tf.math.reduce_sum(decay_mask, axis=1)
+    dec_size = tf.math.maximum(dec_size, 1.0)
+    rms = tf.math.reduce_sum(rms, axis=1) / dec_size
+    rms = tf.math.sqrt(rms + 1e-6)
+
+    rms = rms / (rms + 1.0)  # 0-1 range
 
     return rms
 
 
 def attack_time_measure(h_freq, h_mag, h_phase, residual,
                         sample_rate, frame_step):
+    h_mag = tf.math.abs(h_mag)
+
     mag = tf.math.reduce_mean(h_mag, axis=2)
-    attack_size = tf.argmax(mag, axis=1, output_type=tf.int32)
-    attack_size = tf.cast(attack_size, dtype=tf.float32)
+    pos_max, pos_max_interp = compute_pos_max(mag)
+    attack_size = pos_max_interp
 
     sample_size = tf.shape(h_mag)[1]
     sample_size = tf.cast(sample_size, dtype=tf.float32)
-
+    sample_size = tf.where(sample_size > 0.0, sample_size, 1.0)
     attack_time = attack_size / sample_size
 
     return attack_time
@@ -334,29 +383,24 @@ def attack_time_measure(h_freq, h_mag, h_phase, residual,
 
 def decay_time_measure(h_freq, h_mag, h_phase, residual,
                        sample_rate, frame_step):
+    h_mag = tf.math.abs(h_mag)
+
     mag = tf.math.reduce_mean(h_mag, axis=2)
-    attack_size = tf.argmax(mag, axis=1, output_type=tf.int32)
+    pos_max, pos_max_interp = compute_pos_max(mag)
+    attack_size = pos_max_interp
 
-    def fn(elems):
-        mag, attack_size = elems
-        mag = mag[attack_size + 1:]
-        db_limit = -80
-        mag_db = tsms.core.lin_to_db(mag)
-        mag_db = tf.maximum(mag_db, db_limit)
-        decay_size = tf.squeeze(tf.argmin(mag_db, axis=0, output_type=tf.int32))
-        decay_size = tf.where(mag_db[decay_size] == db_limit,
-                              decay_size, tf.shape(mag_db)[0])
-        decay_size = tf.squeeze(decay_size)
-        decay_size = tf.cast(decay_size, dtype=tf.float32)
-        return decay_size
+    sample_size = tf.shape(mag)[1]
 
-    decay_size = tf.map_fn(fn, (mag, attack_size),
-                           fn_output_signature=tf.float32)
-    decay_size = tf.cast(decay_size, dtype=tf.float32)
+    db_limit = -80
+    mag_db = tsms.core.lin_to_db(mag)
+    mag_db = tf.maximum(mag_db, db_limit)
+    mag_db = mag_db / (-db_limit) + 1.0
+    decay_mask = tf.where(tf.cumsum(mag_db[:, ::-1], axis=1) > 0.0, 1.0, 0.0)
+    decay_mask = decay_mask[:, ::-1]
 
-    sample_size = tf.shape(h_mag)[1]
+    decay_size = tf.math.reduce_sum(decay_mask, axis=1) - attack_size
     sample_size = tf.cast(sample_size, dtype=tf.float32)
-
+    sample_size = tf.where(sample_size > 0.0, sample_size, 1.0)
     decay_time = decay_size / sample_size
 
     return decay_time
@@ -365,6 +409,8 @@ def decay_time_measure(h_freq, h_mag, h_phase, residual,
 def frequency_band_measure(h_freq, h_mag, h_phase, residual,
                            sample_rate, frame_step,
                            f_min, f_max):
+    h_mag = tf.math.abs(h_mag)
+
     # remove components above nyquist frequency
     mask = tf.where(
         tf.greater_equal(h_freq, sample_rate / 2.0),
@@ -390,6 +436,6 @@ def frequency_band_measure(h_freq, h_mag, h_phase, residual,
     num = tf.math.reduce_sum(h_mag * h * mask, axis=(1, 2))
     den = tf.math.reduce_sum(h_mag * mask, axis=(1, 2))
 
-    ratio = num / den
+    ratio = tf.where(den > 0.0, num / den, 0.0)
 
     return ratio
