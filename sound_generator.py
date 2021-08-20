@@ -68,14 +68,14 @@ class SoundGenerator:
 
         # Use defaults
         if self._config_path is None:
-            default_config_path = os.path.join(os.getcwd(), "deployed", "conf.json")
+            default_config_path = os.path.join(os.getcwd(), "deployed", "default_lc_2.json")
             if os.path.isfile(default_config_path):
                 logger.info("Using default config")
                 self._config_path = default_config_path
 
         if self._checkpoint_path is None:
-            self._checkpoint_path = os.path.join(os.getcwd(), "deployed", "lc_2_fabio",
-                                                 "lc_2_85_0.00659.ckpt")
+            self._checkpoint_path = os.path.join(os.getcwd(), "deployed",
+                                                 "lc_2_92_0.01048.ckpt")
             # if not os.path.isfile(default_checkpoint_path) and auto_download:
             #     logger.info("Downloading default model checkpoint")
             #     _ = urlretrieve("https://osr-tsoai.s3.amazonaws.com/mt_5/model.h5", "deployed/model.h5")
@@ -119,7 +119,7 @@ class SoundGenerator:
         # Prediction specific config
         self._conf.batch_size = 1
         self._conf.print_model_summary = False
-        self._conf.data_handler.remap_measures = True
+        self._conf.data_handler.measures_mapping_type = 'linear'
         logger.info("Config loaded")
 
     def load_model(self) -> None:

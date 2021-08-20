@@ -5,6 +5,7 @@ import soundfile as sf
 from time import time
 from loguru import logger
 from sound_generator import SoundGenerator
+from tcae.localconfig import LocalConfig
 
 
 @st.cache(allow_output_mutation=True)
@@ -24,8 +25,8 @@ def get_known_zs():
 
 
 known_zs = get_known_zs()
-measure_max_val = 99
-z_max_val = 99
+measure_max_val = 100
+z_max_val = 100
 default_z = [50] * 2
 default_m = [0] * 11
 
@@ -77,14 +78,22 @@ high = col3.slider("high", min_value=0, max_value=measure_max_val, value=default
 if col1.button("Generate"):
     sg = load_sound_generator()
 
-    z = [z / 100 for z in [z1, z2]]
-    measures = dict((m, eval(m) / 100) for m in sg.conf.data_handler.measures_names)
+    z = [z / z_max_val for z in [z1, z2]]
+    measures = dict((m, eval(m) / measure_max_val) for m in sg.conf.data_handler.measure_names)
     # measures = sg.conf.data_handler.measures_mapping(measures)
+
+    conf = LocalConfig()
+
+    note_index = input_pitch - conf.starting_midi_pitch
+    velocity_index = velocity // 25 - 1
+
+    measures = conf.data_handler.shift_measures_mean(
+        measures, note_index, velocity_index)
 
     data = {
         "input_pitch": input_pitch,
         "pitch": output_pitch,
-        "velocity": 100,
+        "velocity": velocity,
         "heuristic_measures": list(measures.values()),
         "latent_sample": z
     }
