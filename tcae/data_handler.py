@@ -76,8 +76,8 @@ class DataHandler:
                  fix_pitch=True,
                  normalize_mag=False,
                  compact_measures_logs=True,
-                 remap_measures=False,
-                 weight_type='mag_max_pool',  # 'mag_max_pool', 'mag', 'none'
+                 measures_mapping_type='none',  # 'none', 'linear', 'nonlinear'
+                 weight_type='mag_max_pool',  # 'none', 'mag', 'mag_max_pool'
                  freq_loss_type='mse',  # 'cross_entropy', 'mse'
                  mag_loss_type='l2_db',  # 'cross_entropy', 'l2_db' 'l1_db', 'rms_db', 'mse'
                  phase_loss_type='mse',  # 'cross_entropy', 'mse'
@@ -145,12 +145,11 @@ class DataHandler:
         )
         self.measures_losses_weights = dict((x, 0.1) for x in self.measure_names)
 
+        self._measures_mapping_type = None
         self._measures_map = None
-        self.remap_measures = remap_measures
+        self.measures_mapping_type = measures_mapping_type
 
         self.update_losses_weights()
-
-        self.starting_midi_pitch = 40
 
     @property
     def losses_weights(self):
@@ -196,17 +195,19 @@ class DataHandler:
                     self._outputs["h_mag_dist"] = {"size": self.max_harmonics}
 
     @property
-    def remap_measures(self):
-        return self._measures_map is not None
+    def measures_mapping_type(self):
+        return self._measures_mapping_type
 
-    @remap_measures.setter
-    def remap_measures(self, value: bool):
-        if value:
+    @measures_mapping_type.setter
+    def measures_mapping_type(self, value: str):
+        assert value in ['none', 'linear', 'nonlinear']
+        self._measures_mapping_type = value
+        if value == 'none':
+            self._measures_map = None
+        if value == 'linear' or value == 'nonlinear':
             path = "analysis/measures_map.pickle"
             with open(os.path.join(os.path.dirname(__file__), path), 'rb') as h:
                 self._measures_map = pickle.load(h)
-        else:
-            self._measures_map = None
 
     @property
     def weight_type(self):
@@ -214,7 +215,7 @@ class DataHandler:
 
     @weight_type.setter
     def weight_type(self, value: str):
-        assert value in ['mag_max_pool', 'mag', 'none']
+        assert value in ['none', 'mag', 'mag_max_pool']
         self._weight_type = value
 
     @property
@@ -485,7 +486,13 @@ class DataHandler:
         return measures
 
     def measures_mapping(self, measures):
-        if self._measures_map is not None:
+        if self._measures_mapping_type == 'linear':
+            for k, y in measures.items():
+                y_min = self._measures_map[k]["y_min"]
+                y_max = self._measures_map[k]["y_max"]
+                y = (y - y_min) / (y_max - y_min)
+                measures[k] = y
+        elif self._measures_mapping_type == 'nonlinear':
             for k, y in measures.items():
                 y_min = self._measures_map[k]["y_min"]
                 y_max = self._measures_map[k]["y_max"]
@@ -493,6 +500,16 @@ class DataHandler:
                 y = (y - y_min) / (y_max - y_min)
                 y = tfp.math.interp_regular_1d_grid(y, 0.0, 1.0, y_inv, axis=-1)
                 measures[k] = y
+
+        return measures
+
+    def shift_measures_mean(self, measures, note_index, velocity_index):
+        path = "analysis/measures_mean_matrix.pickle"
+        with open(os.path.join(os.path.dirname(__file__), path), 'rb') as h:
+            measures_mean_matrix = pickle.load(h)
+
+        for k in self.measure_names:
+            measures[k] += measures_mean_matrix[k][note_index, velocity_index]
 
         return measures
 
