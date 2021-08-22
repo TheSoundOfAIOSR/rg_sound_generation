@@ -28,7 +28,7 @@ known_zs = get_known_zs()
 measure_max_val = 100
 z_max_val = 100
 default_z = [50] * 2
-default_m = [0] * 11
+default_m = [50] * 11
 
 if "latent_sample" not in st.session_state:
     st.session_state["latent_sample"] = default_z
@@ -79,7 +79,7 @@ if col1.button("Generate"):
     sg = load_sound_generator()
 
     z = [z / z_max_val for z in [z1, z2]]
-    measures = dict((m, eval(m) / measure_max_val) for m in sg.conf.data_handler.measure_names)
+    measures = dict((m, 2.0 * (eval(m) / measure_max_val - 0.5)) for m in sg.conf.data_handler.measure_names)
     # measures = sg.conf.data_handler.measures_mapping(measures)
 
     conf = LocalConfig()

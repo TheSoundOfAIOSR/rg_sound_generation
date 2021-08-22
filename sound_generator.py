@@ -16,8 +16,8 @@ warnings.simplefilter("ignore")
 
 def get_zero_batch(conf: localconfig.LocalConfig):
     mask = TensorShape([conf.batch_size, conf.harmonic_frame_steps, conf.max_num_harmonics])
-    note_number = TensorShape([conf.batch_size, conf.num_pitches])
-    velocity = TensorShape([conf.batch_size, conf.num_velocities])
+    note_number = TensorShape([conf.batch_size, 1])
+    velocity = TensorShape([conf.batch_size, 1])
     measures = TensorShape([conf.batch_size, conf.num_measures])
     f0_shifts = TensorShape([conf.batch_size, conf.harmonic_frame_steps, 1])
     mag_env = TensorShape([conf.batch_size, conf.harmonic_frame_steps, 1])
@@ -68,14 +68,14 @@ class SoundGenerator:
 
         # Use defaults
         if self._config_path is None:
-            default_config_path = os.path.join(os.getcwd(), "deployed", "default_lc_2.json")
+            default_config_path = os.path.join(os.getcwd(), "deployed", "conf.txt")
             if os.path.isfile(default_config_path):
                 logger.info("Using default config")
                 self._config_path = default_config_path
 
         if self._checkpoint_path is None:
             self._checkpoint_path = os.path.join(os.getcwd(), "deployed",
-                                                 "lc_2_92_0.01048.ckpt")
+                                                 "lc_2_87_0.00567.ckpt")
             # if not os.path.isfile(default_checkpoint_path) and auto_download:
             #     logger.info("Downloading default model checkpoint")
             #     _ = urlretrieve("https://osr-tsoai.s3.amazonaws.com/mt_5/model.h5", "deployed/model.h5")
@@ -119,7 +119,6 @@ class SoundGenerator:
         # Prediction specific config
         self._conf.batch_size = 1
         self._conf.print_model_summary = False
-        self._conf.data_handler.measures_mapping_type = 'linear'
         logger.info("Config loaded")
 
     def load_model(self) -> None:
@@ -144,14 +143,16 @@ class SoundGenerator:
 
     def _prepare_note_number(self, note_number) -> np.ndarray:
         index = note_number - self._conf.starting_midi_pitch
-        encoded = np.zeros((self._conf.num_pitches, ))
-        encoded[index] = 1.
+        encoded = float(index) / self._conf.num_pitches
+        # encoded = np.zeros((self._conf.num_pitches, ))
+        # encoded[index] = 1.
         return encoded
 
     def _prepare_velocity(self, velocity) -> np.ndarray:
         index = velocity // 25 - 1
-        encoded = np.zeros((self._conf.num_velocities, ))
-        encoded[index] = 1.
+        encoded = float(index) / self._conf.num_velocities
+        # encoded = np.zeros((self._conf.num_velocities, ))
+        # encoded[index] = 1.
         return encoded
 
     def _prepare_inputs(self, data: Dict) -> Dict:
