@@ -128,17 +128,10 @@ class LocalConfig:
     def load_config_from_text(self, file_path: str):
         assert self.data_handler is not None
         with open(file_path, "r") as f:
-            rows = f.read().splitlines()
-        for r in rows:
-            if len(r) == 0:
-                continue
-            if r.startswith("#"):
-                continue
-            if r.startswith("conf."):
-                command = f"self.{r[5:]}"
-                if command.startswith("self.save_config"):
-                    continue
-                exec(command)
+            file_data = f.read()
+        file_data = file_data.replace("conf.", "self.")
+        file_data = file_data.replace("self.save_config", "# ")
+        exec(file_data)
 
     def save_config(self):
         target_path = os.path.join(self.checkpoints_dir,
