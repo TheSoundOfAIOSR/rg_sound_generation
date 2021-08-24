@@ -141,6 +141,11 @@ class SoundGenerator:
         mask[:, :, :harmonics] = np.ones((1, self._conf.harmonic_frame_steps, harmonics))
         return mask
 
+    def _prepare_instrument_id(self, instrument_id: int) -> np.ndarray:
+        encoded = np.zeros((self._conf.num_instruments, ))
+        encoded[instrument_id] = 1.
+        return encoded
+
     def _prepare_note_number(self, note_number) -> np.ndarray:
         index = note_number - self._conf.starting_midi_pitch
         encoded = float(index) / self._conf.num_pitches
@@ -158,6 +163,7 @@ class SoundGenerator:
     def _prepare_inputs(self, data: Dict) -> Dict:
         logger.info("Preparing inputs")
 
+        instrument_id = data.get("instrument_id") or 0
         output_note_number = data.get("pitch") or 60
         input_note_number = data.get("input_pitch") or 60
         velocity = data.get("velocity") or 75
@@ -165,6 +171,7 @@ class SoundGenerator:
         heuristic_measures = data.get("heuristic_measures") or np.random.rand(self._conf.num_measures)
         _ = data.get("qualities") or []
 
+        assert 0 <= instrument_id < self._conf.num_instruments, f"Instrument ID out of bounds {instrument_id}"
         assert 40 <= input_note_number <= 88, "Conditioning note number must be between" \
                                               " 40 and 88"
         assert 25 <= velocity <= 127, "Velocity must be between 25 and 127"
@@ -180,7 +187,8 @@ class SoundGenerator:
             "note_number": np.expand_dims(self._prepare_note_number(input_note_number), axis=0),
             "velocity": np.expand_dims(self._prepare_velocity(velocity), axis=0),
             "z": np.expand_dims(latent_sample, axis=0),
-            "measures": np.expand_dims(np.array(heuristic_measures), axis=0)
+            "measures": np.expand_dims(np.array(heuristic_measures), axis=0),
+            "instrument_id": instrument_id
         }
         return decoder_inputs
 

@@ -1,11 +1,18 @@
+import os
 import streamlit as st
 import numpy as np
-import random
 import soundfile as sf
+from uuid import uuid4
 from time import time
 from loguru import logger
 from sound_generator import SoundGenerator
 from tcae.localconfig import LocalConfig
+
+
+tmp_dir = os.path.join(os.getcwd(), "tmp")
+
+if not os.path.isdir(tmp_dir):
+    os.mkdir(tmp_dir)
 
 
 @st.cache(allow_output_mutation=True)
@@ -30,6 +37,7 @@ z_max_val = 100
 default_z = [50] * 2
 default_m = [50] * 11
 
+
 if "latent_sample" not in st.session_state:
     st.session_state["latent_sample"] = default_z
 else:
@@ -39,45 +47,39 @@ else:
 col1, col2, col3 = st.beta_columns(3)
 
 
-col1.title("Generator")
-col2.subheader("Latent Sample")
-col3.subheader("Measures")
+sg = load_sound_generator()
+
+instrument_id = st.sidebar.selectbox("Instrument ID", options=list(range(0, sg.conf.num_instruments)))
+
+col1.subheader("Harmonic")
+col2.subheader("Temporal")
+col3.subheader("Frequency")
 
 
-input_pitch = col1.slider("input_pitch", min_value=40, max_value=88, value=60)
-output_pitch = col1.slider("output_pitch", min_value=40, max_value=88, value=60)
-velocity = col1.slider("velocity", min_value=25, max_value=125, value=75, step=25)
+output_pitch = st.sidebar.slider("midi_note_number", min_value=40, max_value=88, value=60)
+velocity = st.sidebar.slider("velocity", min_value=25, max_value=125, value=75, step=25)
+input_pitch = st.sidebar.slider("conditioning_note_number", min_value=40, max_value=88, value=60)
+
+st.sidebar.subheader("Latent Sample")
+
+z1 = st.sidebar.slider("z1", min_value=0, max_value=z_max_val, value=default_z[0])
+z2 = st.sidebar.slider("z2", min_value=0, max_value=z_max_val, value=default_z[1])
 
 
-# if col2.button("Reset Z"):
-#     st.session_state.clear()
-#     default_z = [50] * 2
-#
-# if col2.button("Get Suggested Z"):
-#     default_z = random.choice(known_zs)
-#     logger.info("Got suggested Z, updating session state")
-#     st.session_state["latent_sample"] = default_z
-
-z1 = col2.slider("z1", min_value=0, max_value=z_max_val, value=default_z[0])
-z2 = col2.slider("z2", min_value=0, max_value=z_max_val, value=default_z[1])
-
-
-inharmonic = col3.slider("inharmonic", min_value=0, max_value=measure_max_val, value=default_m[0])
-even_odd = col3.slider("even_odd", min_value=0, max_value=measure_max_val, value=default_m[1])
-sparse_rich = col3.slider("sparse_rich", min_value=0, max_value=measure_max_val, value=default_m[2])
-attack_rms = col3.slider("attack_rms", min_value=0, max_value=measure_max_val, value=default_m[3])
-decay_rms = col3.slider("decay_rms", min_value=0, max_value=measure_max_val, value=default_m[4])
-attack_time = col3.slider("attack_time", min_value=0, max_value=measure_max_val, value=default_m[5])
-decay_time = col3.slider("decay_time", min_value=0, max_value=measure_max_val, value=default_m[6])
+inharmonic = col1.slider("inharmonic", min_value=0, max_value=measure_max_val, value=default_m[0])
+even_odd = col1.slider("even_odd", min_value=0, max_value=measure_max_val, value=default_m[1])
+sparse_rich = col1.slider("sparse_rich", min_value=0, max_value=measure_max_val, value=default_m[2])
+attack_rms = col2.slider("attack_rms", min_value=0, max_value=measure_max_val, value=default_m[3])
+decay_rms = col2.slider("decay_rms", min_value=0, max_value=measure_max_val, value=default_m[4])
+attack_time = col2.slider("attack_time", min_value=0, max_value=measure_max_val, value=default_m[5])
+decay_time = col2.slider("decay_time", min_value=0, max_value=measure_max_val, value=default_m[6])
 bass = col3.slider("bass", min_value=0, max_value=measure_max_val, value=default_m[7])
 mid = col3.slider("mid", min_value=0, max_value=measure_max_val, value=default_m[8])
 high_mid = col3.slider("high_mid", min_value=0, max_value=measure_max_val, value=default_m[9])
 high = col3.slider("high", min_value=0, max_value=measure_max_val, value=default_m[10])
 
 
-if col1.button("Generate"):
-    sg = load_sound_generator()
-
+if st.sidebar.button("Generate"):
     z = [z / z_max_val for z in [z1, z2]]
     measures = dict((m, 2.0 * (eval(m) / measure_max_val - 0.5)) for m in sg.conf.data_handler.measure_names)
     # measures = sg.conf.data_handler.measures_mapping(measures)
@@ -95,15 +97,30 @@ if col1.button("Generate"):
         "pitch": output_pitch,
         "velocity": velocity,
         "heuristic_measures": list(measures.values()),
-        "latent_sample": z
+        "latent_sample": z,
+        "instrument_id": instrument_id
     }
 
     start = time()
     success, audio = sg.get_prediction(data)
     logger.info(f"Time taken for prediction + generation: {time() - start: .3} seconds")
-    if success:
-        audio = np.array(audio) / np.max(np.abs(audio))
-        sf.write("temp.wav", audio, samplerate=sg.conf.sample_rate)
 
-    col1.subheader("Audio")
-    col1.audio("temp.wav", format="audio/wav")
+    if success:
+        tmp_file_name = f"{uuid4()}.wav"
+        tmp_file_path = os.path.join(tmp_dir, tmp_file_name)
+        audio = np.squeeze(np.array(audio) / np.max(np.abs(audio)))
+        sf.write(tmp_file_path, audio, samplerate=sg.conf.sample_rate)
+
+        st.sidebar.subheader("Audio")
+        st.sidebar.audio(tmp_file_path, format="audio/wav")
+
+        # col1.markdown(
+        #     f"""<a href="{tmp_file_path}"
+        #     download="{output_pitch}_{velocity}.wav"
+        #     target="_blank">Download Sample</a>""",
+        #     unsafe_allow_html=True
+        # )
+
+st.subheader("Sound Generator")
+st.text("This app can be used to generate (hopefully) usable one shot guitar samples")
+st.text("Description of parameters comes here")
