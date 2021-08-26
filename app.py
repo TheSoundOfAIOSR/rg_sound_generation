@@ -73,6 +73,10 @@ col3.subheader("Frequency")
 st.sidebar.subheader("Global Parameters")
 
 instrument_id = st.sidebar.selectbox("Instrument ID", options=list(range(0, sg.conf.num_instruments)))
+prev_id = -1
+if "instrument_id" in st.session_state:
+    prev_id = st.session_state["instrument_id"]
+
 output_pitch = st.sidebar.slider("midi_note_number", min_value=40, max_value=88, value=60)
 velocity = st.sidebar.slider("velocity", min_value=25, max_value=127, value=75, step=1)
 input_pitch = st.sidebar.slider("conditioning_note_number", min_value=40, max_value=88, value=60)
@@ -82,12 +86,27 @@ velocity_index = velocity // 25 - 1
 
 decoder_index = compute_encoding(note_index, velocity_index, instrument_id, sg.conf)
 
-if decoder_index < len(decoded_values):
-    decoder_value = decoded_values[decoder_index]
-    default_z = [int(x * z_max_val) for x in decoder_value["z"].numpy()[0]]
-    default_m = [int(x * measure_max_val) for x in decoder_value["measures"].numpy()[0]]
+if instrument_id != prev_id:
+    logger.info(f"Instrument id is changed from {prev_id} to {instrument_id}")
+
+    st.session_state["instrument_id"] = instrument_id
+
+    if decoder_index < len(decoded_values):
+        decoder_value = decoded_values[decoder_index]
+        default_z = [int(x * z_max_val) for x in decoder_value["z"].numpy()[0]]
+        default_m = [int(x * measure_max_val) for x in decoder_value["measures"].numpy()[0]]
+        st.session_state["default_z"] = default_z
+        st.session_state["default_m"] = default_m
+        logger.info("Default z and m are updated to decoder values in session state")
+    else:
+        logger.warning(f"decoder index {decoder_index} not found in decoded values")
 else:
-    logger.warning(f"decoder index {decoder_index} not found in decoded values")
+    logger.info(f"Instrument id {instrument_id} did not change")
+    if "default_z" in st.session_state:
+        default_z = st.session_state["default_z"]
+    if "default_m" in st.session_state:
+        default_m = st.session_state["default_m"]
+    logger.info("Default z and m are set to default values in session state")
 
 
 st.sidebar.subheader("Latent Sample")
@@ -110,6 +129,7 @@ high = col3.slider("high", min_value=0, max_value=measure_max_val, value=default
 
 
 if st.sidebar.button("Generate"):
+    logger.info(f"First z for sanity check {z1}")
     z = [z / z_max_val for z in [z1, z2]]
     measures = dict((m, 2.0 * (eval(m) / measure_max_val - 0.5)) for m in sg.conf.data_handler.measure_names)
 
@@ -142,4 +162,5 @@ if st.sidebar.button("Generate"):
 
 st.subheader("Sound Generator")
 st.text("This app can be used to generate (hopefully) usable one shot guitar samples")
-st.text("Description of parameters comes here")
+st.text("Note: If you change Instrument ID, a new preset is loaded "
+        "which will reset the values of Z as well as all the measures.")
