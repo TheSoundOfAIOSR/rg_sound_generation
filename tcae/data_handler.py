@@ -525,7 +525,7 @@ class DataHandler:
             # velocity_index = int(velocity_index)
             # v = measures_mean_matrix[k][note_index, velocity_index]
 
-            measures_mean[k] = interp
+            measures_mean[k] = tf.squeeze(interp)
 
         return measures_mean
 
