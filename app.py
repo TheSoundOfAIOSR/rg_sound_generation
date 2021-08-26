@@ -2,11 +2,12 @@ import os
 import streamlit as st
 import numpy as np
 import soundfile as sf
+import pickle
 from uuid import uuid4
 from time import time
 from loguru import logger
 from sound_generator import SoundGenerator
-from tcae.localconfig import LocalConfig
+from decoder_inputs_export import compute_encoding
 
 
 tmp_dir = os.path.join(os.getcwd(), "tmp")
@@ -21,6 +22,13 @@ def load_sound_generator():
 
 
 @st.cache(allow_output_mutation=True)
+def load_decoded_values():
+    with open('decoder_inputs.pickle', 'rb') as f:
+        decoded_inputs = pickle.load(f)
+    return decoded_inputs
+
+
+@st.cache(allow_output_mutation=True)
 def get_known_zs():
     _known_zs = []
     with open("latent_samples.csv", "r") as f:
@@ -29,6 +37,14 @@ def get_known_zs():
         for row in _data:
             _known_zs.append([int(float(x) * 100) for x in row.split(",")])
     return _known_zs
+
+
+def update_measure_value(measure_value, measure_mean):
+    if measure_value >= 0.0:
+        measure_value = measure_mean + measure_value * (1.0 - measure_mean)
+    else:
+        measure_value = (1.0 + measure_value) * measure_mean
+    return measure_value
 
 
 known_zs = get_known_zs()
@@ -48,17 +64,31 @@ col1, col2, col3 = st.beta_columns(3)
 
 
 sg = load_sound_generator()
-
-instrument_id = st.sidebar.selectbox("Instrument ID", options=list(range(0, sg.conf.num_instruments)))
+decoded_values = load_decoded_values()
 
 col1.subheader("Harmonic")
 col2.subheader("Temporal")
 col3.subheader("Frequency")
 
+st.sidebar.subheader("Global Parameters")
 
+instrument_id = st.sidebar.selectbox("Instrument ID", options=list(range(0, sg.conf.num_instruments)))
 output_pitch = st.sidebar.slider("midi_note_number", min_value=40, max_value=88, value=60)
-velocity = st.sidebar.slider("velocity", min_value=25, max_value=125, value=75, step=25)
+velocity = st.sidebar.slider("velocity", min_value=25, max_value=127, value=75, step=1)
 input_pitch = st.sidebar.slider("conditioning_note_number", min_value=40, max_value=88, value=60)
+
+note_index = input_pitch - sg.conf.starting_midi_pitch
+velocity_index = velocity // 25 - 1
+
+decoder_index = compute_encoding(note_index, velocity_index, instrument_id, sg.conf)
+
+if decoder_index < len(decoded_values):
+    decoder_value = decoded_values[decoder_index]
+    default_z = [int(x * z_max_val) for x in decoder_value["z"].numpy()[0]]
+    default_m = [int(x * measure_max_val) for x in decoder_value["measures"].numpy()[0]]
+else:
+    logger.warning(f"decoder index {decoder_index} not found in decoded values")
+
 
 st.sidebar.subheader("Latent Sample")
 
@@ -83,23 +113,9 @@ if st.sidebar.button("Generate"):
     z = [z / z_max_val for z in [z1, z2]]
     measures = dict((m, 2.0 * (eval(m) / measure_max_val - 0.5)) for m in sg.conf.data_handler.measure_names)
 
-    conf = LocalConfig()
-
-    note_index = input_pitch - conf.starting_midi_pitch
-    velocity_index = velocity // 25 - 1
-
-    measures_mean = conf.data_handler.get_measures_mean(
+    measures_mean = sg.conf.data_handler.get_measures_mean(
         note_index, velocity_index)
-
-    for k in measures.keys():
-        m = measures[k]  # range -1 to +1
-        mean = measures_mean[k]
-        if m >= 0.0:
-            m = mean + m * (1.0 - mean)
-        else:
-            m = (1.0 + m) * mean
-
-        measures[k] = m
+    measures = dict((k, update_measure_value(v, measures_mean[k])) for k, v in measures.items())
 
     data = {
         "input_pitch": input_pitch,
@@ -123,12 +139,6 @@ if st.sidebar.button("Generate"):
         st.sidebar.subheader("Audio")
         st.sidebar.audio(tmp_file_path, format="audio/wav")
 
-        # col1.markdown(
-        #     f"""<a href="{tmp_file_path}"
-        #     download="{output_pitch}_{velocity}.wav"
-        #     target="_blank">Download Sample</a>""",
-        #     unsafe_allow_html=True
-        # )
 
 st.subheader("Sound Generator")
 st.text("This app can be used to generate (hopefully) usable one shot guitar samples")
