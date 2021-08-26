@@ -1,9 +1,12 @@
 import os
 import streamlit as st
 import numpy as np
-import soundfile as sf
+import io
+import string
+import shutil
+import shortuuid
+from scipy.io import wavfile
 import pickle
-from uuid import uuid4
 from time import time
 from loguru import logger
 from sound_generator import SoundGenerator
@@ -59,6 +62,18 @@ def inverse_measure_transform(measure_value, measure_mean):
     return measure_value
 
 
+def get_note_and_velocity_indices(input_pitch, velocity):
+    note_index = input_pitch - sg.conf.starting_midi_pitch
+    velocity_index = velocity // 25 - 1
+    return note_index, velocity_index
+
+
+def get_folder_path():
+    folder_name = str(shortuuid.uuid())
+    folder_path = os.path.join(tmp_dir, folder_name)
+    return folder_path
+
+
 known_zs = get_known_zs()
 measure_max_val = 100
 z_max_val = 100
@@ -91,10 +106,9 @@ if "instrument_id" in st.session_state:
 
 output_pitch = st.sidebar.slider("midi_note_number", min_value=40, max_value=88, value=60)
 velocity = st.sidebar.slider("velocity", min_value=25, max_value=127, value=75, step=1)
-input_pitch = st.sidebar.slider("conditioning_note_number", min_value=40, max_value=88, value=60)
+input_pitch = output_pitch
 
-note_index = input_pitch - sg.conf.starting_midi_pitch
-velocity_index = velocity // 25 - 1
+note_index, velocity_index = get_note_and_velocity_indices(input_pitch, velocity)
 
 measures_mean = sg.conf.data_handler.get_measures_mean(
     note_index, velocity_index)
@@ -145,7 +159,7 @@ high_mid = col3.slider("high_mid", min_value=0, max_value=measure_max_val, value
 high = col3.slider("high", min_value=0, max_value=measure_max_val, value=default_m[10])
 
 
-if st.sidebar.button("Generate"):
+def get_audio_prediction(z1, z2, input_pitch, output_pitch, velocity, instrument_id):
     logger.info(f"First z for sanity check {z1}")
     z = [z / z_max_val for z in [z1, z2]]
     measures = dict((m, eval(m) / measure_max_val) for m in sg.conf.data_handler.measure_names)
@@ -163,18 +177,65 @@ if st.sidebar.button("Generate"):
     start = time()
     success, audio = sg.get_prediction(data)
     logger.info(f"Time taken for prediction + generation: {time() - start: .3} seconds")
+    return success, audio
+
+
+def get_audio_bytes(audio):
+    audio_norm = np.squeeze(np.array(audio) / np.max(np.abs(audio)))
+
+    bytes_wav = bytes()
+    byte_io = io.BytesIO(bytes_wav)
+    wavfile.write(byte_io, sg.conf.sample_rate, audio_norm.astype("float32"))
+    result_bytes = byte_io.read()
+    return result_bytes
+
+
+if st.sidebar.button("Generate"):
+    success, audio = get_audio_prediction(z1, z2, input_pitch, output_pitch, velocity, instrument_id)
 
     if success:
-        tmp_file_name = f"{uuid4()}.wav"
-        tmp_file_path = os.path.join(tmp_dir, tmp_file_name)
-        audio = np.squeeze(np.array(audio) / np.max(np.abs(audio)))
-        sf.write(tmp_file_path, audio, samplerate=sg.conf.sample_rate)
-
+        result_bytes = get_audio_bytes(audio)
         st.sidebar.subheader("Audio")
-        st.sidebar.audio(tmp_file_path, format="audio/wav")
+        st.sidebar.audio(result_bytes, format="audio/wav")
 
 
 st.subheader("Sound Generator")
-st.text("This app can be used to generate (hopefully) usable one shot guitar samples")
-st.text("Note: If you change Instrument ID, a new preset is loaded")
-st.text("This will reset the values of Z as well as all the measures")
+st.text("Note: If you change Instrument ID, values of Z and measures are reset")
+st.text("Once you're happy with a configuration, you can export the sample pack")
+
+pack_name = st.text_input("Enter a name for your pack")
+
+
+if st.button("Export Sample Pack"):
+    folder_path = get_folder_path()
+    while os.path.isdir(folder_path):
+        folder_path = get_folder_path()
+
+    os.mkdir(folder_path)
+
+    pack_name = [c for c in pack_name.lower() if c in string.ascii_lowercase]
+    pack_name = "".join(pack_name)
+    pack_name = pack_name if pack_name != "" else os.path.basename(folder_path)
+
+    progress_bar = st.progress(0)
+    items_count = sg.conf.num_pitches * sg.conf.num_velocities
+
+    for i, n in enumerate(range(40, 89)):
+        for j, v in enumerate([25, 50, 75, 100, 125]):
+            success, audio = get_audio_prediction(
+                z1, z2, n, n, v, instrument_id
+            )
+            if success:
+                audio_bytes = get_audio_bytes(audio)
+                file_path = os.path.join(folder_path, f"{n}_v{v}_{pack_name}.wav")
+
+                with open(file_path, "wb") as f:
+                    f.write(audio_bytes)
+            progress_bar.progress((i * sg.conf.num_velocities + j) / items_count)
+
+    st.text("Creating archive.. Wait for the download link:")
+
+    archive_path = os.path.join(tmp_dir, f"{os.path.basename(folder_path)}")
+    shutil.make_archive(archive_path, "zip", folder_path)
+
+    st.markdown(f"""<a href='{archive_path}.zip' target='_blank'>Download Pack</a>""", unsafe_allow_html=True)
