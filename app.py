@@ -39,11 +39,23 @@ def get_known_zs():
     return _known_zs
 
 
-def update_measure_value(measure_value, measure_mean):
+def measure_transform(measure_value, measure_mean):
+    measure_value = 2.0 * measure_value - 1.0
+
     if measure_value >= 0.0:
         measure_value = measure_mean + measure_value * (1.0 - measure_mean)
     else:
         measure_value = (1.0 + measure_value) * measure_mean
+    return measure_value
+
+
+def inverse_measure_transform(measure_value, measure_mean):
+    if measure_value >= measure_mean:
+        measure_value = (measure_value - measure_mean) / (1.0 - measure_mean)
+    else:
+        measure_value = (measure_value - measure_mean) / measure_mean
+
+    measure_value = (measure_value + 1.0) / 2.0
     return measure_value
 
 
@@ -80,12 +92,17 @@ input_pitch = st.sidebar.slider("conditioning_note_number", min_value=40, max_va
 note_index = input_pitch - sg.conf.starting_midi_pitch
 velocity_index = velocity // 25 - 1
 
+measures_mean = sg.conf.data_handler.get_measures_mean(
+    note_index, velocity_index)
+
 decoder_index = compute_encoding(note_index, velocity_index, instrument_id, sg.conf)
 
 if decoder_index < len(decoded_values):
     decoder_value = decoded_values[decoder_index]
-    default_z = [int(x * z_max_val) for x in decoder_value["z"].numpy()[0]]
-    default_m = [int(x * measure_max_val) for x in decoder_value["measures"].numpy()[0]]
+    if decoder_value["z"] is not None and decoder_value["measures"] is not None:
+        default_z = [int(x * z_max_val) for x in decoder_value["z"].numpy()[0]]
+        default_m = [int(inverse_measure_transform(v, measures_mean[k]) * measure_max_val)
+                     for k, v in zip(sg.conf.data_handler.measure_names, decoder_value["measures"].numpy()[0])]
 else:
     logger.warning(f"decoder index {decoder_index} not found in decoded values")
 
@@ -111,11 +128,8 @@ high = col3.slider("high", min_value=0, max_value=measure_max_val, value=default
 
 if st.sidebar.button("Generate"):
     z = [z / z_max_val for z in [z1, z2]]
-    measures = dict((m, 2.0 * (eval(m) / measure_max_val - 0.5)) for m in sg.conf.data_handler.measure_names)
-
-    measures_mean = sg.conf.data_handler.get_measures_mean(
-        note_index, velocity_index)
-    measures = dict((k, update_measure_value(v, measures_mean[k])) for k, v in measures.items())
+    measures = dict((m, eval(m) / measure_max_val) for m in sg.conf.data_handler.measure_names)
+    measures = dict((k, measure_transform(v, measures_mean[k])) for k, v in measures.items())
 
     data = {
         "input_pitch": input_pitch,
