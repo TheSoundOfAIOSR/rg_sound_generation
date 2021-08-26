@@ -1,5 +1,6 @@
 import tensorflow as tf
 import tensorflow_probability as tfp
+import tensorflow_addons as tfa
 import numpy as np
 import os
 import pickle
@@ -503,15 +504,30 @@ class DataHandler:
 
         return measures
 
-    def shift_measures_mean(self, measures, note_index, velocity_index):
+    def get_measures_mean(self, note_index, velocity_index):
         path = "analysis/measures_mean_matrix.pickle"
         with open(os.path.join(os.path.dirname(__file__), path), 'rb') as h:
             measures_mean_matrix = pickle.load(h)
 
-        for k in self.measure_names:
-            measures[k] += measures_mean_matrix[k][note_index, velocity_index]
+        query_points = tf.constant(
+            [note_index, velocity_index], dtype=tf.float32, shape=(1, 1, 2))
 
-        return measures
+        measures_mean = {}
+
+        for k in self.measure_names:
+            grid = measures_mean_matrix[k][tf.newaxis, :, :, tf.newaxis]
+
+            interp = tfa.image.interpolate_bilinear(
+                grid=grid,
+                query_points=query_points)
+
+            # note_index = int(note_index)
+            # velocity_index = int(velocity_index)
+            # v = measures_mean_matrix[k][note_index, velocity_index]
+
+            measures_mean[k] = interp
+
+        return measures_mean
 
     def output_transform(self,
                          normalized_data_true,

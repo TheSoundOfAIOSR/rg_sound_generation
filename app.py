@@ -82,15 +82,24 @@ high = col3.slider("high", min_value=0, max_value=measure_max_val, value=default
 if st.sidebar.button("Generate"):
     z = [z / z_max_val for z in [z1, z2]]
     measures = dict((m, 2.0 * (eval(m) / measure_max_val - 0.5)) for m in sg.conf.data_handler.measure_names)
-    # measures = sg.conf.data_handler.measures_mapping(measures)
 
     conf = LocalConfig()
 
     note_index = input_pitch - conf.starting_midi_pitch
     velocity_index = velocity // 25 - 1
 
-    measures = conf.data_handler.shift_measures_mean(
-        measures, note_index, velocity_index)
+    measures_mean = conf.data_handler.get_measures_mean(
+        note_index, velocity_index)
+
+    for k in measures.keys():
+        m = measures[k]  # range -1 to +1
+        mean = measures_mean[k]
+        if m >= 0.0:
+            m = mean + m * (1.0 - mean)
+        else:
+            m = (1.0 + m) * mean
+
+        measures[k] = m
 
     data = {
         "input_pitch": input_pitch,
