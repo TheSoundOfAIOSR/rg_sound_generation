@@ -296,8 +296,9 @@ def create_mt_lc_decoder(inputs, conf: LocalConfig):
     m = tf.keras.models.Model(
         inputs, outputs
     )
-    tf.keras.utils.plot_model(m, to_file="decoder.png", show_shapes=True,
-                              show_layer_names=False)
+    if conf.print_model_summary:
+        tf.keras.utils.plot_model(m, to_file="decoder.png",
+                                  show_shapes=True, show_layer_names=False)
     return m
 
 
@@ -359,10 +360,12 @@ class TCAEModel(tf.keras.Model):
     def call(self, inputs, training=None, mask=None):
         decoder_inputs = inputs.copy()
         if self.encoder is not None:
-            encoder_outputs = self.encoder(inputs)
+            encoder_outputs = self.encoder(
+                inputs, training=training, mask=mask)
             decoder_inputs["z"] = encoder_outputs
 
-        decoder_outputs = self.decoder(decoder_inputs)
+        decoder_outputs = self.decoder(
+            decoder_inputs, training=training, mask=mask)
 
         return decoder_outputs
 

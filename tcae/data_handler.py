@@ -1,10 +1,12 @@
 import tensorflow as tf
 import tensorflow_probability as tfp
+import tensorflow_addons as tfa
 import numpy as np
 import os
 import pickle
 import tsms
 from tcae import measures as m
+from collections import OrderedDict
 
 
 def linear_to_normalized_db(x, db_limit=-120.0):
@@ -75,8 +77,8 @@ class DataHandler:
                  fix_pitch=True,
                  normalize_mag=False,
                  compact_measures_logs=True,
-                 remap_measures=False,
-                 weight_type='mag_max_pool',  # 'mag_max_pool', 'mag', 'none'
+                 measures_mapping_type='none',  # 'none', 'linear', 'nonlinear'
+                 weight_type='mag_max_pool',  # 'none', 'mag', 'mag_max_pool'
                  freq_loss_type='mse',  # 'cross_entropy', 'mse'
                  mag_loss_type='l2_db',  # 'cross_entropy', 'l2_db' 'l1_db', 'rms_db', 'mse'
                  phase_loss_type='mse',  # 'cross_entropy', 'mse'
@@ -129,26 +131,26 @@ class DataHandler:
 
         self._losses_weights = None
         self._outputs = None
-        self.measures_losses_weights = {
-            "inharmonic": 0.1,
-            "even_odd": 0.1,
-            "sparse_rich": 0.1,
-            "attack_rms": 0.1,
-            "decay_rms": 0.1,
-            "attack_time": 0.1,
-            "decay_time": 0.1,
-            "bass": 0.1,
-            "mid": 0.1,
-            "high_mid": 0.1,
-            "high": 0.1,
-        }
+        self.measure_names = (
+            "inharmonic",
+            "even_odd",
+            "sparse_rich",
+            "attack_rms",
+            "decay_rms",
+            "attack_time",
+            "decay_time",
+            "bass",
+            "mid",
+            "high_mid",
+            "high",
+        )
+        self.measures_losses_weights = dict((x, 0.1) for x in self.measure_names)
 
+        self._measures_mapping_type = None
         self._measures_map = None
-        self.remap_measures = remap_measures
+        self.measures_mapping_type = measures_mapping_type
 
         self.update_losses_weights()
-
-        self.starting_midi_pitch = 40
 
     @property
     def losses_weights(self):
@@ -194,24 +196,19 @@ class DataHandler:
                     self._outputs["h_mag_dist"] = {"size": self.max_harmonics}
 
     @property
-    def measures_names(self):
-        measures_names = []
-        for k, v in self.measures_losses_weights.items():
-            measures_names.append(k)
-        return measures_names
+    def measures_mapping_type(self):
+        return self._measures_mapping_type
 
-    @property
-    def remap_measures(self):
-        return self._measures_map is not None
-
-    @remap_measures.setter
-    def remap_measures(self, value: bool):
-        if value:
+    @measures_mapping_type.setter
+    def measures_mapping_type(self, value: str):
+        assert value in ['none', 'linear', 'nonlinear']
+        self._measures_mapping_type = value
+        if value == 'none':
+            self._measures_map = None
+        if value == 'linear' or value == 'nonlinear':
             path = "analysis/measures_map.pickle"
             with open(os.path.join(os.path.dirname(__file__), path), 'rb') as h:
                 self._measures_map = pickle.load(h)
-        else:
-            self._measures_map = None
 
     @property
     def weight_type(self):
@@ -219,7 +216,7 @@ class DataHandler:
 
     @weight_type.setter
     def weight_type(self, value: str):
-        assert value in ['mag_max_pool', 'mag', 'none']
+        assert value in ['none', 'mag', 'mag_max_pool']
         self._weight_type = value
 
     @property
@@ -471,26 +468,32 @@ class DataHandler:
             f_min=self.freq_bands["high"][0], f_max=self.freq_bands["high"][1]
         )
 
-        measures = {
-            "inharmonic": inharmonic,
-            "even_odd": even_odd,
-            "sparse_rich": sparse_rich,
-            "attack_rms": attack_rms,
-            "decay_rms": decay_rms,
-            "attack_time": attack_time,
-            "decay_time": decay_time,
-            "bass": bass,
-            "mid": mid,
-            "high_mid": high_mid,
-            "high": high,
-        }
+        measures = OrderedDict()
+
+        measures["inharmonic"] = inharmonic
+        measures["even_odd"] = even_odd
+        measures["sparse_rich"] = sparse_rich
+        measures["attack_rms"] = attack_rms
+        measures["decay_rms"] = decay_rms
+        measures["attack_time"] = attack_time
+        measures["decay_time"] = decay_time
+        measures["bass"] = bass
+        measures["mid"] = mid
+        measures["high_mid"] = high_mid
+        measures["high"] = high
 
         measures = self.measures_mapping(measures)
 
         return measures
 
     def measures_mapping(self, measures):
-        if self._measures_map is not None:
+        if self._measures_mapping_type == 'linear':
+            for k, y in measures.items():
+                y_min = self._measures_map[k]["y_min"]
+                y_max = self._measures_map[k]["y_max"]
+                y = (y - y_min) / (y_max - y_min)
+                measures[k] = y
+        elif self._measures_mapping_type == 'nonlinear':
             for k, y in measures.items():
                 y_min = self._measures_map[k]["y_min"]
                 y_max = self._measures_map[k]["y_max"]
@@ -500,6 +503,31 @@ class DataHandler:
                 measures[k] = y
 
         return measures
+
+    def get_measures_mean(self, note_index, velocity_index):
+        path = "analysis/measures_mean_matrix.pickle"
+        with open(os.path.join(os.path.dirname(__file__), path), 'rb') as h:
+            measures_mean_matrix = pickle.load(h)
+
+        query_points = tf.constant(
+            [note_index, velocity_index], dtype=tf.float32, shape=(1, 1, 2))
+
+        measures_mean = {}
+
+        for k in self.measure_names:
+            grid = measures_mean_matrix[k][tf.newaxis, :, :, tf.newaxis]
+
+            interp = tfa.image.interpolate_bilinear(
+                grid=grid,
+                query_points=query_points)
+
+            # note_index = int(note_index)
+            # velocity_index = int(velocity_index)
+            # v = measures_mean_matrix[k][note_index, velocity_index]
+
+            measures_mean[k] = tf.squeeze(interp)
+
+        return measures_mean
 
     def output_transform(self,
                          normalized_data_true,

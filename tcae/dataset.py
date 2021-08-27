@@ -133,8 +133,7 @@ def map_features(features):
     for k, v in normalized_data.items():
         normalized_data[k] = tf.squeeze(v, axis=0)
 
-    for k, v in measures.items():
-        measures[k] = tf.squeeze(v, axis=0)
+    measures = dict((k, tf.squeeze(v, axis=0)) for k, v in measures.items())
 
     if conf.use_one_hot_conditioning:
         note_number = tf.one_hot(
@@ -145,10 +144,21 @@ def map_features(features):
         instrument_id = tf.one_hot(
             instrument_id, depth=conf.num_instruments)
     else:
-        note_number = tf.cast(note_number, dtype=tf.float32) / 127.0
-        velocity = tf.cast(velocity, dtype=tf.float32) / 127.0
+        num_pitches = float(conf.num_pitches)
+        num_velocities = float(conf.num_velocities)
         num_instruments = float(conf.num_instruments)
-        instrument_id = tf.cast(instrument_id, tf.float32) / num_instruments
+        starting_midi_pitch = float(conf.starting_midi_pitch)
+
+        note_number = tf.cast(note_number, dtype=tf.float32)
+        velocity = tf.cast(velocity, dtype=tf.float32)
+        instrument_id = tf.cast(instrument_id, dtype=tf.float32)
+
+        note_number = note_number - starting_midi_pitch
+        velocity = tf.math.round(velocity / 25.0) - 1.0
+
+        note_number = note_number / num_pitches
+        velocity = velocity / num_velocities
+        instrument_id = instrument_id / num_instruments
 
     inputs = normalized_data.copy()
     inputs.update({
@@ -156,7 +166,7 @@ def map_features(features):
         "note_number": tf.squeeze(note_number),
         "velocity": tf.squeeze(velocity),
         "instrument_id": tf.squeeze(instrument_id),
-        "measures": tf.stack(tf.nest.flatten(measures), axis=-1),
+        "measures": [measures[k] for k in conf.data_handler.measure_names],
     })
 
     targets = normalized_data.copy()

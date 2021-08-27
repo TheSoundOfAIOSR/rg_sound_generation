@@ -17,24 +17,62 @@ def main():
     conf.checkpoints_dir = os.path.join(base_path, "checkpoints")
     conf.batch_size = 1
     conf.data_handler.remap_measures = False
+    conf.use_one_hot_conditioning = False
     train_dataset, valid_dataset, test_dataset = get_dataset(conf)
 
     dataset = train_dataset.concatenate(valid_dataset).concatenate(test_dataset)
     # dataset = test_dataset
 
-    measures_names = conf.data_handler.measures_names
-    measures = dict((k, []) for k in measures_names)
+    measure_names = conf.data_handler.measure_names
+    measures = dict((k, []) for k in measure_names)
+
+    matrix = np.zeros(shape=(conf.num_pitches, conf.num_velocities))
+    measures_mean_matrix = dict((k, matrix.copy()) for k in measure_names)
+    measures_count_matrix = dict((k, matrix.copy()) for k in measure_names)
 
     iterator = iter(dataset)
     for step, batch in enumerate(iterator):
         x, y = batch
 
-        for k, v in measures.items():
+        note_number = int(tf.math.round(x["note_number"] * conf.num_pitches))
+        velocity = int(tf.math.round(x["velocity"] * conf.num_velocities))
+
+        # y = conf.data_handler.shift_measures_mean(
+        #     y, note_number, velocity)
+
+        for k in measure_names:
             value = tf.squeeze(y[k]).numpy()
             value = float(value)
             measures[k].append(value)
+            measures_mean_matrix[k][note_number, velocity] += value
+            measures_count_matrix[k][note_number, velocity] += 1.0
 
-    measures_map = dict((k, {}) for k in measures_names)
+    for k in measure_names:
+        measures_mean_matrix[k] = np.where(
+            measures_count_matrix[k] > 0.0,
+            measures_mean_matrix[k] / measures_count_matrix[k], 0.0)
+
+        measures_mean_matrix[k] = tf.cast(
+            measures_mean_matrix[k], dtype=tf.float32)
+
+    x = np.arange(conf.num_velocities, dtype=np.float32)
+    y = np.arange(conf.num_pitches, dtype=np.float32)
+    x, y = np.meshgrid(x, y)
+
+    for i, (k, z) in enumerate(measures_mean_matrix.items()):
+        plt.figure()
+        ax = plt.axes(projection='3d')
+        surf = ax.plot_surface(x, y, z, label=k)
+        surf._facecolors2d = surf._facecolors3d
+        surf._edgecolors2d = surf._edgecolors3d
+        ax.legend()
+
+    plt.show()
+
+    with open('measures_mean_matrix.pickle', 'wb') as h:
+        pickle.dump(measures_mean_matrix, h)
+
+    measures_map = dict((k, {}) for k in measure_names)
 
     plt.figure()
     for i, (k, v) in enumerate(measures.items()):
@@ -64,7 +102,7 @@ def main():
         plt.plot(x_new, y_new_inv, label=k + '_inv')
         plt.legend()
 
-    with open('measures_map0.pickle', 'wb') as h:
+    with open('measures_map.pickle', 'wb') as h:
         pickle.dump(measures_map, h)
 
     plt.show()

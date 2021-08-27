@@ -16,16 +16,8 @@ from tcae import localconfig, train
 conf = localconfig.LocalConfig()
 
 conf.batch_size = 8
-
 conf.simple_encoder = True
 conf.simple_decoder = True
-
-conf.mt_outputs["mag_env"]["enabled"] = True
-conf.mt_outputs["h_freq_shifts"]["enabled"] = True
-conf.mt_outputs["f0_shifts"]["enabled"] = True
-conf.mt_outputs["h_mag_dist"]["enabled"] = True
-conf.mt_outputs["h_phase_diff"]["enabled"] = False
-
 conf.save_config()
 
 train.train(conf)
@@ -53,7 +45,11 @@ success, audio = sg.get_prediction({
     # A list of sg.conf.latent_dim values between 0 and 1
     "latent_sample": [0.5] * sg.conf.latent_dim,
     # A list of words describing timbre qualities
-    "qualities": ["dark", "soft"]
+    "qualities": ["dark", "soft"],
+    # Use this flag if you want to load a good starting point
+    # for latent sample and measures. If set to True, it will
+    # override latent_sample and measures given in this dict
+    "load_preset": True
 })
 
 ```

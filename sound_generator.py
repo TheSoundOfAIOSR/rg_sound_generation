@@ -1,23 +1,29 @@
 import os
 import tensorflow as tf
-from tensorflow import TensorShape
 import tsms
 import numpy as np
-from urllib.request import urlretrieve
-from loguru import logger
-from pprint import pprint
+import zipfile
+import pickle
+import gdown
 import warnings
+from loguru import logger
 from typing import Dict, Any
-from tcae import model, localconfig
+from tensorflow import TensorShape
+from tcae import model, train, localconfig
 
 
 warnings.simplefilter("ignore")
+deployed_dir = os.path.join(os.getcwd(), "deployed")
+
+if not os.path.isdir(deployed_dir):
+    logger.info("Deployed dir not found, creating")
+    os.mkdir(deployed_dir)
 
 
 def get_zero_batch(conf: localconfig.LocalConfig):
     mask = TensorShape([conf.batch_size, conf.harmonic_frame_steps, conf.max_num_harmonics])
-    note_number = TensorShape([conf.batch_size, conf.num_pitches])
-    velocity = TensorShape([conf.batch_size, conf.num_velocities])
+    note_number = TensorShape([conf.batch_size, 1])
+    velocity = TensorShape([conf.batch_size, 1])
     measures = TensorShape([conf.batch_size, conf.num_measures])
     f0_shifts = TensorShape([conf.batch_size, conf.harmonic_frame_steps, 1])
     mag_env = TensorShape([conf.batch_size, conf.harmonic_frame_steps, 1])
@@ -33,7 +39,9 @@ def get_zero_batch(conf: localconfig.LocalConfig):
         "mag_env": tf.zeros(mag_env),
         "h_freq_shifts": tf.zeros(h_freq_shifts),
         "h_mag_dist": tf.zeros(h_mag_dist),
-        "h_phase_diff": tf.zeros(h_phase_diff)
+        "h_phase_diff": tf.zeros(h_phase_diff),
+        "instrument_id": tf.zeros([conf.batch_size, conf.num_instruments]),
+        "name": tf.convert_to_tensor([b"a"] * conf.batch_size, dtype=tf.string)
     })
 
     if conf.use_note_number:
@@ -63,28 +71,52 @@ class SoundGenerator:
         self._checkpoint_path = checkpoint_path
         self._conf = localconfig.LocalConfig()
         self._model = None
+        self._decoder_inputs = None
+
+        if self._checkpoint_path is None:
+            default_checkpoint_path = os.path.join(deployed_dir, "lc_2_87_0.00567.ckpt")
+            default_checkpoint_file_path = f"{default_checkpoint_path}.index"
+            if not os.path.isfile(default_checkpoint_file_path) and auto_download:
+                download_path = os.path.join(deployed_dir, "model.zip")
+
+                if not os.path.isfile(download_path):
+                    logger.info("Downloading default model checkpoint")
+                    download_url = "https://drive.google.com/uc?id=1UwoXTVNT3roh179GYvZQtLWvFCf5yK3o"
+                    gdown.download(download_url, download_path, quiet=False)
+                    logger.info("Model checkpoint downloaded")
+
+                logger.info("Extracting archive")
+
+                with zipfile.ZipFile(download_path) as zf:
+                    zf.extractall(deployed_dir)
+
+            if os.path.isfile(default_checkpoint_file_path):
+                logger.info("Using default model checkpoint")
+                self._checkpoint_path = default_checkpoint_path
 
         # Use defaults
         if self._config_path is None:
-            default_config_path = os.path.join(os.getcwd(), "deployed", "conf.json")
+            default_config_path = os.path.join(deployed_dir, "conf.txt")
             if os.path.isfile(default_config_path):
                 logger.info("Using default config")
                 self._config_path = default_config_path
 
-        if self._checkpoint_path is None:
-            default_checkpoint_path = os.path.join(os.getcwd(), "deployed", "model.h5")
-            if not os.path.isfile(default_checkpoint_path) and auto_download:
-                logger.info("Downloading default model checkpoint")
-                _ = urlretrieve("https://osr-tsoai.s3.amazonaws.com/mt_5/model.h5", "deployed/model.h5")
-            if os.path.isfile(default_checkpoint_path):
-                logger.info("Using default model checkpoint")
-                self._checkpoint_path = default_checkpoint_path
-
+        # Config should be loaded before the model
         if self._config_path is not None:
             self.load_config()
+        else:
+            logger.warning("No config path set yet. Make sure this is not a mistake")
 
         if self._checkpoint_path is not None:
             self.load_model()
+        else:
+            logger.warning("No checkpoint path set yet. Make sure this is not a mistake")
+
+        self._load_decoder_values()
+
+    @property
+    def decoder_inputs(self):
+        return self._decoder_inputs
 
     @property
     def checkpoint_path(self):
@@ -119,10 +151,12 @@ class SoundGenerator:
         logger.info("Config loaded")
 
     def load_model(self) -> None:
-        assert os.path.isfile(self._checkpoint_path), f"No checkpoint at {self._checkpoint_path}"
-        self._model = model.TCAEModel(self._conf)
-        _ = self._model(get_zero_batch(self._conf))
-        self._model.load_weights(self._checkpoint_path)
+        # assert os.path.isfile(self._checkpoint_path), f"No checkpoint at {self._checkpoint_path}"
+        model_wrapper = train.ModelWrapper(model.TCAEModel(self._conf), self._conf.data_handler.loss)
+        _ = model_wrapper(get_zero_batch(self._conf))
+        model_wrapper.load_weights(self._checkpoint_path)
+        self._model = model_wrapper.model
+        self._model.trainable = False
         logger.info("Model loaded")
 
     def _get_mask(self, note_number: int) -> np.ndarray:
@@ -136,21 +170,88 @@ class SoundGenerator:
         mask[:, :, :harmonics] = np.ones((1, self._conf.harmonic_frame_steps, harmonics))
         return mask
 
+    def get_measures_mean(self, input_pitch: int, velocity: int) -> (Dict, int, int):
+        note_index = input_pitch - self.conf.starting_midi_pitch
+        velocity_index = velocity // 25 - 1
+        measures_mean = self._conf.data_handler.get_measures_mean(
+            note_index, velocity_index
+        )
+        return measures_mean, note_index, velocity_index
+
+    def get_decoder_index(self, note_index: int, velocity_index: int, instrument_index: int) -> int:
+        c0 = self._conf.num_pitches
+        c1 = c0 * self._conf.num_velocities
+        index = note_index + c0 * velocity_index + c1 * instrument_index
+        return index
+
+    @staticmethod
+    def measure_transform(measure_value: float, measure_mean: float) -> float:
+        measure_value = 2.0 * measure_value - 1.0
+
+        if measure_value >= 0.0:
+            measure_value = measure_mean + measure_value * (1.0 - measure_mean)
+        else:
+            measure_value = (1.0 + measure_value) * measure_mean
+        return measure_value
+
+    @staticmethod
+    def inverse_measure_transform(measure_value: float, measure_mean: float) -> float:
+        if measure_value >= measure_mean:
+            measure_value = (measure_value - measure_mean) / (1.0 - measure_mean)
+        else:
+            measure_value = (measure_value - measure_mean) / measure_mean
+
+        measure_value = (measure_value + 1.0) / 2.0
+        return measure_value
+
+    def _load_decoder_values(self):
+        assert os.path.isfile("decoder_inputs.pickle")
+
+        logger.info("Loading decoded inputs")
+
+        with open("decoder_inputs.pickle", "rb") as f:
+            decoder_inputs = pickle.load(f)
+        self._decoder_inputs = decoder_inputs
+
+    def _prepare_instrument_id(self, instrument_id: int) -> np.ndarray:
+        encoded = np.zeros((self._conf.num_instruments, ))
+        encoded[instrument_id] = 1.
+        return encoded
+
     def _prepare_note_number(self, note_number) -> np.ndarray:
         index = note_number - self._conf.starting_midi_pitch
-        encoded = np.zeros((self._conf.num_pitches, ))
-        encoded[index] = 1.
+        encoded = float(index) / self._conf.num_pitches
+        # encoded = np.zeros((self._conf.num_pitches, ))
+        # encoded[index] = 1.
         return encoded
 
     def _prepare_velocity(self, velocity) -> np.ndarray:
         index = velocity // 25 - 1
-        encoded = np.zeros((self._conf.num_velocities, ))
-        encoded[index] = 1.
+        encoded = float(index) / self._conf.num_velocities
+        # encoded = np.zeros((self._conf.num_velocities, ))
+        # encoded[index] = 1.
         return encoded
+
+    def load_preset_fn(self, measures_mean: Dict, note_index: int,
+                       velocity_index: int, instrument_id: int) -> Any:
+        decoder_index = self.get_decoder_index(note_index, velocity_index, instrument_id)
+        decoder_value = self.decoder_inputs[decoder_index]
+        if decoder_value["z"] is not None and decoder_value["measures"] is not None:
+            logger.info("Updating latent sample")
+            latent_sample = decoder_value["z"].numpy()[0]
+            logger.info("Updating measures")
+            heuristic_measures = [
+                self.inverse_measure_transform(v, measures_mean[k])
+                for k, v in zip(self._conf.data_handler.measure_names, decoder_value["measures"].numpy()[0])
+            ]
+            return True, (latent_sample, heuristic_measures)
+        return False, (None, None)
 
     def _prepare_inputs(self, data: Dict) -> Dict:
         logger.info("Preparing inputs")
 
+        load_preset = data.get("load_preset") or False
+        instrument_id = data.get("instrument_id") or 0
         output_note_number = data.get("pitch") or 60
         input_note_number = data.get("input_pitch") or 60
         velocity = data.get("velocity") or 75
@@ -158,13 +259,26 @@ class SoundGenerator:
         heuristic_measures = data.get("heuristic_measures") or np.random.rand(self._conf.num_measures)
         _ = data.get("qualities") or []
 
+        assert 0 <= instrument_id < self._conf.num_instruments, f"Instrument ID out of bounds {instrument_id}"
         assert 40 <= input_note_number <= 88, "Conditioning note number must be between" \
                                               " 40 and 88"
         assert 25 <= velocity <= 127, "Velocity must be between 25 and 127"
-        assert np.shape(latent_sample) == (self._conf.latent_dim, )
+        assert np.shape(latent_sample) == (self._conf.latent_dim, ), f"Latent dim is wrong {np.shape(latent_sample)}"
         assert np.shape(heuristic_measures) == (self._conf.num_measures, )
 
-        # Heuristic measures will be updated according to qualities present
+        measures_mean, note_index, velocity_index = self.get_measures_mean(
+            input_pitch=input_note_number, velocity=velocity
+        )
+
+        if load_preset:
+            success, values = self.load_preset_fn(measures_mean, note_index, velocity_index, instrument_id)
+            if success:
+                latent_sample, heuristic_measures = values
+
+        processed_measures = [
+            self.measure_transform(v, measures_mean[k])
+            for k, v in zip(self._conf.data_handler.measure_names, heuristic_measures)
+        ]
 
         mask = self._get_mask(output_note_number)
 
@@ -173,33 +287,20 @@ class SoundGenerator:
             "note_number": np.expand_dims(self._prepare_note_number(input_note_number), axis=0),
             "velocity": np.expand_dims(self._prepare_velocity(velocity), axis=0),
             "z": np.expand_dims(latent_sample, axis=0),
-            "measures": np.expand_dims(np.array(heuristic_measures), axis=0)
+            "measures": np.expand_dims(np.array(processed_measures), axis=0),
+            "measures_sliders": np.expand_dims(heuristic_measures, axis=0),
+            "instrument_id": instrument_id
         }
         return decoder_inputs
 
-    def info(self) -> None:
-        print("=" * 40)
-        print("Expected input dictionary:")
-        print("=" * 40)
-        pprint({
-            "input_pitch": 40,
-            "pitch": 40,
-            "velocity": 100,
-            "heuristic_measures": np.random.rand(self._conf.num_measures).tolist(),
-            "latent_sample": np.random.rand(self._conf.latent_dim).tolist(),
-            "qualities": []
-        })
-        print("=" * 40)
-        print("input_pitch: Note number to use in decoder input")
-        print("pitch: Note number to use in audio synthesis")
-        print("velocity: Velocity of the note between 25 and 127")
-        print("heuristic_measures: List of values for following measures used in decoder in the sequence shown:")
-        pprint(self._conf.data_handler.measures_names)
-        print("latent_sample: Values for z input to decoder")
-        print("qualities: List of words detected from user speech")
-        print("=" * 40)
+    def get_prediction(self, data: Dict) -> Dict:
+        output_dict = {
+            "success": False,
+            "audio": [],
+            "measures_sliders": [0.5] * self._conf.num_measures,
+            "z": [0.5] * self._conf.latent_dim
+        }
 
-    def get_prediction(self, data: Dict) -> Any:
         try:
             output_note_number = data.get("pitch") or 60
             decoder_inputs = self._prepare_inputs(data)
@@ -216,7 +317,13 @@ class SoundGenerator:
                 freq, mag, phase,
                 self._conf.sample_rate,  self._conf.frame_size
             )
-            return True, np.squeeze(audio).tolist()
+            output_dict.update({
+                "success": True,
+                "audio": np.squeeze(audio).tolist(),
+                "measures_sliders": np.squeeze(decoder_inputs.get("measures_sliders")).tolist(),
+                "z": np.squeeze(decoder_inputs.get("z")).tolist()
+            })
+            return output_dict
         except Exception as e:
             logger.error(e)
-        return False, []
+        return output_dict
