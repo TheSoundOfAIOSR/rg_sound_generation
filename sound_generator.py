@@ -7,7 +7,7 @@ import pickle
 import gdown
 import warnings
 from loguru import logger
-from typing import Dict
+from typing import Dict, Any
 from tensorflow import TensorShape
 from tcae import model, train, localconfig
 
@@ -170,7 +170,7 @@ class SoundGenerator:
         mask[:, :, :harmonics] = np.ones((1, self._conf.harmonic_frame_steps, harmonics))
         return mask
 
-    def get_measures_mean(self, input_pitch, velocity):
+    def get_measures_mean(self, input_pitch: int, velocity: int) -> (Dict, int, int):
         note_index = input_pitch - self.conf.starting_midi_pitch
         velocity_index = velocity // 25 - 1
         measures_mean = self._conf.data_handler.get_measures_mean(
@@ -178,14 +178,14 @@ class SoundGenerator:
         )
         return measures_mean, note_index, velocity_index
 
-    def get_decoder_index(self, note_index, velocity_index, instrument_index):
+    def get_decoder_index(self, note_index: int, velocity_index: int, instrument_index: int) -> int:
         c0 = self._conf.num_pitches
         c1 = c0 * self._conf.num_velocities
         index = note_index + c0 * velocity_index + c1 * instrument_index
         return index
 
     @staticmethod
-    def measure_transform(measure_value, measure_mean):
+    def measure_transform(measure_value: float, measure_mean: float) -> float:
         measure_value = 2.0 * measure_value - 1.0
 
         if measure_value >= 0.0:
@@ -195,7 +195,7 @@ class SoundGenerator:
         return measure_value
 
     @staticmethod
-    def inverse_measure_transform(measure_value, measure_mean):
+    def inverse_measure_transform(measure_value: float, measure_mean: float) -> float:
         if measure_value >= measure_mean:
             measure_value = (measure_value - measure_mean) / (1.0 - measure_mean)
         else:
@@ -232,7 +232,8 @@ class SoundGenerator:
         # encoded[index] = 1.
         return encoded
 
-    def load_preset_fn(self, measures_mean, note_index, velocity_index, instrument_id):
+    def load_preset_fn(self, measures_mean: Dict, note_index: int,
+                       velocity_index: int, instrument_id: int) -> Any:
         decoder_index = self.get_decoder_index(note_index, velocity_index, instrument_id)
         decoder_value = self.decoder_inputs[decoder_index]
         if decoder_value["z"] is not None and decoder_value["measures"] is not None:
