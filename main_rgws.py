@@ -24,8 +24,13 @@ class SGServerInterface(WebsocketServer):
 
     async def get_prediction(self, data):
         self.state = "Processing"
-        success, resp = self.generator.get_prediction(data)
-        yield {"resp": resp, "success": success}
+        result = self.generator.get_prediction(data)
+        yield {
+            "resp": result.get("audio") or [],
+            "success": result.get("success") or False,
+            "measures_sliders": result.get("measures_sliders"),
+            "z": result.get("z")
+        }
         self.state = "Processed"
 
     async def setup_model(self):

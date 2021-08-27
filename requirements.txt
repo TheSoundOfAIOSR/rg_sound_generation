@@ -9,3 +9,4 @@ tsms @ git+https://github.com/fabiodimarco/tf-spectral-modeling-synthesis.git@c0
 loguru
 scipy
 shortuuid
+gdown
