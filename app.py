@@ -126,13 +126,16 @@ high_mid = col3.slider("high_mid", min_value=0, max_value=measure_max_val, value
 high = col3.slider("high", min_value=0, max_value=measure_max_val, value=default_m[10])
 
 
-if st.sidebar.button("Generate"):
-    success, audio = get_audio_prediction(z1, z2, input_pitch, output_pitch, velocity, instrument_id)
+# if st.sidebar.button("Generate"):
+warning_message = st.warning("Generating audio")
+success, audio = get_audio_prediction(z1, z2, input_pitch, output_pitch, velocity, instrument_id)
+warning_message.empty()
 
-    if success:
-        result_bytes = get_audio_bytes(audio)
-        st.sidebar.subheader("Audio")
-        st.sidebar.audio(result_bytes, format="audio/wav")
+if success:
+    result_bytes = get_audio_bytes(audio)
+    st.success("Audio generated")
+    st.sidebar.subheader("Audio")
+    st.sidebar.audio(result_bytes, format="audio/wav")
 
 
 st.subheader("Sound Generator")
