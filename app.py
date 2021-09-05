@@ -80,6 +80,7 @@ output_pitch = st.sidebar.slider("midi_note_number", min_value=40, max_value=88,
 velocity = st.sidebar.slider("velocity", min_value=25, max_value=127, value=75, step=1)
 input_pitch = output_pitch
 
+load_preset_success = False
 
 if instrument_id != prev_id:
     logger.info(f"Instrument id is changed from {prev_id} to {instrument_id}")
@@ -88,17 +89,18 @@ if instrument_id != prev_id:
     measures_mean, note_index, velocity_index = sg.get_measures_mean(
         input_pitch=input_pitch, velocity=velocity
     )
-    success, values = sg.load_preset_fn(measures_mean, note_index, velocity_index, instrument_id)
 
-    if success:
+    load_preset_success, values = sg.load_preset_fn(measures_mean, note_index, velocity_index, instrument_id)
+
+    if load_preset_success:
         default_z, default_m = values
         default_z = [int(val * z_max_val) for val in default_z]
         default_m = [int(val * measure_max_val) for val in default_m]
-        st.session_state["default_z"] = default_z
-        st.session_state["default_m"] = default_m
         logger.info("Default z and m are updated to decoder values in session state")
     else:
-        logger.info("Could not successfully load preset")
+        logger.info("Could not successfully load preset, loading defaults")
+    st.session_state["default_z"] = default_z
+    st.session_state["default_m"] = default_m
 else:
     logger.info(f"Instrument id {instrument_id} did not change")
     if "default_z" in st.session_state:
