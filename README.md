@@ -1,6 +1,10 @@
-# Timbre Conditioned Auto Encoder
+# Neural Audio Synthesis with Timbre Conditioned Auto Encoder
 
 TBD
+
+## Web App
+
+The system is deployed as a web app [here](https://share.streamlit.io/thesoundofaiosr/rg_sound_generation/main/app.py)
 
 ## Data Preparation
 
@@ -25,7 +29,7 @@ train.train(conf)
 
 ## Sound Generator
 
-Deploy a trained model as a `SoundGenerator`
+Deploy a trained model as a `SoundGenerator`. A more complete example can be found [here](deploy.ipynb)
 
 ```python
 from sound_generator import SoundGenerator

@@ -1,17 +1,20 @@
 import os
 import tensorflow as tf
 import tsms
+import json
 import numpy as np
+import random
 import zipfile
 import pickle
 import gdown
 import warnings
 from loguru import logger
-from typing import Dict, Any
+from typing import Dict, Any, List
 from tensorflow import TensorShape
 from tcae import model, train, localconfig
 
 
+tf.get_logger().setLevel("ERROR")
 warnings.simplefilter("ignore")
 deployed_dir = os.path.join(os.getcwd(), "deployed")
 
@@ -72,6 +75,20 @@ class SoundGenerator:
         self._conf = localconfig.LocalConfig()
         self._model = None
         self._decoder_inputs = None
+        self._mapping_data = None
+        self._instrument_id_options = (
+            0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 13, 14, 15, 16, 18, 19, 20, 21, 22,
+            24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40,
+            41, 42, 43, 44, 45, 46, 48, 49, 50, 52, 53, 54, 55, 56, 57, 58, 59,
+            60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73
+        )
+        self._taxonomy = (
+            "bright", "dark", "smooth", "rough", "pure", "noisy",
+            "clear", "muddy", "warm", "metallic", "full", "hollow",
+            "thick", "thin", "rich", "sparse", "soft", "hard"
+        )
+        self._tax_to_index = dict((k, i) for i, k in enumerate(self._taxonomy))
+        self._index_to_tax = dict((v, k) for k, v in self._tax_to_index.items())
 
         if self._checkpoint_path is None:
             default_checkpoint_path = os.path.join(deployed_dir, "lc_2_87_0.00567.ckpt")
@@ -112,6 +129,11 @@ class SoundGenerator:
         else:
             logger.warning("No checkpoint path set yet. Make sure this is not a mistake")
 
+        if self._mapping_data is None:
+            logger.info("Loading qualities mapping data")
+            with open("mapping_data.json", "r") as f:
+                self._mapping_data = json.load(f)
+
         self._load_decoder_values()
 
     @property
@@ -135,12 +157,20 @@ class SoundGenerator:
         self._config_path = new_path
 
     @property
+    def instrument_id_options(self):
+        return self._instrument_id_options
+
+    @property
     def conf(self):
         return self._conf
 
     @property
     def model(self):
         return self._model
+
+    @property
+    def measures_names(self):
+        return self._conf.data_handler.measure_names
 
     def load_config(self) -> None:
         assert os.path.isfile(self._config_path), f"No config at {self._config_path}"
@@ -158,6 +188,44 @@ class SoundGenerator:
         self._model = model_wrapper.model
         self._model.trainable = False
         logger.info("Model loaded")
+
+    def _qualities_embedding(self, qualities: List[str]) -> List[int]:
+        all_words, emb = [], []
+
+        for word in qualities:
+            all_words += str(word).lower().replace(" ", "").split(",")
+
+        for word in all_words:
+            if word == "":
+                continue
+            assert word in self._tax_to_index, f"{word} not found in taxonomy"
+            emb.append(self._tax_to_index[word])
+
+        return list(sorted(emb))
+
+    def _find_iids(self, qualities: List[str]) -> List[int]:
+        emb = self._qualities_embedding(qualities)
+        matches = dict((k, 0) for k in self._mapping_data.keys())
+
+        for key, value in self._mapping_data.items():
+            for index in value:
+                if index in emb:
+                    matches[key] += 1
+
+        count_to_ids = {}
+
+        for key, count in matches.items():
+            if count not in count_to_ids:
+                count_to_ids[count] = [int(key)]
+            else:
+                count_to_ids[count].append(int(key))
+
+        max_count = max(count_to_ids.keys())
+        matching_ids = count_to_ids[max_count]
+
+        if len(matching_ids) == 0:
+            return list(self._instrument_id_options)
+        return matching_ids
 
     def _get_mask(self, note_number: int) -> np.ndarray:
         f0 = tsms.core.midi_to_f0_estimate(
@@ -253,11 +321,11 @@ class SoundGenerator:
         load_preset = data.get("load_preset") or False
         instrument_id = data.get("instrument_id") or 0
         output_note_number = data.get("pitch") or 60
-        input_note_number = data.get("input_pitch") or 60
+        input_note_number = data.get("input_pitch") or output_note_number
         velocity = data.get("velocity") or 75
         latent_sample = data.get("latent_sample") or np.random.rand(self._conf.latent_dim)
         heuristic_measures = data.get("heuristic_measures") or np.random.rand(self._conf.num_measures)
-        _ = data.get("qualities") or []
+        qualities = data.get("qualities") or []
 
         assert 0 <= instrument_id < self._conf.num_instruments, f"Instrument ID out of bounds {instrument_id}"
         assert 40 <= input_note_number <= 88, "Conditioning note number must be between" \
@@ -265,12 +333,18 @@ class SoundGenerator:
         assert 25 <= velocity <= 127, "Velocity must be between 25 and 127"
         assert np.shape(latent_sample) == (self._conf.latent_dim, ), f"Latent dim is wrong {np.shape(latent_sample)}"
         assert np.shape(heuristic_measures) == (self._conf.num_measures, )
+        assert len(qualities) <= 18, f"Number of qualities can not be more than 18, found {len(qualities)}"
 
         measures_mean, note_index, velocity_index = self.get_measures_mean(
             input_pitch=input_note_number, velocity=velocity
         )
 
         if load_preset:
+            # Find the appropriate instrument id based on qualities
+            # This overrides the given measures and latent sample values
+            logger.info("Selecting an instrument id based on input qualities")
+            instrument_id = random.choice(self._find_iids(qualities))
+            logger.info(f"Loading preset for instrument id {instrument_id}")
             success, values = self.load_preset_fn(measures_mean, note_index, velocity_index, instrument_id)
             if success:
                 latent_sample, heuristic_measures = values
