@@ -8,13 +8,14 @@ import json
 import gin
 import time
 import tsms
-import warnings
-from ddsp import core
 from ddsp import spectral_ops
 import ddsp.training.data as data
 import ddsp.training.models as models
 import ddsp.training.trainers as trainers
 import ddsp.training.train_util as train_util
+
+
+tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 
 
 class PartialTFRecordProvider(data.RecordProvider):
@@ -112,8 +113,8 @@ def _tensor_feature(value):
 
 
 def prepare_partial_tfrecord(dataset_dir='nsynth_guitar',
-                             valid_instrument_file="instruments_to_keep.csv",
-                             instrument_map_file="instrument_id_map.csv",
+                             valid_instrument_file="maps/instruments_to_keep.csv",
+                             instrument_map_file="maps/instrument_id_map.csv",
                              min_pitch=40,
                              max_pitch=88,
                              split='train',
@@ -192,7 +193,7 @@ def get_instrument_map(valid_instrument_file, instrument_map_file):
     import json
     from pprint import pprint
 
-    if not os.path.isfile("instrument_to_index.json") or not os.path.isfile("index_to_instrument.json"):
+    if not os.path.isfile("maps/instrument_to_index.json") or not os.path.isfile("maps/index_to_instrument.json"):
         print("Instrument to index maps don't exist yet..")
         with open(valid_instrument_file, "r") as f:
             instruments = f.read().splitlines()
@@ -203,20 +204,20 @@ def get_instrument_map(valid_instrument_file, instrument_map_file):
         instrument_to_index = dict((name, i) for i, name in enumerate(names))
         index_to_instrument = dict((value, key) for key, value in instrument_to_index.items())
 
-        with open("instrument_to_index.json", "w") as f:
+        with open("maps/instrument_to_index.json", "w") as f:
             json.dump(instrument_to_index, f)
-        with open("index_to_instrument.json", "w") as f:
+        with open("maps/index_to_instrument.json", "w") as f:
             json.dump(index_to_instrument, f)
 
-    with open("instrument_to_index.json", "r") as f:
+    with open("maps/instrument_to_index.json", "r") as f:
         instrument_to_index = json.load(f)
 
     return instrument_to_index
 
 
 def prepare_complete_tfrecord(dataset_dir='nsynth_guitar',
-                              valid_instrument_file="instruments_to_keep.csv",
-                              instrument_map_file="instrument_id_map.csv",
+                              valid_instrument_file="maps/instruments_to_keep.csv",
+                              instrument_map_file="maps/instrument_id_map.csv",
                               checkpoints_dir="",
                               split='train',
                               sample_rate=16000,
@@ -224,6 +225,8 @@ def prepare_complete_tfrecord(dataset_dir='nsynth_guitar',
     assert os.path.isfile(valid_instrument_file)
     assert os.path.isfile(instrument_map_file)
     instrument_to_index = get_instrument_map(valid_instrument_file, instrument_map_file)
+
+    print("CHECKPOINTS DIR:", checkpoints_dir)
 
     frame_step = 64
     split_dir = os.path.join(dataset_dir, split)
@@ -242,12 +245,12 @@ def prepare_complete_tfrecord(dataset_dir='nsynth_guitar',
         frame_rate=frame_rate)
 
     dataset = data_provider.get_batch(1, shuffle=False, repeats=1)
-
     strategy = train_util.get_strategy()
+
     with strategy.scope():
         model = models.get_model()
         trainer = trainers.Trainer(model, strategy)
-        trainer.restore(split_dir)
+        trainer.restore(checkpoints_dir)
 
         # steps = dataset.cardinality()
 

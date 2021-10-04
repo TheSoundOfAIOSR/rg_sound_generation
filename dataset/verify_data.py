@@ -8,7 +8,7 @@ from prepare import CompleteTFRecordProvider
 base_dir = "D:\soundofai\\nsynth-guitar-subset"
 sets = ["test", "valid", "train"]
 
-with open("instrument_to_index.json", "r") as f:
+with open("maps/instrument_to_index.json", "r") as f:
     instrument_to_index = json.load(f)
 
 for s in sets:

@@ -9,9 +9,9 @@ from tqdm import tqdm
 
 base_dir = "D:\soundofai\\nsynth-guitar-subset"
 
-target_train_path = "D:\soundofai\\cleaned_nsynth\\train.tfrecord"
-target_valid_path = "D:\soundofai\\cleaned_nsynth\\valid.tfrecord"
-target_test_path = "D:\soundofai\\cleaned_nsynth\\test.tfrecord"
+target_train_path = "D:\soundofai\\cleaned_nsynth\\new\\train.tfrecord"
+target_valid_path = "D:\soundofai\\cleaned_nsynth\\new\\valid.tfrecord"
+target_test_path = "D:\soundofai\\cleaned_nsynth\\new\\test.tfrecord"
 
 train_pattern = os.path.join(base_dir, "train", "complete.tfrecord")
 valid_pattern = os.path.join(base_dir, "valid", "complete.tfrecord")
