@@ -55,7 +55,7 @@ def main():
         else:
             print("wft")
 
-    with open('decoder_inputs.pickle', 'wb') as h:
+    with open('assets/decoder_inputs.pickle', 'wb') as h:
         pickle.dump(decoder_inputs, h)
 
 

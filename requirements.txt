@@ -9,3 +9,4 @@ tsms @ git+https://github.com/fabiodimarco/tf-spectral-modeling-synthesis.git@c0
 loguru==0.5.3
 scipy==1.7.1
 gdown==3.13.0
+wget==3.2

@@ -131,7 +131,7 @@ class SoundGenerator:
 
         if self._mapping_data is None:
             logger.info("Loading qualities mapping data")
-            with open("mapping_data.json", "r") as f:
+            with open("assets/mapping_data.json", "r") as f:
                 self._mapping_data = json.load(f)
 
         self._load_decoder_values()
@@ -273,11 +273,11 @@ class SoundGenerator:
         return measure_value
 
     def _load_decoder_values(self):
-        assert os.path.isfile("decoder_inputs.pickle")
+        assert os.path.isfile("assets/decoder_inputs.pickle")
 
         logger.info("Loading decoded inputs")
 
-        with open("decoder_inputs.pickle", "rb") as f:
+        with open("assets/decoder_inputs.pickle", "rb") as f:
             decoder_inputs = pickle.load(f)
         self._decoder_inputs = decoder_inputs
 
