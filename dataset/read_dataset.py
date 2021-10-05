@@ -51,5 +51,4 @@ class TFRecordProvider:
             'h_freq': tf.io.FixedLenFeature([], dtype=tf.string),
             'h_mag': tf.io.FixedLenFeature([], dtype=tf.string),
             'h_phase': tf.io.FixedLenFeature([], dtype=tf.string),
-            'f0_estimate': tf.io.FixedLenFeature([], dtype=tf.string)
         }

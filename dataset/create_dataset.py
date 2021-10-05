@@ -4,8 +4,7 @@ import os
 import json
 import pydub
 import tsms
-import sys
-from time import time
+from tqdm import tqdm
 
 
 audio_max_samples = 64000
@@ -96,6 +95,22 @@ def _get_instrument_map():
     return instrument_to_index
 
 
+def prepare_example(sample_name, note_number,
+                    velocity, instrument_id,
+                    audio, h_freq, h_mag, h_phase):
+    example_dict = {
+        'sample_name': _byte_feature(sample_name),
+        'note_number': _int64_feature(note_number),
+        'velocity': _int64_feature(velocity),
+        'instrument_id': _int64_feature(instrument_id),
+        'audio': _float_feature(audio),
+        'h_freq': _tensor_feature(h_freq),
+        'h_mag': _tensor_feature(h_mag),
+        'h_phase': _tensor_feature(h_phase)
+    }
+    return tf.train.Example(features=tf.train.Features(feature=example_dict))
+
+
 def create_set(source_dir, target_dir, set_name="test"):
     assert os.path.isfile(valid_instrument_file)
     assert os.path.isfile(instrument_map_file)
@@ -114,12 +129,8 @@ def create_set(source_dir, target_dir, set_name="test"):
     with open(source_dataset_file, 'r') as file:
         source_dict = json.load(file)
 
-    total_examples = len(source_dict)
-
     with tf.io.TFRecordWriter(target_dataset_file) as writer:
-        for example_index, (k, v) in enumerate(source_dict.items()):
-            start_time = time()
-
+        for k, v in tqdm(source_dict.items()):
             instrument = str(k[7:-8])
 
             if instrument not in instrument_to_index:
@@ -155,30 +166,16 @@ def create_set(source_dir, target_dir, set_name="test"):
                 sample_rate=sample_rate,
                 frame_step=frame_step)
 
-            f0_estimate = tf.squeeze(f0_estimate, axis=0)
             h_freq = tf.squeeze(h_freq, axis=0)
             h_mag = tf.squeeze(h_mag, axis=0)
             h_phase = tf.squeeze(h_phase, axis=0)
 
-            example_dict = {
-                'sample_name': _byte_feature([str.encode(k)]),
-                'note_number': _int64_feature([v['pitch']]),
-                'velocity': _int64_feature([v['velocity']]),
-                'instrument_id': _int64_feature([instrument_id]),
-                'audio': _float_feature(audio),
-                'f0_estimate': _tensor_feature(f0_estimate),
-                'h_freq': _tensor_feature(h_freq),
-                'h_mag': _tensor_feature(h_mag),
-                'h_phase': _tensor_feature(h_phase)
-            }
+            tf_example = prepare_example(sample_name=[str.encode(k)], note_number=[v['pitch']],
+                                         velocity=[v['velocity']], instrument_id=[instrument_id],
+                                         audio=audio, h_freq=h_freq, h_mag=h_mag, h_phase=h_phase)
 
-            tf_example = tf.train.Example(features=tf.train.Features(feature=example_dict))
             writer.write(tf_example.SerializeToString())
-
-            elapsed_time = time() - start_time
-
-            print(f"Example {example_index + 1} / {total_examples}."
-                  f" sample_name: {k}. Elapsed {elapsed_time:.3} seconds")
+    print("Finished creating set")
 
 
 def create_dataset(source_dir, target_dir):
@@ -193,16 +190,3 @@ def create_dataset(source_dir, target_dir):
         print(" " * 20, set_name, " " * 20)
         print("=" * 50)
         create_set(source_dir, target_dir, set_name=set_name)
-
-
-if __name__ == "__main__":
-    assert len(sys.argv) == 3
-
-    source_dir = sys.argv[1]
-    target_dir = sys.argv[2]
-
-    print(f"Source dir: {source_dir}. Target dir: {target_dir}")
-
-    assert os.path.isdir(source_dir)
-
-    create_dataset(source_dir, target_dir)
