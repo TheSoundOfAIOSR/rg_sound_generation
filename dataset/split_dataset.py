@@ -40,7 +40,6 @@ def split_dataset(source_dir, target_dir):
         note_number = e['note_number'][0].numpy()
         velocity = e['velocity'][0].numpy()
         audio = e['audio'][0].numpy()
-        f0_estimate = e["f0_estimate"][0].numpy()
         h_freq = e["h_freq"][0].numpy()
         h_mag = e["h_mag"][0].numpy()
         h_phase = e["h_phase"][0].numpy()
@@ -55,12 +54,14 @@ def split_dataset(source_dir, target_dir):
                                      instrument_id, audio, h_freq, h_mag, h_phase)
 
         if target_set < 10:
+            valid_count += 1
             valid_writer.write(tf_example.SerializeToString())
         else:
+            train_count += 1
             train_writer.write(tf_example.SerializeToString())
 
     train_writer.close()
     valid_writer.close()
 
-    print("Finished..")
+    print(f"Finished with num training examples: {train_count}, num validation examples: {valid_count}")
     print(f"The {source_dir} can now be deleted to save space, if required")

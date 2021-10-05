@@ -190,3 +190,5 @@ def create_dataset(source_dir, target_dir):
         print(" " * 20, set_name, " " * 20)
         print("=" * 50)
         create_set(source_dir, target_dir, set_name=set_name)
+
+    print(f"Finished creating dataset. {source_dir} can be removed to save space, if required")
