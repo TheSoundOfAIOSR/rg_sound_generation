@@ -7,6 +7,8 @@ import tsms
 from tqdm import tqdm
 
 
+tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
+
 audio_max_samples = 64000
 min_pitch = 40
 max_pitch = 88
@@ -134,14 +136,14 @@ def create_set(source_dir, target_dir, set_name="test"):
             instrument = str(k[7:-8])
 
             if instrument not in instrument_to_index:
-                print(f"{instrument} not found in valid instruments, skipping..")
+                # print(f"{instrument} not found in valid instruments, skipping..")
                 continue
 
             instrument_id = instrument_to_index[instrument]
             note_number = v["pitch"]
 
             if note_number < min_pitch or note_number > max_pitch:
-                print(f"{note_number} not found in valid range, skipping..")
+                # print(f"{note_number} not found in valid range, skipping..")
                 continue
 
             file_name = f"{k}.wav"
