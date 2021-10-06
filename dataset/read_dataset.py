@@ -4,12 +4,10 @@ import tensorflow as tf
 class TFRecordProvider:
     def __init__(self,
                  file_pattern,
-                 example_secs=4,
-                 sample_rate=16000,
+                 audio_length=64000,
                  map_func=None):
         self._file_pattern = file_pattern
-        self._sample_rate = sample_rate
-        self._audio_length = example_secs * sample_rate
+        self._audio_length = audio_length
         self._data_format_map_fn = tf.data.TFRecordDataset
         self._map_func = map_func
 

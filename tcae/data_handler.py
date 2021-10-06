@@ -88,7 +88,7 @@ class DataHandler:
                  max_harmonics=110,
                  sample_rate=16000,
                  frame_step=64,
-                 frames=1001,
+                 frames=1000,
                  max_semitone_displacement=2,
                  db_limit=-120.0,
                  h_mag_delta=1e-6,
@@ -162,21 +162,25 @@ class DataHandler:
 
     def update_losses_weights(
             self,
-            f0_shifts=1.0,
-            h_freq_shifts=1.0,
-            mag_env=1.0,
-            h_mag_dist=1.0,
+            audio=1.0,
+            h_freq=1.0,
+            f0_shifts=0.0,
+            h_freq_shifts=0.0,
             h_mag=1.0,
-            h_phase_diff=0.0,
+            mag_env=0.0,
+            h_mag_dist=0.0,
+            freq_correction=0.0,
             measures=0.0):
 
         self._losses_weights = {
+            "audio": audio,
+            "h_freq": h_freq,
             "f0_shifts": f0_shifts,
             "h_freq_shifts": h_freq_shifts,
+            "h_mag": h_mag,
             "mag_env": mag_env,
             "h_mag_dist": h_mag_dist,
-            "h_mag": h_mag,
-            "h_phase_diff": h_phase_diff,
+            "freq_correction": freq_correction,
             "measures": measures
         }
         self._outputs = {}
@@ -184,12 +188,15 @@ class DataHandler:
             if v > 0.0:
                 if k == "f0_shifts" or k == "mag_env":
                     self._outputs[k] = {"size": 1}
-                elif k == "h_freq_shifts" or k == "h_mag_dist" or k == "h_phase_diff":
+                elif k == "h_freq_shifts" or k == "h_mag_dist" or k == "h_freq_correction":
                     self._outputs[k] = {"size": self.max_harmonics}
+                elif k == "h_freq":
+                    self._outputs["f0_shifts"] = {"size": 1}
+                    self._outputs["h_freq_shifts"] = {"size": self.max_harmonics}
                 elif k == "h_mag":
                     self._outputs["mag_env"] = {"size": 1}
                     self._outputs["h_mag_dist"] = {"size": self.max_harmonics}
-                elif k == "measures":
+                elif k == "audio" or k == "measures":
                     self._outputs["f0_shifts"] = {"size": 1}
                     self._outputs["h_freq_shifts"] = {"size": self.max_harmonics}
                     self._outputs["mag_env"] = {"size": 1}
@@ -320,11 +327,8 @@ class DataHandler:
         if self.fix_pitch:
             f0_mean = tf.math.reduce_mean(f0)
             f0_shifts = (f0 - f0_mean) / max_f0_displ
-            fixed_harmonics = tsms.core.get_number_harmonics(
-                f0_mean, self._sample_rate)
         else:
             f0_shifts = (f0 - f0_note) / max_f0_displ
-            fixed_harmonics = harmonics
 
         h_freq_shifts = ((h_freq / harmonic_numbers) - f0) / max_f0_displ
 
@@ -337,18 +341,10 @@ class DataHandler:
 
         mag_env, h_mag_dist = self.split_mag(h_mag)
 
-        # compute h_phase_diff
-        h_phase_gen = tsms.core.generate_phase(
-            h_freq,
-            sample_rate=self._sample_rate,
-            frame_step=self._frame_step)
-
-        h_phase_diff = tsms.core.phase_diff(h_phase, h_phase_gen)
-        # unwrap d_phase from +/- pi to +/- 2*pi
-        h_phase_diff = tsms.core.phase_unwrap(h_phase_diff, axis=1)
-        h_phase_diff = tf.where(
-            tf.math.abs(h_phase_diff) > 2.0 * np.pi, 0.0, h_phase_diff)
-        h_phase_diff = h_phase_diff / (2.0 * np.pi)  # [-1, +1] range
+        # compute freq_correction
+        h_freq_correction = tsms.core.compute_freq_correction(
+            h_freq, h_phase, self._sample_rate, self._frame_step)
+        h_freq_correction = tf.clip_by_value(h_freq_correction, -1.0, 1.0)
 
         # zero-padding to max_harmonics
         h_freq_shifts = tf.pad(
@@ -359,19 +355,19 @@ class DataHandler:
             h_mag_dist,
             paddings=((0, 0), (0, 0), (0, self.max_harmonics - harmonics)))
 
-        h_phase_diff = tf.pad(
-            h_phase_diff,
+        h_freq_correction = tf.pad(
+            h_freq_correction,
             paddings=((0, 0), (0, 0), (0, self.max_harmonics - harmonics)))
 
         # compute mask
         mask = tf.concat([
-            tf.ones((batches, frames, fixed_harmonics)),
-            tf.zeros((batches, frames, self.max_harmonics - fixed_harmonics))],
+            tf.ones((batches, frames, harmonics)),
+            tf.zeros((batches, frames, self.max_harmonics - harmonics))],
             axis=2)
 
         h_freq_shifts = h_freq_shifts * mask
         h_mag_dist = h_mag_dist * mask
-        h_phase_diff = h_phase_diff * mask
+        h_freq_correction = h_freq_correction * mask
 
         normalized_data = {
             "mask": mask,
@@ -380,7 +376,7 @@ class DataHandler:
             "h_freq_shifts": h_freq_shifts,
             "mag_env": mag_env,
             "h_mag_dist": h_mag_dist,
-            "h_phase_diff": h_phase_diff,
+            "h_freq_correction": h_freq_correction,
         }
 
         return normalized_data
@@ -416,16 +412,17 @@ class DataHandler:
         # compute h_phase
         h_phase = None
 
-        if phase_mode == 'generated' or phase_mode == 'complete':
+        if phase_mode == 'generated':
             h_phase = tsms.core.generate_phase(
                 h_freq,
                 sample_rate=self._sample_rate,
                 frame_step=self._frame_step)
-
-        if phase_mode == 'complete':
-            h_phase_diff = normalized_data["h_phase_diff"]
-            h_phase_diff = h_phase_diff * 2.0 * np.pi * mask
-            h_phase = (h_phase + h_phase_diff) % (2.0 * np.pi)
+        elif phase_mode == 'complete':
+            h_phase = tsms.core.generate_phase(
+                h_freq,
+                sample_rate=self._sample_rate,
+                frame_step=self._frame_step,
+                freq_correction=normalized_data["h_freq_correction"])
 
         # remove zero-padding
         harmonics = tf.cast(tf.math.reduce_sum(mask[0, 0, :]), dtype=tf.int64)
@@ -551,7 +548,7 @@ class DataHandler:
                     normalized_data_pred[k] = exp_sigmoid(
                         normalized_data_pred[k])
 
-            if k == "h_phase_diff":
+            if k == "h_freq_correction":
                 if self._phase_scale_fn is not None and \
                         self._phase_loss_type != 'cross_entropy':
                     normalized_data_pred[k] = tf.math.tanh(
@@ -659,12 +656,13 @@ class DataHandler:
         h_mag_weight = self.compute_mag_weight(h_mag_true, mask)
 
         weights = {
+            "h_freq": mag_env_weight,
             "f0_shifts": mag_env_weight,
             "h_freq_shifts": h_mag_weight,
+            "h_mag": mask,
             "mag_env": env_mask,
             "h_mag_dist": h_mag_weight,
-            "h_mag": mask,
-            "h_phase_diff": h_mag_weight,
+            "h_freq_correction": h_mag_weight,
         }
 
         losses = {"loss": 0.0}
@@ -672,7 +670,28 @@ class DataHandler:
         for k, v in self._losses_weights.items():
             if v > 0.0:
                 loss = 0.0
-                if k == "f0_shifts" or k == "h_freq_shifts":
+                if k == "audio":
+                    harmonics = tf.cast(
+                        tf.math.reduce_sum(mask[0, 0, :]), dtype=tf.int64)
+                    h_freq_true = data_true["h_freq"][:, :, :harmonics]
+                    h_mag_true = data_true["h_mag"][:, :, :harmonics]
+                    h_phase_true = data_true["h_phase"][:, :, :harmonics]
+
+                    h_freq_pred, h_mag_pred, _ = self.denormalize(
+                        data_pred, phase_mode='none')
+
+                    audio_true = tsms.core.harmonic_synthesis(
+                        h_freq_true, h_mag_true, h_phase_true,
+                        self._sample_rate, self._frame_step)
+
+                    audio_pred = tsms.core.harmonic_synthesis(
+                        h_freq_pred, h_mag_pred, h_phase_true,
+                        self._sample_rate, self._frame_step)
+
+                    loss = tf.math.reduce_mean(tf.square(
+                        audio_true - audio_pred))
+
+                if k == "h_freq" or k == "f0_shifts" or k == "h_freq_shifts":
                     loss = self.freq_loss(
                         data_true[k],
                         data_pred[k],
@@ -687,7 +706,7 @@ class DataHandler:
                         data_pred["mag_env"],
                         data_pred["h_mag_dist"])
                     loss = self.mag_loss(h_mag_true, h_mag_pred, mask)
-                elif k == "h_phase_diff":
+                elif k == "h_freq_correction":
                     loss = self.phase_loss(
                         data_true[k],
                         data_pred[k],
