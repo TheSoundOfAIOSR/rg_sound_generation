@@ -5,7 +5,7 @@ streamlit==0.85.1
 tensorflow==2.5.0
 tensorflow-addons==0.13.0
 tensorflow-probability==0.13.0
-tsms @ git+https://github.com/fabiodimarco/tf-spectral-modeling-synthesis.git@c090cf50916285500df0c96348dbfd8e01b73b9b
+tsms @ git+https://github.com/fabiodimarco/tf-spectral-modeling-synthesis.git@10af389eeb7b56c1b81d8fa5f17d3bcd18e0f979
 loguru==0.5.3
 scipy==1.7.1
 gdown==3.13.0
