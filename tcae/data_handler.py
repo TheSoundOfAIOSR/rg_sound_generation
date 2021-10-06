@@ -646,14 +646,9 @@ class DataHandler:
             data_true, data_pred, loss_data=True)
 
         # compute weights
-        mag_env_true = data_true["mag_env"]
-        h_mag_dist_true = data_true["h_mag_dist"]
-
-        h_mag_true = self.combine_mag(mag_env_true, h_mag_dist_true)
-
-        env_mask = tf.ones_like(mag_env_true)
-        mag_env_weight = self.compute_mag_weight(mag_env_true, env_mask)
-        h_mag_weight = self.compute_mag_weight(h_mag_true, mask)
+        env_mask = tf.ones_like(data_true["mag_env"])
+        mag_env_weight = self.compute_mag_weight(data_true["mag_env"], env_mask)
+        h_mag_weight = self.compute_mag_weight(data_true["h_mag"], mask)
 
         weights = {
             "h_freq": mag_env_weight,
@@ -705,7 +700,7 @@ class DataHandler:
                     h_mag_pred = self.combine_mag(
                         data_pred["mag_env"],
                         data_pred["h_mag_dist"])
-                    loss = self.mag_loss(h_mag_true, h_mag_pred, mask)
+                    loss = self.mag_loss(data_true["h_mag"], h_mag_pred, mask)
                 elif k == "h_freq_correction":
                     loss = self.phase_loss(
                         data_true[k],
