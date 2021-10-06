@@ -60,15 +60,6 @@ def map_features(features):
         normalized_data, phase_mode='none')
     measures = conf.data_handler.compute_measures(h_freq, h_mag)
 
-    # zero-padding to max_harmonics
-    h_freq = tf.pad(
-        h_freq,
-        paddings=((0, 0), (0, 0), (0, max_harmonics - harmonics)))
-
-    h_mag = tf.pad(
-        h_mag,
-        paddings=((0, 0), (0, 0), (0, max_harmonics - harmonics)))
-
     h_phase = tf.pad(
         h_phase,
         paddings=((0, 0), (0, 0), (0, max_harmonics - harmonics)))

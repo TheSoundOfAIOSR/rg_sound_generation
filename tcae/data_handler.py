@@ -169,7 +169,7 @@ class DataHandler:
             h_mag=1.0,
             mag_env=0.0,
             h_mag_dist=0.0,
-            freq_correction=0.0,
+            h_freq_correction=0.0,
             measures=0.0):
 
         self._losses_weights = {
@@ -180,7 +180,7 @@ class DataHandler:
             "h_mag": h_mag,
             "mag_env": mag_env,
             "h_mag_dist": h_mag_dist,
-            "freq_correction": freq_correction,
+            "h_freq_correction": h_freq_correction,
             "measures": measures
         }
         self._outputs = {}
@@ -428,12 +428,6 @@ class DataHandler:
                 frame_step=self._frame_step,
                 freq_correction=normalized_data["h_freq_correction"])
 
-        # remove zero-padding
-        harmonics = tf.cast(tf.math.reduce_sum(mask[0, 0, :]), dtype=tf.int64)
-        h_freq = h_freq[:, :, :harmonics]
-        h_mag = h_mag[:, :, :harmonics]
-        h_phase = h_phase[:, :, :harmonics] if h_phase is not None else h_phase
-
         return h_freq, h_mag, h_phase
 
     def compute_measures(self, h_freq, h_mag):
@@ -654,8 +648,11 @@ class DataHandler:
         mag_env_weight = self.compute_mag_weight(data_true["mag_env"], env_mask)
         h_mag_weight = self.compute_mag_weight(data_true["h_mag"], mask)
 
+        harmonic_numbers = tf.range(1, self.max_harmonics + 1, dtype=tf.float32)
+        harmonic_numbers = harmonic_numbers[tf.newaxis, tf.newaxis, :]
+
         weights = {
-            "h_freq": mag_env_weight,
+            "h_freq": h_mag_weight / harmonic_numbers,
             "f0_shifts": mag_env_weight,
             "h_freq_shifts": h_mag_weight,
             "h_mag": mask,
@@ -664,47 +661,51 @@ class DataHandler:
             "h_freq_correction": h_mag_weight,
         }
 
+        if self._losses_weights["audio"] > 0.0 or \
+           self._losses_weights["h_freq"] > 0.0 or \
+           self._losses_weights["h_mag"] > 0.0:
+            data_pred["h_freq"], data_pred["h_mag"], _ = self.denormalize(
+                data_pred, phase_mode='none')
+
         losses = {"loss": 0.0}
 
         for k, v in self._losses_weights.items():
             if v > 0.0:
                 loss = 0.0
                 if k == "audio":
-                    harmonics = tf.cast(
-                        tf.math.reduce_sum(mask[0, 0, :]), dtype=tf.int64)
-                    h_freq_true = data_true["h_freq"][:, :, :harmonics]
-                    h_mag_true = data_true["h_mag"][:, :, :harmonics]
-                    h_phase_true = data_true["h_phase"][:, :, :harmonics]
-
-                    h_freq_pred, h_mag_pred, _ = self.denormalize(
-                        data_pred, phase_mode='none')
-
                     audio_true = tsms.core.harmonic_synthesis(
-                        h_freq_true, h_mag_true, h_phase_true,
+                        data_true["h_freq"], data_true["h_mag"],
+                        data_true["h_phase"],
                         self._sample_rate, self._frame_step)
 
                     audio_pred = tsms.core.harmonic_synthesis(
-                        h_freq_pred, h_mag_pred, h_phase_true,
+                        data_pred["h_freq"], data_pred["h_mag"],
+                        data_true["h_phase"],
                         self._sample_rate, self._frame_step)
 
                     loss = tf.math.reduce_mean(tf.square(
                         audio_true - audio_pred))
+                elif k == "h_freq":
+                    note_number = data_true["note_number"]
+                    note_number = tf.reshape(note_number, shape=(-1, 1, 1))
+                    note_number = tf.cast(note_number, dtype=tf.float32)
+                    f0_note = tsms.core.midi_to_hz(note_number)
+                    max_f0_displ = f0_note * self._f0_st_factor
 
-                if k == "h_freq" or k == "f0_shifts" or k == "h_freq_shifts":
+                    loss = self.freq_loss(
+                        data_true[k] / max_f0_displ,
+                        data_pred[k] / max_f0_displ,
+                        weights[k])
+                elif k == "f0_shifts" or k == "h_freq_shifts":
                     loss = self.freq_loss(
                         data_true[k],
                         data_pred[k],
                         weights[k])
-                elif k == "mag_env" or k == "h_mag_dist":
+                elif k == "h_mag" or k == "mag_env" or k == "h_mag_dist":
                     loss = self.mag_loss(
                         data_true[k],
                         data_pred[k],
                         weights[k])
-                elif k == "h_mag" and self._mag_loss_type != 'cross_entropy':
-                    h_mag_pred = self.combine_mag(
-                        data_pred["mag_env"],
-                        data_pred["h_mag_dist"])
-                    loss = self.mag_loss(data_true["h_mag"], h_mag_pred, mask)
                 elif k == "h_freq_correction":
                     loss = self.phase_loss(
                         data_true[k],
