@@ -83,7 +83,7 @@ class DataHandler:
                  mag_loss_type='l2_db',  # 'cross_entropy', 'l2_db' 'l1_db', 'rms_db', 'mse'
                  phase_loss_type='mse',  # 'cross_entropy', 'mse'
                  freq_scale_fn='none',  # 'none', 'tanh'
-                 mag_scale_fn='exp_sigmoid',  # 'none', 'exp_sigmoid'
+                 mag_scale_fn='exp_sigmoid',  # 'none', 'exp_sigmoid', 'relu'
                  phase_scale_fn='none',  # 'none', 'tanh'
                  max_harmonics=110,
                  sample_rate=16000,
@@ -272,16 +272,20 @@ class DataHandler:
     def mag_scale_fn(self):
         if self._mag_scale_fn is None:
             return "none"
-        else:
+        elif self._mag_scale_fn is exp_sigmoid:
             return "exp_sigmoid"
+        elif self._mag_scale_fn is tf.keras.activations.relu:
+            return "relu"
 
     @mag_scale_fn.setter
     def mag_scale_fn(self, value: str):
-        assert value in ["none", "exp_sigmoid"]
+        assert value in ["none", "exp_sigmoid", "relu"]
         if value == "none":
             self._mag_scale_fn = None
-        else:
+        elif value == "exp_sigmoid":
             self._mag_scale_fn = exp_sigmoid
+        elif value == "relu":
+            self._mag_scale_fn = tf.keras.activations.relu
 
     @property
     def phase_scale_fn(self):
