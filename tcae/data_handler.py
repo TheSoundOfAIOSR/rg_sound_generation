@@ -78,7 +78,8 @@ class DataHandler:
                  normalize_mag=False,
                  compact_measures_logs=True,
                  measures_mapping_type='none',  # 'none', 'linear', 'nonlinear'
-                 weight_type='mag_max_pool',  # 'none', 'mag', 'mag_max_pool'
+                 weight_type='mag',  # 'none', 'mag', 'mag_max_pool'
+                 weight_threshold=1e-4,
                  freq_loss_type='mse',  # 'cross_entropy', 'mse'
                  mag_loss_type='l2_db',  # 'cross_entropy', 'l2_db' 'l1_db', 'rms_db', 'mse'
                  phase_loss_type='mse',  # 'cross_entropy', 'mse'
@@ -99,6 +100,7 @@ class DataHandler:
         self.normalize_mag = normalize_mag
         self.compact_measures_logs = compact_measures_logs
         self._weight_type = weight_type
+        self._weight_threshold = weight_threshold
         self._freq_loss_type = freq_loss_type
         self._mag_loss_type = mag_loss_type
         self._phase_loss_type = phase_loss_type
@@ -650,6 +652,11 @@ class DataHandler:
 
         harmonic_numbers = tf.range(1, self.max_harmonics + 1, dtype=tf.float32)
         harmonic_numbers = harmonic_numbers[tf.newaxis, tf.newaxis, :]
+
+        mag_env_weight = tf.where(
+            mag_env_weight > self._weight_threshold, mag_env_weight, 0.0)
+        h_mag_weight = tf.where(
+            h_mag_weight > self._weight_threshold, h_mag_weight, 0.0)
 
         weights = {
             "h_freq": h_mag_weight / harmonic_numbers,
