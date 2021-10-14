@@ -24,29 +24,25 @@ if not os.path.isdir(deployed_dir):
 
 
 def get_zero_batch(conf: localconfig.LocalConfig):
-    mask = TensorShape([conf.batch_size, conf.harmonic_frame_steps, conf.max_num_harmonics])
     note_number = TensorShape([conf.batch_size, 1])
     velocity = TensorShape([conf.batch_size, 1])
+    instrument_id = TensorShape([conf.batch_size, 1])
     measures = TensorShape([conf.batch_size, conf.num_measures])
-    f0_shifts = TensorShape([conf.batch_size, conf.harmonic_frame_steps, 1])
-    mag_env = TensorShape([conf.batch_size, conf.harmonic_frame_steps, 1])
-    h_freq_shifts = TensorShape([conf.batch_size, conf.harmonic_frame_steps, conf.max_num_harmonics])
-    h_mag_dist = TensorShape([conf.batch_size, conf.harmonic_frame_steps, conf.max_num_harmonics])
-    h_phase_diff = TensorShape([conf.batch_size, conf.harmonic_frame_steps, conf.max_num_harmonics])
+    h_freq = TensorShape([conf.batch_size, conf.harmonic_frame_steps, conf.max_num_harmonics])
+    h_mag = TensorShape([conf.batch_size, conf.harmonic_frame_steps, conf.max_num_harmonics])
+    h_phase = TensorShape([conf.batch_size, conf.harmonic_frame_steps, conf.max_num_harmonics])
 
     _shapes = {}
 
     _shapes.update({
-        "mask": tf.zeros(mask),
-        "f0_shifts": tf.zeros(f0_shifts),
-        "mag_env": tf.zeros(mag_env),
-        "h_freq_shifts": tf.zeros(h_freq_shifts),
-        "h_mag_dist": tf.zeros(h_mag_dist),
-        "h_phase_diff": tf.zeros(h_phase_diff),
-        "instrument_id": tf.zeros([conf.batch_size, conf.num_instruments]),
-        "name": tf.convert_to_tensor([b"a"] * conf.batch_size, dtype=tf.string)
+        "name": tf.convert_to_tensor([b"a"] * conf.batch_size, dtype=tf.string),
+        "h_freq": tf.zeros(h_freq),
+        "h_mag": tf.zeros(h_mag),
+        "h_phase": tf.zeros(h_phase)
     })
 
+    if conf.use_instrument_id:
+        _shapes.update({"instrument_id": tf.zeros(instrument_id)})
     if conf.use_note_number:
         _shapes.update({"note_number": tf.zeros(note_number)})
     if conf.use_velocity:
@@ -282,9 +278,9 @@ class SoundGenerator:
         self._decoder_inputs = decoder_inputs
 
     def _prepare_instrument_id(self, instrument_id: int) -> np.ndarray:
-        encoded = np.zeros((self._conf.num_instruments, ))
-        encoded[instrument_id] = 1.
-        return encoded
+        encoded = np.array([instrument_id], dtype=np.float32)
+        # encoded[instrument_id] = 1.
+        return encoded * self.conf.num_instruments
 
     def _prepare_note_number(self, note_number) -> np.ndarray:
         index = note_number - self._conf.starting_midi_pitch
