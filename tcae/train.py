@@ -54,7 +54,7 @@ def train(conf: LocalConfig):
 
     # create dataset
     print("Loading datasets...")
-    train_dataset, valid_dataset, test_dataset = get_dataset(conf)
+    train_dataset, valid_dataset, _ = get_dataset(conf)
 
     # create and compile model
     model = ModelWrapper(
@@ -109,14 +109,3 @@ def train(conf: LocalConfig):
             checkpoint, early_stop,
             reduce_lr, csv_logger
         ])
-
-    # model.fit(
-    #     train_dataset,
-    #     epochs=10,
-    #     steps_per_epoch=5,
-    #     validation_data=valid_dataset,
-    #     validation_steps=5,
-    #     callbacks=[checkpoint, early_stop, reduce_lr])
-
-    # evaluate model
-    model.evaluate(test_dataset)
