@@ -98,6 +98,12 @@ def map_features(features):
     h_mag = tf.expand_dims(h_mag, axis=0)
     h_phase = tf.expand_dims(h_phase, axis=0)
 
+    # the last element is repeated so that the synthesized audio has a size
+    # greater than or equal to that of the analysis audio
+    h_freq = tf.concat([h_freq, h_freq[:, -1:, :]], axis=1)
+    h_mag = tf.concat([h_mag, h_mag[:, -1:, :]], axis=1)
+    h_phase = tf.concat([h_phase, h_phase[:, -1:, :]], axis=1)
+
     max_harmonics = conf.data_handler.max_harmonics
     harmonics = tf.shape(h_freq)[-1]
 
@@ -171,17 +177,14 @@ def get_dataset(conf: LocalConfig):
         conf = LocalConfig()
     train_path = os.path.join(conf.dataset_dir, "train.tfrecord")
     valid_path = os.path.join(conf.dataset_dir, "valid.tfrecord")
-    # test_path = os.path.join(conf.dataset_dir, "test.tfrecord")
 
     train_dataset = create_dataset(
         train_path, map_func=map_features, batch_size=conf.batch_size)
     valid_dataset = create_dataset(
         valid_path, map_func=map_features, batch_size=conf.batch_size)
-    # test_dataset = create_dataset(
-    #     test_path, map_func=map_features, batch_size=conf.batch_size)
-    #
-    # if conf.dataset_modifier is not None:
-    #     train_dataset, valid_dataset, test_dataset = conf.dataset_modifier(
-    #         train_dataset, valid_dataset, test_dataset)
+
+    if conf.dataset_modifier is not None:
+        train_dataset, valid_dataset, _ = conf.dataset_modifier(
+            train_dataset, valid_dataset, valid_dataset)
 
     return train_dataset, valid_dataset, None
