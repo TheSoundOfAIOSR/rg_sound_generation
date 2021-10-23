@@ -10,6 +10,7 @@ class LocalConfig:
     dataset_modifier = None
     simple_encoder = False
     simple_decoder = False
+    create_encoder_function = 'mt'
     create_decoder_function = 'cnn'
     lc_dropout_rate = 0.1
     pretrained_model_path = None
@@ -58,7 +59,7 @@ class LocalConfig:
         "h_freq_shifts": {"shape": (row_dim, 64)},
         "mag_env": {"shape": (row_dim, 32)},
         "h_mag_dist": {"shape": (row_dim, 64)},
-        "h_phase_diff": {"shape": (row_dim, 64)},
+        # "h_freq_correction": {"shape": (row_dim, 64)},
     }
 
     mt_outputs = {
@@ -66,7 +67,7 @@ class LocalConfig:
         "h_freq_shifts": {"shape": (row_dim, 110, 16)},
         "mag_env": {"shape": (row_dim, 64, 16)},
         "h_mag_dist": {"shape": (row_dim, 110, 16)},
-        "h_phase_diff": {"shape": (row_dim, 110, 16)},
+        # "h_freq_correction": {"shape": (row_dim, 110, 16)},
     }
 
     data_handler = None

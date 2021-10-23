@@ -78,8 +78,8 @@ class DataHandler:
                  normalize_mag=False,
                  compact_measures_logs=True,
                  measures_mapping_type='none',  # 'none', 'linear', 'nonlinear'
-                 weight_type='mag',  # 'none', 'mag', 'mag_max_pool'
-                 weight_threshold=1e-4,
+                 weight_type='mag_max_pool',  # 'none', 'mag', 'mag_max_pool'
+                 weight_threshold=0.0,
                  freq_loss_type='mse',  # 'cross_entropy', 'mse'
                  mag_loss_type='l2_db',  # 'cross_entropy', 'l2_db' 'l1_db', 'rms_db', 'mse'
                  phase_loss_type='mse',  # 'cross_entropy', 'mse'
