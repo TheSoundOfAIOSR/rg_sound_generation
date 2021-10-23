@@ -10,6 +10,7 @@ class LocalConfig:
     dataset_modifier = None
     simple_encoder = False
     simple_decoder = False
+    use_fnet_skip_dense = True
     create_encoder_function = 'mt'
     create_decoder_function = 'cnn'
     lc_dropout_rate = 0.1

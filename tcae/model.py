@@ -353,12 +353,17 @@ def create_fnet_encoder(inputs, conf: LocalConfig):
     skips = []
     for i in range(8):
         x = FNetBlock(256, dropout=0.0)(x)
-        skips.append(x)
+        if conf.use_fnet_skip_dense:
+            s = tf.keras.layers.Dense(256)(x)
+            skips.append(s)
+        else:
+            skips.append(x)
 
     x = tf.concat(skips, axis=-1)
     x = tf.keras.layers.Lambda(lambda z: tf.math.reduce_mean(z, axis=1))(x)
 
-    outputs = tf.keras.layers.Dense(conf.latent_dim, activation='sigmoid')(x)
+    outputs = tf.keras.layers.Dense(
+        conf.latent_dim, use_bias=False, activation='sigmoid')(x)
 
     m = tf.keras.models.Model(
         inputs, outputs
@@ -383,15 +388,18 @@ def create_fnet_decoder(inputs, conf: LocalConfig):
     skips = []
     for i in range(20):
         x = FNetBlock(256, dropout=0.0)(x)
-        # s = tf.keras.layers.Dense(256)(x)
-        skips.append(x)
+        if conf.use_fnet_skip_dense:
+            s = tf.keras.layers.Dense(256)(x)
+            skips.append(s)
+        else:
+            skips.append(x)
 
     x = tf.concat(skips, axis=-1)
 
     outputs = {}
 
     for k, v in conf.data_handler.outputs.items():
-        y = tf.keras.layers.Dense(v["size"])(x)
+        y = tf.keras.layers.Dense(v["size"], use_bias=False)(x)
         outputs[k] = y
 
     m = tf.keras.models.Model(
