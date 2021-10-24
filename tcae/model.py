@@ -302,6 +302,113 @@ def create_mt_lc_decoder(inputs, conf: LocalConfig):
     return m
 
 
+class FeedForward(tf.keras.layers.Layer):
+    def __init__(self, units, expansion_factor, dropout):
+        super().__init__()
+        num_hidden = expansion_factor * units
+        self.dense1 = tf.keras.layers.Dense(num_hidden, activation=tf.nn.gelu)
+        self.dense2 = tf.keras.layers.Dense(units)
+        self.dropout1 = tf.keras.layers.Dropout(dropout)
+        self.dropout2 = tf.keras.layers.Dropout(dropout)
+
+    def call(self, inputs, training=False, *args, **kwargs):
+        x = self.dense1(inputs)
+        x = self.dropout1(x, training=training)
+        x = self.dense2(x)
+        x = self.dropout2(x, training=training)
+        return x
+
+
+class FNetBlock(tf.keras.layers.Layer):
+    def __init__(self, units, expansion_factor=2, dropout=0.0):
+        super().__init__()
+        self.ff = FeedForward(units, expansion_factor, dropout)
+        self.norm1 = tf.keras.layers.LayerNormalization()
+        self.norm2 = tf.keras.layers.LayerNormalization()
+
+    def call(self, x, training=False, *args, **kwargs):
+        residual = x
+        x = tf.math.real(tf.signal.fft2d(tf.cast(x, tf.complex64)))
+        x = x + residual
+        x = self.norm1(x, training=training)
+
+        residual = x
+        x = self.ff(x, training=training)
+        x = x + residual
+        x = self.norm2(x, training=training)
+        return x
+
+
+def create_fnet_encoder(inputs, conf: LocalConfig):
+    if conf is None:
+        conf = LocalConfig()
+
+    concat_inputs = []
+    for k, v in inputs.items():
+        concat_inputs += [v]
+
+    concat_inputs = tf.keras.layers.concatenate(concat_inputs)
+    x = tf.keras.layers.Dense(256)(concat_inputs)
+
+    skips = []
+    for i in range(8):
+        x = FNetBlock(256, dropout=0.0)(x)
+        if conf.use_fnet_skip_dense:
+            s = tf.keras.layers.Dense(256)(x)
+            skips.append(s)
+        else:
+            skips.append(x)
+
+    x = tf.concat(skips, axis=-1)
+    x = tf.keras.layers.Lambda(lambda z: tf.math.reduce_mean(z, axis=1))(x)
+
+    outputs = tf.keras.layers.Dense(
+        conf.latent_dim, use_bias=False, activation='sigmoid')(x)
+
+    m = tf.keras.models.Model(
+        inputs, outputs
+    )
+
+    return m
+
+
+def create_fnet_decoder(inputs, conf: LocalConfig):
+    if conf is None:
+        conf = LocalConfig()
+
+    concat_inputs = []
+    for k, v in inputs.items():
+        concat_inputs += [v]
+
+    concat_inputs = tf.keras.layers.concatenate(concat_inputs)
+    x = tf.keras.layers.RepeatVector(1000)(concat_inputs)
+    x = tf.keras.layers.LocallyConnected1D(64, 1, 1)(x)
+    x = tf.keras.layers.Dense(256)(x)
+
+    skips = []
+    for i in range(20):
+        x = FNetBlock(256, dropout=0.0)(x)
+        if conf.use_fnet_skip_dense:
+            s = tf.keras.layers.Dense(256)(x)
+            skips.append(s)
+        else:
+            skips.append(x)
+
+    x = tf.concat(skips, axis=-1)
+
+    outputs = {}
+
+    for k, v in conf.data_handler.outputs.items():
+        y = tf.keras.layers.Dense(v["size"], use_bias=False)(x)
+        outputs[k] = y
+
+    m = tf.keras.models.Model(
+        inputs, outputs
+    )
+
+    return m
+
+
 class TCAEModel(tf.keras.Model):
     def __init__(self, conf: LocalConfig):
         super(TCAEModel, self).__init__()
@@ -316,12 +423,18 @@ class TCAEModel(tf.keras.Model):
         decoder_inputs = {}
 
         if conf.use_encoder:
-            for k, v in conf.mt_inputs.items():
+            for k, v in conf.data_handler.outputs.items():
                 if k in input_shape:
                     shape = input_shape[k]
                     encoder_inputs[k] = tf.keras.layers.Input(shape=shape[1:])
 
-            self.encoder = create_mt_encoder(encoder_inputs, conf)
+            if conf.create_encoder_function == 'mt':
+                self.encoder = create_mt_encoder(encoder_inputs, conf)
+            elif conf.create_encoder_function == 'fnet':
+                self.encoder = create_fnet_encoder(encoder_inputs, conf)
+            else:
+                self.encoder = conf.create_encoder_function(encoder_inputs, conf)
+
             if conf.print_model_summary:
                 print(self.encoder.summary())
             decoder_inputs["z"] = tf.keras.layers.Input(
@@ -351,6 +464,8 @@ class TCAEModel(tf.keras.Model):
             self.decoder = create_mt_decoder(decoder_inputs, conf)
         elif conf.create_decoder_function == 'lc':
             self.decoder = create_mt_lc_decoder(decoder_inputs, conf)
+        elif conf.create_decoder_function == 'fnet':
+            self.decoder = create_fnet_decoder(decoder_inputs, conf)
         else:
             self.decoder = conf.create_decoder_function(decoder_inputs, conf)
 
