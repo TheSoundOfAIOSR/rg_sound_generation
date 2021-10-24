@@ -282,10 +282,10 @@ def create_mt_lc_decoder(inputs, conf: LocalConfig):
     x = tf.keras.layers.RepeatVector(128)(x)
     input_shape = x.shape[1:]
 
-    x0 = base_lc_decoder(input_shape, conf.lc_dropout_rate)(x)
-    x1 = base_lc_decoder(input_shape, conf.lc_dropout_rate)(x)
-    x2 = base_lc_decoder(input_shape, conf.lc_dropout_rate)(x)
-    x3 = base_lc_decoder(input_shape, conf.lc_dropout_rate)(x)
+    x0 = base_lc_decoder(input_shape, conf.dropout_rate)(x)
+    x1 = base_lc_decoder(input_shape, conf.dropout_rate)(x)
+    x2 = base_lc_decoder(input_shape, conf.dropout_rate)(x)
+    x3 = base_lc_decoder(input_shape, conf.dropout_rate)(x)
 
     x = tf.keras.layers.Concatenate(axis=-1)([x0, x1, x2, x3])
     outputs = {}
@@ -352,7 +352,7 @@ def create_fnet_encoder(inputs, conf: LocalConfig):
 
     skips = []
     for i in range(8):
-        x = FNetBlock(256, dropout=0.0)(x)
+        x = FNetBlock(256, dropout=conf.dropout_rate)(x)
         if conf.use_fnet_skip_dense:
             s = tf.keras.layers.Dense(256)(x)
             skips.append(s)
@@ -387,7 +387,7 @@ def create_fnet_decoder(inputs, conf: LocalConfig):
 
     skips = []
     for i in range(20):
-        x = FNetBlock(256, dropout=0.0)(x)
+        x = FNetBlock(256, dropout=conf.dropout_rate)(x)
         if conf.use_fnet_skip_dense:
             s = tf.keras.layers.Dense(256)(x)
             skips.append(s)

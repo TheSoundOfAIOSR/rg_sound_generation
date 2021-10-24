@@ -13,7 +13,7 @@ class LocalConfig:
     use_fnet_skip_dense = True
     create_encoder_function = 'mt'
     create_decoder_function = 'cnn'
-    lc_dropout_rate = 0.1
+    dropout_rate = 0.0
     pretrained_model_path = None
     model_name = "tcae"
     run_name = "default"
