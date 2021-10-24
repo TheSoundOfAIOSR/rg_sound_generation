@@ -17,8 +17,8 @@ def main():
     model = sg.model
     conf = sg.conf
 
-    base_path = os.getcwd()
-    conf.dataset_dir = os.path.join(base_path, "complete_dataset")
+    # base_path = os.getcwd()
+    # conf.dataset_dir = os.path.join(base_path, "complete_dataset")
     # conf.checkpoints_dir = os.path.join(base_path, "checkpoints/fnet_dataset_branch_audio")
     conf.batch_size = 1
     conf.data_handler.remap_measures = False

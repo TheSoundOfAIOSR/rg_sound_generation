@@ -98,7 +98,7 @@ class SoundGenerator:
 
                 if not os.path.isfile(download_path):
                     logger.info("Downloading default model checkpoint")
-                    download_url = "https://drive.google.com/uc?id=1Oe_GHDa6efwXuJUl5ZFP6tLZRV9q6Gea"
+                    download_url = "https://drive.google.com/uc?id=1eXbV-CHTRWsvR6YavBLqP9Of5iUn01gA"
                     gdown.download(download_url, download_path, quiet=False)
                     logger.info("Model checkpoint downloaded")
 
