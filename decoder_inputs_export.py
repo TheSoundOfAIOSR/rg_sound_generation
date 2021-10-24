@@ -1,7 +1,5 @@
 import tensorflow as tf
-import numpy as np
 import os
-from tcae.localconfig import LocalConfig
 from tcae.dataset import get_dataset
 from sound_generator import SoundGenerator
 import pickle
@@ -21,13 +19,13 @@ def main():
 
     base_path = os.getcwd()
     conf.dataset_dir = os.path.join(base_path, "complete_dataset")
-    conf.checkpoints_dir = os.path.join(base_path, "checkpoints")
+    # conf.checkpoints_dir = os.path.join(base_path, "checkpoints/fnet_dataset_branch_audio")
     conf.batch_size = 1
     conf.data_handler.remap_measures = False
     conf.use_one_hot_conditioning = False
-    train_dataset, valid_dataset, test_dataset = get_dataset(conf)
+    train_dataset, valid_dataset, _ = get_dataset(conf)
 
-    dataset = train_dataset.concatenate(valid_dataset).concatenate(test_dataset)
+    dataset = train_dataset.concatenate(valid_dataset)
     # dataset = test_dataset
 
     elements = conf.num_pitches * conf.num_velocities * conf.num_instruments

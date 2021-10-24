@@ -24,25 +24,29 @@ if not os.path.isdir(deployed_dir):
 
 
 def get_zero_batch(conf: localconfig.LocalConfig):
+    mask = TensorShape([conf.batch_size, conf.harmonic_frame_steps, conf.max_num_harmonics])
     note_number = TensorShape([conf.batch_size, 1])
     velocity = TensorShape([conf.batch_size, 1])
-    instrument_id = TensorShape([conf.batch_size, 1])
     measures = TensorShape([conf.batch_size, conf.num_measures])
-    h_freq = TensorShape([conf.batch_size, conf.harmonic_frame_steps, conf.max_num_harmonics])
-    h_mag = TensorShape([conf.batch_size, conf.harmonic_frame_steps, conf.max_num_harmonics])
-    h_phase = TensorShape([conf.batch_size, conf.harmonic_frame_steps, conf.max_num_harmonics])
+    f0_shifts = TensorShape([conf.batch_size, conf.harmonic_frame_steps, 1])
+    mag_env = TensorShape([conf.batch_size, conf.harmonic_frame_steps, 1])
+    h_freq_shifts = TensorShape([conf.batch_size, conf.harmonic_frame_steps, conf.max_num_harmonics])
+    h_mag_dist = TensorShape([conf.batch_size, conf.harmonic_frame_steps, conf.max_num_harmonics])
+    h_freq_correction = TensorShape([conf.batch_size, conf.harmonic_frame_steps, conf.max_num_harmonics])
 
     _shapes = {}
 
     _shapes.update({
-        "name": tf.convert_to_tensor([b"a"] * conf.batch_size, dtype=tf.string),
-        "h_freq": tf.zeros(h_freq),
-        "h_mag": tf.zeros(h_mag),
-        "h_phase": tf.zeros(h_phase)
+        "mask": tf.zeros(mask),
+        "f0_shifts": tf.zeros(f0_shifts),
+        "mag_env": tf.zeros(mag_env),
+        "h_freq_shifts": tf.zeros(h_freq_shifts),
+        "h_mag_dist": tf.zeros(h_mag_dist),
+        "h_freq_correction": tf.zeros(h_freq_correction),
+        "instrument_id": tf.zeros([conf.batch_size, conf.num_instruments]),
+        "name": tf.convert_to_tensor([b"a"] * conf.batch_size, dtype=tf.string)
     })
 
-    if conf.use_instrument_id:
-        _shapes.update({"instrument_id": tf.zeros(instrument_id)})
     if conf.use_note_number:
         _shapes.update({"note_number": tf.zeros(note_number)})
     if conf.use_velocity:
@@ -87,14 +91,14 @@ class SoundGenerator:
         self._index_to_tax = dict((v, k) for k, v in self._tax_to_index.items())
 
         if self._checkpoint_path is None:
-            default_checkpoint_path = os.path.join(deployed_dir, "lc_2_87_0.00567.ckpt")
+            default_checkpoint_path = os.path.join(deployed_dir, "new_data_132_0.00961.ckpt")
             default_checkpoint_file_path = f"{default_checkpoint_path}.index"
             if not os.path.isfile(default_checkpoint_file_path) and auto_download:
                 download_path = os.path.join(deployed_dir, "model.zip")
 
                 if not os.path.isfile(download_path):
                     logger.info("Downloading default model checkpoint")
-                    download_url = "https://drive.google.com/uc?id=1UwoXTVNT3roh179GYvZQtLWvFCf5yK3o"
+                    download_url = "https://drive.google.com/uc?id=1Oe_GHDa6efwXuJUl5ZFP6tLZRV9q6Gea"
                     gdown.download(download_url, download_path, quiet=False)
                     logger.info("Model checkpoint downloaded")
 
