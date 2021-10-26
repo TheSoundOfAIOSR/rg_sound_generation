@@ -408,6 +408,147 @@ def create_fnet_decoder(inputs, conf: LocalConfig):
 
     return m
 
+class ResidualBlock(tf.keras.layers.Layer):
+    def __init__(self, residual_channels, dilation_channels, skip_channels,
+                 dilation_rate=1, kernel_size=2, padding='same',
+                 last_layer=False):
+        super().__init__()
+
+        self.last_layer = last_layer
+
+        self.filter = tf.keras.layers.Conv1D(
+            filters=dilation_channels,
+            kernel_size=kernel_size,
+            padding=padding,
+            dilation_rate=dilation_rate)
+
+        self.gate = tf.keras.layers.Conv1D(
+            filters=dilation_channels,
+            kernel_size=kernel_size,
+            padding=padding,
+            dilation_rate=dilation_rate)
+
+        self.filter_cond = tf.keras.layers.Conv1D(
+            filters=dilation_channels,
+            kernel_size=1,
+            padding=padding)
+
+        self.gate_cond = tf.keras.layers.Conv1D(
+            filters=dilation_channels,
+            kernel_size=1,
+            padding=padding)
+
+        self.skip = tf.keras.layers.Conv1D(
+            filters=skip_channels,
+            kernel_size=1,
+            padding=padding)
+
+        if not self.last_layer:
+            self.out = tf.keras.layers.Conv1D(
+                filters=residual_channels,
+                kernel_size=1,
+                padding=padding)
+
+    def call(self, inputs, cond):
+        f = self.filter(inputs)
+        g = self.gate(inputs)
+        fc = self.filter_cond(cond)
+        gc = self.gate_cond(cond)
+
+        x = tf.math.tanh(f + fc) * tf.math.sigmoid(g + gc)
+
+        s = self.skip(x)
+
+        if not self.last_layer:
+            x = self.out(x)
+            x = x + inputs
+        else:
+            x = inputs
+
+        return x, s
+
+
+class WaveNet(tf.keras.Model):
+    def __init__(self,
+                 layers=9,
+                 blocks=2,
+                 residual_channels=128,
+                 dilation_channels=128,
+                 skip_channels=128,
+                 kernel_size=2,
+                 padding='same'):  # 'same', 'causal'
+        super().__init__()
+
+        self.first_layer = tf.keras.layers.Conv1D(
+            filters=residual_channels,
+            kernel_size=1,
+            padding=padding)
+
+        self.receptive_field = 1
+        self.residual_blocks = []
+        for _ in range(blocks):
+            additional_scope = kernel_size - 1
+            for i in range(layers):
+                self.residual_blocks.append(
+                    ResidualBlock(residual_channels=residual_channels,
+                                  dilation_channels=dilation_channels,
+                                  skip_channels=skip_channels,
+                                  dilation_rate=2 ** i,
+                                  kernel_size=kernel_size,
+                                  padding=padding,
+                                  last_layer=(i == layers - 1)))
+
+                self.receptive_field += additional_scope
+                additional_scope *= 2
+
+        print(f"receptive_field: {self.receptive_field}")
+
+    def call(self, inputs, cond):
+        x = self.first_layer(inputs)
+        skips = []
+        for block in self.residual_blocks:
+            x, h = block(x, cond)
+            skips.append(h)
+
+        x = tf.stack(skips, axis=-1)
+        return x
+
+    def get_config(self):
+        pass
+
+
+def create_wavenet_decoder(inputs, conf: LocalConfig):
+    if conf is None:
+        conf = LocalConfig()
+
+    concat_inputs = []
+    for k, v in inputs.items():
+        concat_inputs += [v]
+
+    concat_inputs = tf.keras.layers.concatenate(concat_inputs)
+    x = tf.keras.layers.RepeatVector(1000)(concat_inputs)
+    x = tf.keras.layers.LocallyConnected1D(16, 1, 1)(x)
+
+    x = WaveNet(
+        layers=10,
+        blocks=2,
+        residual_channels=128,
+        dilation_channels=128,
+        skip_channels=128)(x, x)
+
+    x = tf.keras.layers.Reshape((1000, 128 * 20))(x)
+
+    outputs = {}
+
+    for k, v in conf.data_handler.outputs.items():
+        outputs[k] = tf.keras.layers.Dense(v["size"])(x)
+
+    m = tf.keras.models.Model(
+        inputs, outputs
+    )
+
+    return m
+
 
 class TCAEModel(tf.keras.Model):
     def __init__(self, conf: LocalConfig):
@@ -466,6 +607,8 @@ class TCAEModel(tf.keras.Model):
             self.decoder = create_mt_lc_decoder(decoder_inputs, conf)
         elif conf.create_decoder_function == 'fnet':
             self.decoder = create_fnet_decoder(decoder_inputs, conf)
+        elif conf.create_decoder_function == 'wavenet':
+            self.decoder = create_wavenet_decoder(decoder_inputs, conf)
         else:
             self.decoder = conf.create_decoder_function(decoder_inputs, conf)
 
