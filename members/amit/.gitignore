@@ -1,6 +1,0 @@
-checkpoints
-*.h5
-tmp
-logs
-plots
-*.png
