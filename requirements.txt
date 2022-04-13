@@ -8,4 +8,4 @@ tensorflow-probability==0.13.0
 tsms @ git+https://github.com/fabiodimarco/tf-spectral-modeling-synthesis.git@c090cf50916285500df0c96348dbfd8e01b73b9b
 loguru==0.5.3
 scipy==1.7.1
-gdown==3.13.0
+gdown>3.13.0
